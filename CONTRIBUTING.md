@@ -7,7 +7,7 @@ Thanks for your interest. Genie 5 is alpha-stage software with a small contribut
 - 🐛 [File a bug](https://github.com/GenieClient/Genie5/issues/new?template=bug_report.md)
 - 💡 [Request a feature](https://github.com/GenieClient/Genie5/issues/new?template=feature_request.md)
 - 🔒 [Report a security issue](SECURITY.md) — **please don't file these as public issues**
-- 💬 [Discuss in Discord](#) (link TBD)
+- 💬 [Discuss in Discord](https://discord.gg/MtmzE2w) — shared community server with Genie 4. Drop by for design questions before opening a big PR; it'll save us both review-cycle time.
 
 ## Building locally
 

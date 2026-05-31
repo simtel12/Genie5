@@ -1,5 +1,9 @@
 # Genie 5
 
+[![Discord](https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.gg/MtmzE2w)
+[![Releases](https://img.shields.io/github/v/release/GenieClient/Genie5?include_prereleases&label=latest%20release)](https://github.com/GenieClient/Genie5/releases)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
+
 **A cross-platform, modern successor to [Genie 4](https://github.com/GenieClient) — the long-running Windows client for [DragonRealms](https://www.play.net/dr), Simutronics' text-based MMO.**
 
 > ⚠️ **Alpha** — Genie 5 is in active development. The first public alpha targets feature parity with the most-used 80% of Genie 4 while running natively on Windows, macOS, and Linux. Expect rough edges. File issues; PRs welcome.
@@ -133,8 +137,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports, feature requests, and PRs a
 
 ## Community
 
-- **Discord** — [link TBD; coordinate with existing Genie / DR scripting channels]
-- **Issues** — [GitHub Issues](https://github.com/GenieClient/Genie5/issues)
+- **Discord** — [discord.gg/MtmzE2w](https://discord.gg/MtmzE2w) — the long-running Genie community server, shared with Genie 4. Drop in for alpha-tester chat, scripting help, mapper questions, or general DR conversation.
+- **Issues** — [GitHub Issues](https://github.com/GenieClient/Genie5/issues) for bug reports + feature requests
 - **Discussions** — [GitHub Discussions](https://github.com/GenieClient/Genie5/discussions) (TBD)
 
 ## Code signing policy

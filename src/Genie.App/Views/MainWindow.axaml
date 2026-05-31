@@ -277,6 +277,10 @@
         <MenuItem Header="Check for _Updates…"
                   Command="{Binding ShowUpdatesCommand}"
                   ToolTip.Tip="Open the Updates dialog — Core / Maps / Plugins, with per-source enable, check, and update."/>
+        <Separator/>
+        <MenuItem Header="Join _Discord"
+                  Command="{Binding OpenDiscordCommand}"
+                  ToolTip.Tip="Opens the Genie community Discord (shared with Genie 4) in your default browser. Drop in for alpha-tester chat, scripting help, mapper questions."/>
       </MenuItem>
     </Menu>
 

@@ -14,7 +14,9 @@ We aim to:
 - Provide an initial assessment within **7 business days**
 - Issue a fix or detailed timeline within **30 days** for confirmed high-severity issues
 
-If you don't hear back within those windows, feel free to follow up via DM on Discord (link TBD).
+If you don't hear back within those windows, feel free to follow up via DM on [Discord](https://discord.gg/MtmzE2w) (shared community server with Genie 4).
+
+**Non-sensitive bug reports** (crashes, missing features, weird parser output) don't need to come through this private channel — file them as [GitHub issues](https://github.com/GenieClient/Genie5/issues) or drop a note in Discord. This policy is specifically for vulnerabilities that could let someone harm another user — credential leaks, code execution, privilege escalation, that kind of thing.
 
 ## What counts as a security issue
 

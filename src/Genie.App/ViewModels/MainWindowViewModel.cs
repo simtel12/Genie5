@@ -111,6 +111,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     // ── Help menu (Updates) ─────────────────────────────────────────────────
     public ReactiveCommand<Unit, Unit>                    ShowUpdatesCommand       { get; }
     public Interaction<UpdatesDialogViewModel, Unit>      ShowUpdatesDialog        { get; } = new();
+
+    /// <summary>Opens the community Discord invite in the user's default browser.
+    /// Cross-platform via <c>UseShellExecute = true</c>; same pattern the parser
+    /// uses for <c>&lt;a href&gt;</c> links from the game stream.</summary>
+    public ReactiveCommand<Unit, Unit>                    OpenDiscordCommand       { get; }
     /// <summary>True when a background check found at least one enabled feed with an update available.
     /// Drives the Help-menu badge ("Help ●") so users see availability without opening the dialog.</summary>
     [Reactive] public bool                                UpdatesAvailable         { get; private set; }
@@ -626,6 +631,25 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             // Re-run a background check so the badge reflects post-dialog state
             // (a successful update during the session should clear the dot).
             _ = CheckForUpdatesInBackgroundAsync();
+        });
+
+        OpenDiscordCommand = ReactiveCommand.Create(() =>
+        {
+            // Hand off to the OS shell so the user's default browser opens the
+            // invite. UseShellExecute=true is required by .NET for URL strings;
+            // the runtime won't launch them as raw filenames. Same pattern the
+            // parser uses for in-game <a href> link clicks (see Highlighting.
+            // DefaultHighlights.OnUrlClicked below).
+            const string discordInvite = "https://discord.gg/MtmzE2w";
+            try
+            {
+                System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo(discordInvite) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                GameText.AddSystemLine($"[help] could not open Discord ({ex.Message}). Visit {discordInvite} manually.");
+            }
         });
 
         // Fire-and-forget startup check so the Help-menu badge surfaces
