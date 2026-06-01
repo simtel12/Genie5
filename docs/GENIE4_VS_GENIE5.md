@@ -9,10 +9,10 @@
 
 ## Executive Summary
 
-Genie 5 alpha lands at roughly **85% feature parity** with Genie 4 by surface area, but the missing 15% is intentionally split into three buckets:
-- Features deferred to **beta** that don't block initial value (~10%): Plugin host, Auto Log, Themes, Workspace presets, LAMP 2.0 updater, JavaScript scripts.
-- Features deferred to **v1.0+** as roadmap vision items (~3%): AI advisor, plugin marketplace, cloud sync.
-- Features intentionally **forbidden** by DR policy (~2%): auto-reconnect, agentive AI, auto-walk-while-away.
+Genie 5 alpha lands at a high level of feature parity with Genie 4 by surface area, and climbed further after the **plugin host** and the **in-app updater** (both originally deferred) shipped. The remaining gap is intentionally split into three buckets:
+- Features deferred to **beta** that don't block initial value: Auto Log, Themes, Workspace presets, JavaScript scripts.
+- Features deferred to **v1.0+** as roadmap vision items: AI advisor, plugin marketplace, cloud sync, plugin signing / trust.
+- Features intentionally **forbidden** by DR policy: auto-reconnect, agentive AI, auto-walk-while-away.
 
 **Genie 5 also adds ~10% of capability Genie 4 doesn't have**: cross-platform (Win/Mac/Linux), AES-GCM password encryption, per-character profile dirs, Session Recorder, tab-complete script names, Editor-of-choice integration, Genie 4 settings import dialog, modern XAML/MVVM architecture.
 
@@ -80,7 +80,7 @@ Genie 5 alpha lands at roughly **85% feature parity** with Genie 4 by surface ar
 | Classic Connect Window (toggle) | ✅ | n/a | 🚀 SHIP | We don't have a legacy dialog to fall back to |
 | Ignores/Gags Enabled (master toggle) | ✅ | ❌ | 🗓 BETA OK | Per-rule IsEnabled exists; no master switch |
 | Triggers Enabled (master toggle) | ✅ | ❌ | 🗓 BETA OK | Per-rule IsEnabled exists; no master switch |
-| Plugins Enabled (master toggle) | ✅ | n/a | 🗓 BETA OK | No plugin host yet |
+| Plugins Enabled (master toggle) | ✅ | ✅ per-plugin enable/disable (Plugins menu + `#plugin enable`/`disable`) | 🆕 | Toggled individually; no single master switch |
 | AutoMapper Enabled (master toggle) | ✅ | ❌ | 🗓 BETA OK | Mapper is always active; no master off-switch |
 | Images Enabled (toggle) | ✅ | ❌ | 🗓 BETA OK | `ShowImages` setting exists; no `<image>` rendering yet |
 | Mute Sounds (toggle) | ✅ | n/a | 🗓 BETA OK | No audio yet |
@@ -140,7 +140,7 @@ Genie 5 alpha lands at roughly **85% feature parity** with Genie 4 by surface ar
 |---|---|---|---|---|
 | **Entire menu** | ✅ Script menu | ❌ | 🗓 BETA OK | Genie 5 has command-bar `.script`, `#stop`, `#scripts`, plus Script Bar UI, plus `#edit`. Genie 4 Script menu provides muscle-memory entry points; functionality is present but discovery isn't |
 | Script Explorer... | ✅ tree browser | ❌ | 🗓 BETA OK | Scripts dir + Script Bar are the entry points today |
-| Update Scripts | ✅ LAMP | ❌ | 🗓 BETA OK | LAMP 2.0 backlog |
+| Update Scripts | ✅ LAMP | ❌ | 🗓 BETA OK | A `ScriptsUpdater` can ride the in-app updater framework (shares `GithubContentsSource`); not yet wired |
 | Show Active Scripts | ✅ | ✅ via Script Bar | 🆕 | Genie 5 always-visible; Genie 4 was on-demand |
 | Trace Active Scripts (debug toggle) | ✅ | partial | 🗓 BETA OK | Genie 5 has `dbg:10` script-level debug; no menu toggle |
 | Pause All / Resume All Scripts | ✅ | ❌ | 🗓 BETA OK | Genie 5 has Stop (#stop) and StopAll (#stopall); no pause/resume primitive |
@@ -158,13 +158,13 @@ Genie 5 alpha lands at roughly **85% feature parity** with Genie 4 by surface ar
 
 | Menu Item | Genie 4 | Genie 5 | Status | Notes |
 |---|---|---|---|---|
-| **Entire menu** | ✅ | ❌ | 🎯 v1.0+ | Plugin host not built. Roadmap "Modern Plugin Marketplace" |
+| **Entire menu** | ✅ | ✅ Plugins menu (Open Folder, Reload, Load ▶, Enable/Disable ▶, Unload ▶) + `#plugin` command | 🚀 SHIP | Marketplace still roadmap |
 
 ### Help menu
 
 | Menu Item | Genie 4 | Genie 5 | Status | Notes |
 |---|---|---|---|---|
-| Check For Updates / AutoUpdate / Force Update | ✅ | ❌ | 🗓 BETA OK | LAMP 2.0 |
+| Check For Updates / AutoUpdate / Force Update | ✅ | ✅ Help → Check for Updates (dialog + ● badge + startup background check) | 🚀 SHIP | In-app updater (Velopack); no silent auto-apply by policy |
 | Load Test Client | ✅ | n/a | 🗓 BETA OK | Could use GameCode picker on Connect dialog (already supports Test) |
 | Latest Release Page | ✅ | ❌ | **🔧 FIX BEFORE ALPHA** | Helpful for testers reporting; 10 min to add |
 | Discord / GitHub / Wiki / Play.net / Elanthipedia / Lich Discord links | ✅ | ❌ | **🔧 FIX BEFORE ALPHA** | Tester onboarding; ~30 min for a full Help menu |
@@ -177,7 +177,7 @@ Genie 5 alpha lands at roughly **85% feature parity** with Genie 4 by surface ar
 
 **Menu rollup:**
 - Critical missing: **Help menu** (links). ~30 min — should-add before alpha for tester orientation.
-- Defer to beta: Layout save/load, Plugins menu (depends on host), Script menu (functionality exists, discovery doesn't), Auto Log / Open Log In Editor, master toggles for engines.
+- Defer to beta: Script menu (functionality exists, discovery doesn't), Auto Log / Open Log In Editor, master toggles for engines.
 - Never: Auto Reconnect.
 
 ---
@@ -197,7 +197,7 @@ Genie 4 has 60+ config keys in `Lists/Config.cs`. Genie 5 has rough equivalents 
 | `prompt` | `> ` | `> ` | ✅ Match |
 | `mycommandchar` | `/` | `/` | ⚠️ Match in setting but Genie 5 doesn't use it for anything |
 | `spelltimer` | True | True | ✅ Match (Genie 5 cast bar shipped) |
-| `autoupdate` | False | False | ✅ Match (both default OFF; Genie 4 has LAMP, Genie 5 deferred) |
+| `autoupdate` | False | False | ✅ Match (both default OFF; Genie 5 now has the in-app updater — startup runs a background **check** only, never a silent auto-apply) |
 
 ### Shipped in Genie 5 with different default
 
@@ -233,9 +233,9 @@ These are small individual items, mostly UI-toggle wiring. Total estimated: 2-3 
 | `connectstring` | `FE:GENIE...` | Client-ID announcement string | ✅ shipped (engine-controlled) |
 | `servertimeout` + `servertimeoutcommand` | 180s / fatigue | Keep-alive verb on idle | 🗓 BETA OK |
 | `usertimeout` + `usertimeoutcommand` | 300s / quit | User-side idle disconnect verb | 🗓 BETA OK |
-| `requiresignedplugins` | False | Plugin signature verification | 🎯 v1.0+ (no plugin host) |
+| `requiresignedplugins` | False | Plugin signature verification | 🎯 v1.0+ (plugin host shipped; signing / trust is Phase 4) |
 | Per-data-dir overrides (`artdir`, `logdir`, `configdir`, `plugindir`, `mapdir`, `scriptdir`, `sounddir`) | local relative dirs | resolved via `LocalDirectoryService` | 🗓 BETA OK (overrides not exposed in UI) |
-| Repository URLs (`scriptrepo`, `maprepo`, `pluginrepo`, `artrepo`) | empty | empty | 🎯 v1.0+ (LAMP 2.0) |
+| Repository URLs (`scriptrepo`, `maprepo`, `pluginrepo`, `artrepo`) | empty | superseded by `update-feeds.json` | 🆕 maps + plugin feeds shipped; scripts / art not yet |
 | Lich integration (`rubypath`, `cmdpath`, `lichpath`, `licharguments`, `lichserver`, `lichport`, `lichstartpause`) | typical | n/a | 🗓 BETA OK (Genie 5 has LichProxy mode; no auto-launch yet) |
 
 ### Forbidden by DR policy
@@ -401,18 +401,17 @@ Both clients support a flexible dockable-panel layout, but the implementation te
 
 | Feature | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
-| Plugin host (.NET DLL plugin API) | ✅ `Core/PluginHost.cs` + `Core/LegacyPluginHost.cs` | ⚠️ scaffolding only (`Extensions/` interfaces) | 🎯 v1.0+ |
-| Plugin DLL loading | ✅ | ❌ | 🎯 v1.0+ |
-| Plugin signature verification | ✅ `requiresignedplugins` | ❌ | 🎯 v1.0+ |
-| Plugin manager UI | ✅ `Forms/FormPlugins.cs` | ❌ | 🎯 v1.0+ |
+| Plugin host (.NET DLL plugin API) | ✅ `Core/PluginHost.cs` + `Core/LegacyPluginHost.cs` | ✅ `Genie.Plugins.Abstractions` (`IGeniePlugin` / `IPluginHost` / `IGameStateView`) + `PluginManager` | 🚀 SHIP |
+| Plugin DLL loading | ✅ | ✅ collectible `AssemblyLoadContext` (`PluginLoadContext`); `DiscoverAndLoad` from `{AppData}/Genie5/Plugins/`; per-plugin load / unload / reload | 🚀 SHIP |
+| Plugin signature verification | ✅ `requiresignedplugins` | ❌ | 🎯 v1.0+ (Phase 4 — signing / trust hardening) |
+| Plugin manager UI | ✅ `Forms/FormPlugins.cs` | ⚠️ Plugins menu (load / unload / enable / disable / reload / open-folder) + `#plugin` command; no dedicated manager dialog | 🆕 |
 | Plugin marketplace | ❌ | 🎯 backlog "Modern Plugin Marketplace" | 🎯 v1.0+ |
-| Built-in extensions | ❌ | ⚠️ `ExpTrackerExtension`, `InfoTrackerExtension` | 🆕 (different model) |
+| First external plugin | ❌ | ✅ `Plugin_EXPTrackerV5` (separate repo `GenieClient/Plugin_EXPTrackerV5`) | 🆕 |
 
 **Plugin rollup:**
-- This is the largest single feature area absent from Genie 5.
-- The roadmap target is v1.0+ — a "Modern Plugin Marketplace" with one-click install, ratings, signed packages, sandboxing.
-- Built-in extensions (Genie 5 addition) are a stepping stone: same API surface that a plugin would use, but in-process.
-- **Alpha-acceptable**: Genie 5 ships without plugin host. ALPHA-README already calls this out: "No plugin host (Genie 4 plugin DLLs won't load)."
+- Plugin host **shipped**: a UI-free contract (`Genie.Plugins.Abstractions`), a collectible-ALC DLL loader, a Plugins menu + `#plugin` command, and the first external plugin (`Plugin_EXPTrackerV5`). The earlier in-process `ExpTrackerExtension` stepping-stone was removed once the external plugin replaced it.
+- Still roadmap (v1.0+): a "Modern Plugin Marketplace" with one-click install, ratings, and signed packages, plus the Phase 4 signing / trust model + API-surface lint.
+- Genie 4 plugin DLLs still won't load unmodified (WinForms / Windows-only); they need a recompile against `Genie.Plugins.Abstractions`. The interface shape is kept familiar to ease porting.
 
 ---
 
@@ -467,21 +466,23 @@ Both clients support a flexible dockable-panel layout, but the implementation te
 
 ---
 
-## 9. Updater (LAMP)
+## 9. Updater (in-app)
+
+> The planned standalone **LAMP 2.0** updater was **canceled** and replaced by an integrated, in-app updater: Velopack for the Core app, plus a GitHub-feed framework for Maps and Plugins.
 
 | Feature | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
-| LAMP auto-updater | ✅ separate `Lamp.exe` | ❌ | 🎯 v1.0+ |
-| Check For Updates menu | ✅ | ❌ | 🎯 v1.0+ |
-| Auto-update on startup | ✅ | ❌ | 🎯 v1.0+ |
-| Update plugins / maps / scripts independently | ✅ | ⚠️ only maps (File menu) | 🆕 (partial — maps repo updater shipped) |
-| Update channels (stable/beta/nightly) | ❌ | 🎯 backlog | 🎯 v1.0+ |
-| Auto-update LAMP itself | ✅ `autoupdatelamp` | ❌ | 🎯 v1.0+ |
+| Auto-updater | ✅ separate `Lamp.exe` | ✅ in-app (Velopack `UpdateManager`), no separate exe | 🆕 |
+| Check For Updates menu | ✅ | ✅ Help → Check for Updates (Core / Maps / Plugins tabs) + Help-menu ● badge | 🚀 SHIP |
+| Auto-update on startup | ✅ | ⚠️ background **check** + badge on startup; no silent auto-apply (policy choice) | 🆕 |
+| Update plugins / maps / scripts independently | ✅ | ⚠️ maps + plugins shipped (Updates dialog tabs); scripts not yet | 🆕 (partial) |
+| Update channels (stable/beta/nightly) | ❌ | ✅ stable + beta (no nightly) | 🆕 |
+| Core app self-update | ✅ `autoupdatelamp` | ⚠️ Velopack replaces the app in place; applies only from a Velopack-built install (Windows) — macOS / Linux packaging on the roadmap | 🆕 |
 
 **Updater rollup:**
-- This is the second-largest feature area absent. LAMP 2.0 is the canonical roadmap item.
-- Alpha-acceptable workaround: testers download a new zip when we ship updates. Painful but fine for select-few alpha.
-- ALPHA-README explicitly calls this out: "No auto-update (LAMP 2.0 is on the roadmap)."
+- The integrated updater **shipped**, superseding the canceled LAMP 2.0 concept: `CoreAppUpdater` (Velopack), `MapsUpdater` + `PluginUpdater` over pluggable `IFileListSource` / `IReleaseSource` GitHub sources, a three-tab Updates dialog, and a startup background check that drives the Help-menu badge.
+- Remaining: macOS / Linux Core packaging targets (a `.app` / AppImage) + a per-platform `IReleaseSource`; an optional `ScriptsUpdater`; signed-installer + signed-manifest hardening (Phase 4).
+- The Core *self-update* applies only when launched from a Velopack-built install; from `dotnet run` / a raw publish it shows a friendly "dev build" message (Check still works).
 
 ---
 
@@ -679,8 +680,8 @@ These are documented gaps that testers will encounter and report on, which is fi
 
 ### Defer to v1.0+ (vision items)
 
-- Plugin host + marketplace
-- LAMP 2.0 updater
+- Plugin marketplace (plugin host has since shipped)
+- Updater: macOS / Linux Core packaging + a Scripts updater (the in-app updater itself has shipped)
 - JavaScript `.js` script support (Jint)
 - AI advisor mode (with compliance gating)
 - Cloud sync / cross-device profiles
@@ -702,7 +703,7 @@ These are documented gaps that testers will encounter and report on, which is fi
 
 ## Closing notes
 
-**Genie 5 is ready to ship to select-few alpha testers** once the 6 items in the Alpha-Blocker Decision Matrix are addressed (or explicitly accepted as gaps in ALPHA-README). The largest gap by feature surface is the absent plugin host — this is intentional and on the v1.0+ roadmap.
+**Genie 5 is ready to ship to select-few alpha testers** once the 6 items in the Alpha-Blocker Decision Matrix are addressed (or explicitly accepted as gaps in ALPHA-README). The plugin host and in-app updater have since shipped; the largest remaining v1.0+ items are the plugin marketplace, plugin signing / trust, and the AI advisor.
 
 **The most consequential gap is AutoMapper auto-walk** (pre-publish checklist v1 blocker). Recommended path: ship the alpha with click-to-goto only, document the gap clearly in ALPHA-README, gather tester feedback on which auto-walk approach (engine vs script) they'd prefer.
 
