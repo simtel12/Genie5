@@ -135,7 +135,7 @@ public sealed class ScriptGlobalsSync : IDisposable
             case RoundTimeEvent rt:    Set("roundtime", SecondsRemaining(rt.ExpiresAt)); break;
             case CastTimeEvent ct:     Set("casttime",  SecondsRemaining(ct.ExpiresAt)); break;
             case SpellEvent sp:        Set("preparedspell", sp.SpellName ?? string.Empty); break;
-            case PromptEvent:          /* $prompt is updated via component "prompt" if any; ignore */ break;
+            case PromptEvent p:        Set("prompt", p.Indicator);                            break;
         }
     }
 

@@ -49,8 +49,27 @@ public sealed class DrXmlParser : IDisposable
     private bool _inSpell     = false;
     private bool _inHand      = false;   // <left>…</left> / <right>…</right> body — discard
     private bool _inCompass   = false;
+    private bool _inPrompt    = false;   // <prompt>…</prompt> body — route to _promptBuffer, fire on close
     private string _currentPresetId = "";
     private readonly System.Text.StringBuilder _compassBuffer = new();
+
+    // ── Prompt indicator capture ────────────────────────────────────────────
+    // The text BETWEEN <prompt time='…'> and </prompt> is the indicator chars
+    // (">", "R>", "HR>", etc.). We collect it into a side buffer so it doesn't
+    // pollute _textLineBuffer, and fire the PromptEvent on close — that way
+    // we have both the server timestamp from the open and the indicator
+    // string from the body in a single emission.
+    private readonly System.Text.StringBuilder _promptBuffer = new();
+    private DateTimeOffset _pendingPromptTime = DateTimeOffset.MinValue;
+
+    // Genie 4 renders every prompt the server sends so the user can see when
+    // they're in roundtime, hidden, stunned, etc. DR sends a prompt at the
+    // end of EVERY server batch though, so a literal "emit on every prompt"
+    // policy floods the game window with ">" lines. Compromise: emit a
+    // TextEvent only when the indicator string actually changes from the
+    // last one we emitted. This surfaces every state transition (> → R>,
+    // R> → >, > → H>, etc.) without spamming the steady state.
+    private string _lastEmittedPromptText = "";
 
     // ── Text line accumulation ───────────────────────────────────────────────
     // EmitChunks (GameConnection) splits at every '>' boundary, so inline
@@ -165,6 +184,7 @@ public sealed class DrXmlParser : IDisposable
         if (_inSpell)     { _componentBuffer.Append(text); return; }
         if (_inHand)      { _componentBuffer.Append(text); return; } // content discarded on </left>/</right>
         if (_inCompass)   { _compassBuffer.Append(text);   return; }
+        if (_inPrompt)    { _promptBuffer.Append(text);    return; } // indicator chars, emitted on </prompt>
 
         _textLineBuffer.Append(text);
 
@@ -223,9 +243,23 @@ public sealed class DrXmlParser : IDisposable
         // Bare-text prompt line (">", "H>", "HR>"). Trim leading whitespace
         // for prompt detection only — the regex anchors on '^' so accidental
         // leading spaces from XML tag splits would miss the match.
-        if (_promptRe.IsMatch(stripped.TrimStart()))
+        var promptCandidate = stripped.TrimStart();
+        if (_promptRe.IsMatch(promptCandidate))
         {
-            _events.OnNext(new PromptEvent(DateTimeOffset.MinValue));
+            // Wizard plain-text mode: this line IS the indicator. StormFront
+            // mode prompts arrive as <prompt>…</prompt> XML and never reach here.
+            _events.OnNext(new PromptEvent(DateTimeOffset.MinValue, promptCandidate));
+
+            // Surface in the game window on state change only — same policy
+            // as the XML branch. In WIZ mode the bare-text line was previously
+            // suppressed entirely (early return before the TextEvent below);
+            // with state-change gating we now show transitions to the user
+            // without flooding on every steady-state ">".
+            if (promptCandidate != _lastEmittedPromptText)
+            {
+                _events.OnNext(new TextEvent(_activeStream, promptCandidate, null, null));
+                _lastEmittedPromptText = promptCandidate;
+            }
             return;
         }
 
@@ -497,11 +531,17 @@ public sealed class DrXmlParser : IDisposable
             }
 
             // ── Prompt / timestamp ───────────────────────────────────────
+            // Open tag — capture the server timestamp and start routing the
+            // inner text (the indicator chars: ">", "R>", "HR>", …) into
+            // _promptBuffer. We fire PromptEvent on the CLOSE tag so the
+            // event carries both the timestamp and the indicator together.
             case "prompt":
             {
                 FlushTextLine(); // flush any partial line before the prompt marker
                 var ts = long.TryParse(r["time"], out var t) ? t : 0L;
-                _events.OnNext(new PromptEvent(DateTimeOffset.FromUnixTimeSeconds(ts)));
+                _pendingPromptTime = DateTimeOffset.FromUnixTimeSeconds(ts);
+                _promptBuffer.Clear();
+                _inPrompt = true;
                 break;
             }
 
@@ -798,8 +838,38 @@ public sealed class DrXmlParser : IDisposable
                 break;
 
             case "prompt":
-                // The open <prompt time="…"> already fired PromptEvent with the real timestamp.
-                // The element content is just the visual '&gt;' indicator — discard it.
+                // Close tag — emit the PromptEvent with the timestamp captured
+                // at open + the indicator string accumulated from the body.
+                // The raw body may contain encoded entities (e.g. "&gt;" → ">");
+                // _promptBuffer holds the post-decode text since AccumulateText
+                // routes already-decoded chunks here.
+                if (_inPrompt)
+                {
+                    // HTML-decode: DR sends ">" as the entity "&gt;" inside
+                    // the <prompt> body. The normal text path runs every
+                    // line through HtmlDecode in EmitLine; the prompt path
+                    // bypasses EmitLine (we route to _promptBuffer instead
+                    // of _textLineBuffer) so we must decode here ourselves.
+                    // Without this the renderer shows literal "R&gt;" / "&gt;".
+                    var indicator = System.Net.WebUtility
+                        .HtmlDecode(_promptBuffer.ToString()).Trim();
+                    _events.OnNext(new PromptEvent(_pendingPromptTime, indicator));
+
+                    // Surface the indicator in the game window on state change
+                    // only — see _lastEmittedPromptText for rationale.
+                    if (indicator.Length > 0 && indicator != _lastEmittedPromptText)
+                    {
+                        _events.OnNext(new TextEvent(_activeStream, indicator, null, null));
+                        _lastEmittedPromptText = indicator;
+                    }
+
+                    _promptBuffer.Clear();
+                    _inPrompt = false;
+                }
+                // Defensive: a malformed stream missing the open could leave
+                // partial text in _textLineBuffer; clearing here matches the
+                // pre-change behavior so a corrupt prompt doesn't leak into
+                // the next line.
                 _textLineBuffer.Clear();
                 break;
 

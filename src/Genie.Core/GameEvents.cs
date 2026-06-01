@@ -145,8 +145,32 @@ public sealed record ClearStreamEvent(string StreamId) : GameEvent;
 
 // ── Prompt ───────────────────────────────────────────────────────────────────
 
-/// <summary>Server-side prompt — marks end of a server output batch. Carries server time.</summary>
-public sealed record PromptEvent(DateTimeOffset ServerTime) : GameEvent;
+/// <summary>
+/// Server-side prompt — marks end of a server output batch.
+///
+/// <para>
+/// <b>ServerTime</b> is the Unix-epoch timestamp from the &lt;prompt time='…'/&gt;
+/// open tag. For bare-text prompts in Wizard mode (no XML) this is
+/// <see cref="DateTimeOffset.MinValue"/>.
+/// </para>
+///
+/// <para>
+/// <b>Indicator</b> is the raw prompt string the server sent — typically one of:
+/// <list type="bullet">
+///   <item><c>&gt;</c> — ready, no special state</item>
+///   <item><c>R&gt;</c> — in roundtime</item>
+///   <item><c>H&gt;</c> — hidden / stalking</item>
+///   <item><c>HR&gt;</c> — hidden + roundtime</item>
+///   <item><c>S&gt;</c> — stunned</item>
+///   <item><c>D&gt;</c> — dead</item>
+/// </list>
+/// In Wizard plain-text mode this is the only authoritative source of these
+/// status flags — the separate &lt;indicator&gt; / &lt;roundTime&gt; tags only
+/// appear in StormFront/Wrayth XML. Genie 4 scripts read this as the
+/// <c>$prompt</c> variable.
+/// </para>
+/// </summary>
+public sealed record PromptEvent(DateTimeOffset ServerTime, string Indicator = "") : GameEvent;
 
 // ── Output styling ───────────────────────────────────────────────────────────
 
