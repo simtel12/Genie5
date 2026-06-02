@@ -109,4 +109,23 @@ public interface ICommandHost
     /// build with no handler echoes a diagnostic.
     /// </summary>
     void PluginCommand(string args);
+
+    /// <summary>
+    /// Run a <c>#config</c> command — the raw argument string after
+    /// <c>#config </c>.
+    /// <list type="bullet">
+    ///   <item>(empty) — open the Configuration dialog.</item>
+    ///   <item><c>save</c> — flush DisplaySettings to <c>display.json</c>.</item>
+    ///   <item><c>load</c> — reload DisplaySettings from <c>display.json</c>.</item>
+    ///   <item><c>edit</c> — shell-open <c>display.json</c> in the user's editor.</item>
+    ///   <item><c>&lt;key&gt;</c> / <c>&lt;key&gt; &lt;value&gt;</c> —
+    ///         get / set a specific setting (Genie 4 parity placeholder; for
+    ///         now echoes a "use the dialog" hint).</item>
+    /// </list>
+    /// Aliases accepted at the command-bar layer: <c>#set</c>, <c>#setting</c>,
+    /// <c>#settings</c>. Settings storage + the Configuration dialog live in
+    /// the App layer, so <see cref="Genie.Core"/> forwards the args to a host
+    /// handler; the Console build with no handler echoes a diagnostic.
+    /// </summary>
+    void ConfigCommand(string args);
 }

@@ -223,6 +223,17 @@ public sealed class CommandEngine
                 // the plugin loader + Plugins folder.
                 _host.PluginCommand(string.Join(" ", parts.Skip(1)));
                 break;
+            case "config":
+            case "set":
+            case "setting":
+            case "settings":
+                // #config / #set / #setting / #settings — Genie 4 parity for
+                // the Configuration dialog + settings.cfg ops. Forwarded whole
+                // (minus the verb) so the App layer can dispatch save / load /
+                // edit / get-key / set-key, or open the Configuration dialog
+                // for the bare-verb form.
+                _host.ConfigCommand(string.Join(" ", parts.Skip(1)));
+                break;
             case "class":
             case "classes":
                 HandleClass(parts);

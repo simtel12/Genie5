@@ -1808,6 +1808,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _core.PluginCommandRequested  += args =>
             Avalonia.Threading.Dispatcher.UIThread.Post(() => HandlePluginCommand(args));
 
+        // #config / #set / #setting / #settings — open Configuration dialog,
+        // or save / load / edit display.json. UI-thread-bound because the
+        // dialog handler executes via ReactiveCommand.
+        _core.ConfigCommandRequested  += args =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => HandleConfigCommand(args));
+
         // Mapper Edit-Exit requests — user right-clicks a map node, picks
         // "Edit Exit ▶ {verb}". MapperViewModel raises the event, we open
         // the dialog, and on save we ask the mapper to persist the zone.
@@ -2009,6 +2015,129 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
         foreach (var name in _globalLayouts.List())
             SavedLayouts.Add(new LayoutMenuItem($"{name} (Global)", name, LayoutScope.Global, LoadLayoutCommand));
+    }
+
+    // ── #config command bar handler ─────────────────────────────────────────
+    //
+    //   #config                         → open Configuration dialog
+    //   #config save                    → flush DisplaySettings to display.json
+    //   #config load                    → reload DisplaySettings from display.json
+    //   #config edit                    → open display.json in user's editor
+    //   #config <key>                   → echo current value (placeholder)
+    //   #config <key> <value>           → set value (placeholder)
+    //
+    // Genie 4 parity for the four sub-forms (settings.cfg → display.json in
+    // Genie 5). Key/value get-set is a placeholder for now — the Configuration
+    // dialog covers the realistic editing path; a script-level setting API
+    // can land later when needed.
+    //
+    // Aliases #set / #setting / #settings route here too via CommandEngine.
+    private void HandleConfigCommand(string args)
+    {
+        var trimmed = (args ?? string.Empty).Trim();
+
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            // Bare #config → open the Configuration dialog (the same one as
+            // Edit → Configuration… in the menu). ReactiveCommand handles
+            // the modal lifecycle.
+            ConfigurationCommand.Execute().Subscribe(
+                _   => { },
+                ex  => Diagnostics.ErrorLog.Log("ConfigCommand.OpenDialog", ex));
+            return;
+        }
+
+        var split = trimmed.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        var sub   = split[0].ToLowerInvariant();
+        var rest  = split.Length > 1 ? split[1].Trim() : string.Empty;
+
+        switch (sub)
+        {
+            case "save":
+                // Most settings auto-save on change (each menu command calls
+                // Display.Save). #config save is the explicit form for users
+                // muscle-memoried from Genie 4. Safe to call repeatedly.
+                Display.Save(_displayPath);
+                GameText.AddSystemLine($"[config] Settings saved → {_displayPath}");
+                break;
+
+            case "load":
+                // Replace in-place would require swapping the reactive
+                // instance everywhere, which is invasive. Echo a clear next
+                // step instead: the persisted file is what the next launch
+                // reads, and the dialog is the right surface to live-edit.
+                GameText.AddSystemLine(
+                    "[config] Display settings live-reload not supported. Restart Genie to pick up external edits to display.json.");
+                break;
+
+            case "edit":
+            {
+                // Open display.json in a text editor. Fallback ladder, in order:
+                //   1. Display.EditorPath if the user has explicitly set one
+                //      (set via Configuration → Display Settings → Editor Path).
+                //   2. Notepad on Windows — always present, opens .json as
+                //      text. Skips the "Choose an app for .json" OS picker
+                //      that UseShellExecute=true would otherwise trigger.
+                //   3. macOS / Linux — try `open` / `xdg-open` with the file;
+                //      these usually route to TextEdit / the user's default
+                //      text app, not a generic file-association picker.
+                //   4. Last-resort UseShellExecute=true — only if the OS-
+                //      specific helpers above aren't available.
+                try
+                {
+                    var path = _displayPath;
+                    if (!System.IO.File.Exists(path))
+                        Display.Save(path);  // first-write — make sure there's a file to open
+
+                    var editor = Display.EditorPath;
+                    if (!string.IsNullOrWhiteSpace(editor) && System.IO.File.Exists(editor))
+                    {
+                        System.Diagnostics.Process.Start(
+                            new System.Diagnostics.ProcessStartInfo(editor, "\"" + path + "\"")
+                            { UseShellExecute = false });
+                    }
+                    else if (OperatingSystem.IsWindows())
+                    {
+                        // Notepad is always available on Windows and opens
+                        // .json files as text without the file-association
+                        // chooser dialog.
+                        System.Diagnostics.Process.Start("notepad.exe", "\"" + path + "\"");
+                    }
+                    else if (OperatingSystem.IsMacOS())
+                    {
+                        System.Diagnostics.Process.Start("open", "-t \"" + path + "\"");
+                    }
+                    else if (OperatingSystem.IsLinux())
+                    {
+                        System.Diagnostics.Process.Start("xdg-open", "\"" + path + "\"");
+                    }
+                    else
+                    {
+                        System.Diagnostics.Process.Start(
+                            new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+                    }
+                    GameText.AddSystemLine($"[config] Opened {_displayPath}");
+                    GameText.AddSystemLine(
+                        "[config] To use a different editor, set Edit → Configuration → Display Settings → Editor Path.");
+                }
+                catch (Exception ex)
+                {
+                    GameText.AddSystemLine($"[config] Could not open editor: {ex.Message}");
+                    Diagnostics.ErrorLog.Log("ConfigCommand.Edit", ex);
+                }
+                break;
+            }
+
+            default:
+                // Genie 4's #config <key> [value] uses the settings.cfg
+                // dictionary schema; ours lives on the strongly-typed
+                // DisplaySettings record. Until/unless there's demand for
+                // a script-level reflection-based getter/setter, point the
+                // user at the dialog.
+                GameText.AddSystemLine(
+                    $"[config] '#config {sub}' — script-level get/set not wired yet. Use #config (no args) to open the Configuration dialog.");
+                break;
+        }
     }
 
     // ── #layout command bar handler ─────────────────────────────────────────

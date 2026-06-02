@@ -556,6 +556,21 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// load/unload/reload against <see cref="Plugins"/> and the Plugins folder.</summary>
     public event Action<string>? PluginCommandRequested;
 
+    void ICommandHost.ConfigCommand(string args)
+    {
+        if (ConfigCommandRequested is null)
+            EchoLine?.Invoke("[config] no config host wired (Console build).");
+        else
+            ConfigCommandRequested.Invoke(args);
+    }
+
+    /// <summary>
+    /// Raised by <c>#config</c> / <c>#set</c> / <c>#setting</c> / <c>#settings</c>.
+    /// The App handles the bare-form (open Configuration dialog) and the
+    /// save / load / edit / get / set subforms against <c>DisplaySettings</c>.
+    /// </summary>
+    public event Action<string>? ConfigCommandRequested;
+
     // ── IPluginHost (explicit — avoids name clashes with ICommandHost.Echo,
     //    the public State (GameState) and Variables (VariableEngine)) ──────────
 
