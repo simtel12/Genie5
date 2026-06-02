@@ -25,12 +25,82 @@ public class GenieDockFactory : Factory
         new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
+    /// How to recreate a structural ToolDock if it was pruned. Dock.Avalonia
+    /// collapses (removes) an empty ToolDock when its last child is closed via
+    /// the tab X — after which <see cref="SetToolVisibility"/> can no longer
+    /// find the parent to re-open the tool into. This records each home dock's
+    /// grandparent + placement so we can rebuild it in its original spot.
+    /// Grandparents (left-col / center-col / root-layout) are IsCollapsable=false
+    /// and therefore always present, so a single level of rebuild is enough.
+    /// </summary>
+    private readonly record struct DockHome(
+        string GrandparentId, Alignment Alignment, double Proportion, bool AtFront);
+
+    private readonly Dictionary<string, DockHome> _dockHomes =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// The root returned by <see cref="CreateLayout"/>. Stored so we can walk
     /// the whole layout tree (including floating windows) when answering
     /// visibility queries — reference-equality on stored Dockable instances is
     /// unreliable because Dock.Avalonia may reinstantiate during layout init.
     /// </summary>
     private IRootDock? _root;
+
+    /// <summary>
+    /// "Last known location" for every registered tool. Captures enough
+    /// state to fully reconstruct the tool's home, even when its parent
+    /// ToolDock was pruned by Dock.Avalonia after the panel was closed:
+    ///
+    /// <list type="bullet">
+    ///   <item><c>ParentId</c> — the parent dock the tool lived in.</item>
+    ///   <item><c>Index</c> — position within that parent's
+    ///         <c>VisibleDockables</c>.</item>
+    ///   <item><c>GrandparentId</c> — the parent's parent dock; needed when
+    ///         the parent itself was pruned and must be rebuilt.</item>
+    ///   <item><c>ParentAlignment</c> + <c>ParentProportion</c> — enough to
+    ///         re-instantiate the pruned ToolDock with the right placement.
+    ///         Null when the parent isn't an IToolDock.</item>
+    ///   <item><c>IndexInGrandparent</c> — where to splice the rebuilt
+    ///         parent back into the grandparent's children.</item>
+    /// </list>
+    /// </summary>
+    private readonly record struct LastKnownLocation(
+        string         ParentId,
+        int            Index,
+        string?        GrandparentId,
+        Alignment?     ParentAlignment,
+        double         ParentProportion,
+        int            IndexInGrandparent,
+        string?        AnchorSiblingId,        // a non-splitter sibling of the parent
+                                               // dock — used as a survivor anchor
+                                               // when the grandparent itself gets
+                                               // collapsed by Dock.Avalonia
+        Orientation?   GrandparentOrientation); // the orientation the dissolved
+                                                // grandparent had (Vertical for
+                                                // center-col) — used by the
+                                                // wrap-restore path to recreate
+                                                // it around the anchor at the
+                                                // right axis
+
+    /// <summary>
+    /// "Last known location" for every registered tool. Used by
+    /// <see cref="SetToolVisibility"/> as the preferred restore target — gives
+    /// users back EXACTLY where they had the panel before close, including
+    /// custom positions from drag-redocking.
+    ///
+    /// <para>Populated three ways:</para>
+    /// <list type="number">
+    ///   <item>On every layout build (default + snapshot) via
+    ///         <see cref="CaptureAllPositions"/>.</item>
+    ///   <item>Just before a menu-driven close in
+    ///         <see cref="SetToolVisibility"/>'s hide branch.</item>
+    ///   <item>On every <c>DockableAdded</c> event so a re-shown tool's
+    ///         new position immediately replaces its stale entry.</item>
+    /// </list>
+    /// </summary>
+    private readonly Dictionary<string, LastKnownLocation> _lastKnownPositions =
+        new(StringComparer.OrdinalIgnoreCase);
 
     // ── Plugin-created windows ───────────────────────────────────────────────
     // Plugins surface their own panels by writing to a named window
@@ -62,6 +132,7 @@ public class GenieDockFactory : Factory
     public GenieDockFactory(MainWindowViewModel vm)
     {
         _vm = vm;
+        WireLastKnownPositionTracking();
     }
 
     public override IRootDock CreateLayout()
@@ -235,6 +306,17 @@ public class GenieDockFactory : Factory
         // beside the Backpack via Window → Experience. The plugin fills it.
         _tools[experience.Id] = (experience, backpackDock.Id);
 
+        // ── Home-dock recreation map ─────────────────────────────────────
+        // Mirrors the proportions/alignments set on the ToolDocks above so a
+        // home dock that Dock pruned on close can be rebuilt where it lived.
+        // Values MUST match the dock definitions above. (The Game DocumentDock
+        // is IsCollapsable=false, so it never needs rebuilding.)
+        _dockHomes.Clear();
+        _dockHomes[roomDock.Id]     = new(leftCol.Id,    Alignment.Left,   0.35, AtFront: true);
+        _dockHomes[streamDock.Id]   = new(leftCol.Id,    Alignment.Bottom, 0.65, AtFront: false);
+        _dockHomes[mapperDock.Id]   = new(centerCol.Id,  Alignment.Bottom, 0.40, AtFront: false);
+        _dockHomes[backpackDock.Id] = new(rootLayout.Id, Alignment.Right,  0.22, AtFront: false);
+
         // Re-register any plugin windows created earlier this session so their
         // Window-menu toggles still resolve after a default-layout rebuild
         // (Reset / legacy load). They're registered (not force-shown) — the user
@@ -333,6 +415,10 @@ public class GenieDockFactory : Factory
         _root                 = root;
 
         InitLayout(root);
+        // Re-prime the "last-known position" cache against the snapshot's
+        // structure — _dockHomes may not match a saved layout's grandparent
+        // ids, but _lastKnownPositions just records whatever ended up where.
+        CaptureAllPositions();
         return root;
     }
 
@@ -348,6 +434,7 @@ public class GenieDockFactory : Factory
     {
         var root = CreateLayout();
         InitLayout(root);
+        CaptureAllPositions();
         return root;
     }
 
@@ -455,19 +542,301 @@ public class GenieDockFactory : Factory
 
         if (visible)
         {
+            if (_root is null) return;
+
+            // Stage 0: last-known-location. If the user dragged this panel
+            // somewhere custom and then closed it, restore it to exactly
+            // that spot — better UX than always going back to the default
+            // home. _lastKnownPositions is populated continuously (initial
+            // layout build, every DockableAdded, and just before close).
+            if (_lastKnownPositions.TryGetValue(id, out var lastPos))
+            {
+                // Stage 0a: parent dock still in the tree — simplest restore.
+                if (FindByIdInTree(_root, lastPos.ParentId) is IDock lastParent)
+                {
+                    InitDockable(dockable, lastParent);
+                    var count = lastParent.VisibleDockables?.Count ?? 0;
+                    if (lastPos.Index >= 0 && lastPos.Index <= count)
+                        InsertDockable(lastParent, dockable, lastPos.Index);
+                    else
+                        AddDockable(lastParent, dockable);
+                    SetActiveDockable(dockable);
+                    return;
+                }
+
+                // Stage 0b: parent got pruned (the single-child ToolDock
+                // collapsed when its last tool was closed), but the
+                // grandparent is still around — rebuild the parent in its
+                // recorded position. This is what the user's "previously
+                // closed location" requirement needs: when Mapper was alone
+                // in mapper-dock and got closed, mapper-dock vanished;
+                // recreating it inside center-col with the captured
+                // alignment + proportion brings Mapper back to its real
+                // home.
+                if (!string.IsNullOrEmpty(lastPos.GrandparentId)
+                    && lastPos.ParentAlignment.HasValue
+                    && FindByIdInTree(_root, lastPos.GrandparentId) is IDock grand)
+                {
+                    var rebuiltParent = new ToolDock
+                    {
+                        Id               = lastPos.ParentId,
+                        Alignment        = lastPos.ParentAlignment.Value,
+                        Proportion       = lastPos.ParentProportion,
+                        VisibleDockables = CreateList<IDockable>(),
+                    };
+                    InitDockable(rebuiltParent, grand);
+                    var grandCount = grand.VisibleDockables?.Count ?? 0;
+                    if (lastPos.IndexInGrandparent >= 0 && lastPos.IndexInGrandparent <= grandCount)
+                        InsertDockable(grand, rebuiltParent, lastPos.IndexInGrandparent);
+                    else
+                        AddDockable(grand, rebuiltParent);
+
+                    InitDockable(dockable, rebuiltParent);
+                    AddDockable(rebuiltParent, dockable);
+                    SetActiveDockable(dockable);
+                    return;
+                }
+
+                // Stage 0c/0d: grandparent ALSO got dissolved (the classic
+                // Dock.Avalonia "single-non-splitter-child → unwrap" trap).
+                // Look for an anchor sibling — a dock that used to share
+                // the grandparent with our parent. The anchor survived the
+                // unwrap; we use it as a coordinate to find where the
+                // grandparent USED to be in the tree, then either:
+                //   • 0d (wrap-restore): if the anchor's current parent
+                //     has a DIFFERENT orientation than the dissolved
+                //     grandparent (e.g. the dissolved center-col was
+                //     Vertical, but the anchor now lives in the
+                //     Horizontal root-layout), rebuild the missing
+                //     grandparent ProportionalDock and move the anchor
+                //     into it together with the new ToolDock. Result:
+                //     original "Game on top, Mapper below" stacking is
+                //     restored.
+                //   • 0c (sibling-splice): if orientations match (or we
+                //     have no orientation info), just splice the rebuilt
+                //     ToolDock as a sibling of the anchor.
+                if (!string.IsNullOrEmpty(lastPos.AnchorSiblingId)
+                    && lastPos.ParentAlignment.HasValue
+                    && FindByIdInTree(_root, lastPos.AnchorSiblingId) is IDockable anchor
+                    && FindParentInTree(_root, anchor) is IDock anchorParent)
+                {
+                    var rebuiltParent = new ToolDock
+                    {
+                        Id               = lastPos.ParentId,
+                        Alignment        = lastPos.ParentAlignment.Value,
+                        Proportion       = lastPos.ParentProportion,
+                        VisibleDockables = CreateList<IDockable>(),
+                    };
+                    InitDockable(rebuiltParent, anchorParent);
+
+                    var anchorIdx = anchorParent.VisibleDockables?.IndexOf(anchor) ?? -1;
+
+                    // Stage 0d: orientation-aware wrap-restore. If the
+                    // anchor's current parent is a ProportionalDock with a
+                    // different orientation than our captured grandparent
+                    // (e.g. anchor moved Vertical→Horizontal during the
+                    // unwrap), we wrap the anchor in a fresh
+                    // ProportionalDock of the original orientation so the
+                    // restored stacking matches what the user had.
+                    if (lastPos.GrandparentOrientation.HasValue
+                        && anchorParent is ProportionalDock anchorProp
+                        && anchorProp.Orientation != lastPos.GrandparentOrientation.Value
+                        && anchorIdx >= 0
+                        && anchorProp.VisibleDockables is { } anchorSiblings)
+                    {
+                        // Build a new ProportionalDock that will host both
+                        // the anchor and the rebuilt mapper-dock. Inherit
+                        // the captured grandparent's id so future captures
+                        // see consistent ids.
+                        var rebuiltGrand = new ProportionalDock
+                        {
+                            Id               = lastPos.GrandparentId ?? string.Empty,
+                            Orientation      = lastPos.GrandparentOrientation.Value,
+                            IsCollapsable    = false,
+                            VisibleDockables = CreateList<IDockable>(),
+                        };
+
+                        // Move the anchor out of its current parent — manual
+                        // collection edit since Dock.Avalonia's FactoryBase
+                        // doesn't expose a cross-parent move primitive at
+                        // this version. Removing also drops any adjacent
+                        // ProportionalDockSplitter (the one separating the
+                        // anchor from its old neighbour) — without that
+                        // cleanup the new wrapper inherits a phantom
+                        // splitter.
+                        anchorSiblings.RemoveAt(anchorIdx);
+                        if (anchorIdx < anchorSiblings.Count
+                            && anchorSiblings[anchorIdx] is ProportionalDockSplitter trailingSplitter)
+                            anchorSiblings.RemoveAt(anchorIdx);
+                        else if (anchorIdx > 0
+                            && anchorSiblings[anchorIdx - 1] is ProportionalDockSplitter leadingSplitter)
+                            anchorSiblings.RemoveAt(anchorIdx - 1);
+
+                        // Splice the new wrapper at the anchor's old
+                        // position in the great-grandparent. Compute the
+                        // insertion index AFTER the splitter cleanup above.
+                        var insertIdx = Math.Min(anchorIdx, anchorSiblings.Count);
+
+                        // Populate the wrapper: anchor → splitter →
+                        // rebuilt mapper-dock. This restores the original
+                        // stacking (Game on top, Mapper below in the
+                        // Vertical case).
+                        InitDockable(anchor,        rebuiltGrand);
+                        AddDockable (rebuiltGrand,  anchor);
+                        AddDockable (rebuiltGrand,  new ProportionalDockSplitter());
+                        InitDockable(rebuiltParent, rebuiltGrand);
+                        AddDockable (rebuiltGrand,  rebuiltParent);
+
+                        // Add the tool itself to the new ToolDock.
+                        InitDockable(dockable,      rebuiltParent);
+                        AddDockable (rebuiltParent, dockable);
+                        SetActiveDockable(dockable);
+
+                        // Finally drop the wrapper back into the great-
+                        // grandparent at the anchor's old slot.
+                        InitDockable(rebuiltGrand, anchorParent);
+                        if (insertIdx < anchorSiblings.Count)
+                            anchorSiblings.Insert(insertIdx, rebuiltGrand);
+                        else
+                            anchorSiblings.Add(rebuiltGrand);
+
+                        return;
+                    }
+
+                    // Stage 0c (fallback): orientations match (or no
+                    // orientation info) — simple sibling splice. The panel
+                    // comes back next to the anchor on the same axis as
+                    // the survivor; the user can drag it elsewhere if
+                    // they want.
+                    if (anchorIdx >= 0 && anchorParent is ProportionalDock)
+                    {
+                        InsertDockable(anchorParent, new ProportionalDockSplitter(), anchorIdx + 1);
+                        InsertDockable(anchorParent, rebuiltParent, anchorIdx + 2);
+                    }
+                    else if (anchorIdx >= 0)
+                    {
+                        InsertDockable(anchorParent, rebuiltParent, anchorIdx + 1);
+                    }
+                    else
+                    {
+                        AddDockable(anchorParent, rebuiltParent);
+                    }
+
+                    InitDockable(dockable, rebuiltParent);
+                    AddDockable(rebuiltParent, dockable);
+                    SetActiveDockable(dockable);
+                    return;
+                }
+            }
+
             // Resolve the parent dock live by id — the stored reference would
-            // be stale after a BuildLayout rebuild. If the parent dock isn't
-            // present in the current layout there's nowhere to put it.
-            if (_root is null || FindByIdInTree(_root, parentId) is not IDock parent) return;
-            AddDockable(parent, dockable);
-            SetActiveDockable(dockable);
+            // be stale after a BuildLayout rebuild.
+            if (FindByIdInTree(_root, parentId) is IDock parent)
+            {
+                // Re-establish parent / owner wiring before adding. Without
+                // this, a dockable that was X-closed re-enters
+                // VisibleDockables but the ContentControl never re-binds
+                // to it — the tab shows in the strip but the panel beneath
+                // stays blank, OR the visual doesn't appear at all. This
+                // is the difference between "menu checkbox flipped on" and
+                // "user actually sees their panel back."
+                InitDockable(dockable, parent);
+                AddDockable(parent, dockable);
+                SetActiveDockable(dockable);
+            }
+            // The parent ToolDock was pruned when its last child was closed
+            // (the tab-X bug). Rebuild it in its home position so the tool
+            // returns to the dock it lived in before, instead of silently
+            // failing to re-open.
+            else if (TryRestoreHomeDock(parentId, dockable))
+            {
+                // home rebuild succeeded — nothing more to do.
+            }
+            // Both the original parent and the home-rebuild failed. This
+            // typically happens when a saved layout was loaded that doesn't
+            // include the original grandparent (e.g. "center-col" was renamed
+            // or the snapshot pre-dates the _dockHomes registration code).
+            // Rather than silently leaving the menu checkbox flipped on with
+            // nothing on screen, fall back through:
+            //   1. Any other ToolDock anywhere in the live tree (so the
+            //      panel comes back in a reasonable location).
+            //   2. As a last resort, float it in its own OS window so the
+            //      user at least sees their panel — they can drag it back
+            //      to redock wherever they want.
+            else if (FindFirstToolDockInTree(_root) is IDock fallbackParent)
+            {
+                InitDockable(dockable, fallbackParent);
+                AddDockable(fallbackParent, dockable);
+                SetActiveDockable(dockable);
+            }
+            else
+            {
+                InitDockable(dockable, _root);
+                FloatDockable(dockable);
+            }
         }
         else
         {
+            // Capture last-known location before closing so a future re-open
+            // can put the panel back exactly where it was — including any
+            // drag-redocked custom position. The matching capture for X-button
+            // close happens via the DockableAdded hook (the panel's position
+            // was recorded the last time it entered the tree).
+            CapturePosition(current);
+
             // Close the instance actually in the tree, not our stored reference
             // (which Dock.Avalonia may have replaced during init).
             CloseDockable(current!);
         }
+    }
+
+    /// <summary>
+    /// Recreate a pruned home ToolDock (per <see cref="_dockHomes"/>) inside its
+    /// always-present grandparent, drop <paramref name="dockable"/> into it, and
+    /// activate it. Returns false if there's no recorded home or the grandparent
+    /// can't be found. Splitters are inserted only where one isn't already
+    /// adjacent, so re-opening doesn't accumulate duplicate separators.
+    /// </summary>
+    private bool TryRestoreHomeDock(string parentId, IDockable dockable)
+    {
+        if (_root is null) return false;
+        if (!_dockHomes.TryGetValue(parentId, out var home)) return false;
+        if (FindByIdInTree(_root, home.GrandparentId) is not IDock grand) return false;
+
+        var dock = new ToolDock
+        {
+            Id               = parentId,
+            Alignment        = home.Alignment,
+            Proportion       = home.Proportion,
+            VisibleDockables = CreateList<IDockable>(),
+        };
+
+        var kids = grand.VisibleDockables;
+        var hadChildren = kids is { Count: > 0 };
+
+        if (home.AtFront)
+        {
+            InsertDockable(grand, dock, 0);
+            // grand is now [dock, <old first child>, …]; separate them unless
+            // the old first child is already a splitter.
+            if (hadChildren && grand.VisibleDockables is { Count: > 1 } k
+                && k[1] is not ProportionalDockSplitter)
+                InsertDockable(grand, new ProportionalDockSplitter(), 1);
+        }
+        else
+        {
+            if (hadChildren && kids![kids.Count - 1] is not ProportionalDockSplitter)
+                AddDockable(grand, new ProportionalDockSplitter());
+            AddDockable(grand, dock);
+        }
+
+        // Same re-init as the live-parent path in SetToolVisibility — without
+        // this, the freshly-rebuilt ToolDock holds a phantom dockable whose
+        // visual isn't bound to its content.
+        InitDockable(dockable, dock);
+        AddDockable(dock, dockable);
+        SetActiveDockable(dockable);
+        return true;
     }
 
     /// <summary>
@@ -487,6 +856,164 @@ public class GenieDockFactory : Factory
         // title bar back over the main app shows dock indicators so the user
         // can re-dock it wherever they want.
         FloatDockable(current);
+    }
+
+    /// <summary>
+    /// Record the dockable's current parent + index in
+    /// <see cref="_lastKnownPositions"/>, along with the grandparent + parent
+    /// alignment / proportion so we can rebuild the parent ToolDock if it
+    /// gets pruned later. Walks the live tree to discover the parent rather
+    /// than reading <c>Dockable.Owner</c> — the latter is only reliably set
+    /// when a dockable enters the tree via <c>AddDockable</c>; tools wired
+    /// at <c>CreateLayout</c> time (the initial <c>VisibleDockables</c>
+    /// list-init path) have <c>Owner == null</c> until later, which would
+    /// make CapturePosition silently fail on the initial cache priming.
+    /// </summary>
+    private void CapturePosition(IDockable? dockable)
+    {
+        if (dockable?.Id is not { Length: > 0 } id) return;
+        if (_root is null) return;
+
+        // Walk the tree to find this dockable's parent + grandparent rather
+        // than relying on Dockable.Owner being set.
+        if (FindParentInTree(_root, dockable) is not IDock parent) return;
+        if (string.IsNullOrEmpty(parent.Id)) return;
+        var idx = parent.VisibleDockables?.IndexOf(dockable) ?? -1;
+
+        string?      grandparentId          = null;
+        Alignment?   parentAlignment        = null;
+        double       parentProportion       = 0;
+        int          idxInGrandparent       = -1;
+        string?      anchorSiblingId        = null;
+        Orientation? grandparentOrientation = null;
+        if (FindParentInTree(_root, parent) is IDock grand
+            && !string.IsNullOrEmpty(grand.Id))
+        {
+            grandparentId    = grand.Id;
+            idxInGrandparent = grand.VisibleDockables?.IndexOf(parent) ?? -1;
+            if (parent is IToolDock toolDock)
+            {
+                parentAlignment  = toolDock.Alignment;
+                parentProportion = toolDock.Proportion;
+            }
+            if (grand is ProportionalDock propGrand)
+                grandparentOrientation = propGrand.Orientation;
+
+            // Find an "anchor sibling": a non-splitter dockable in the same
+            // grandparent that we can use as a survivor reference if the
+            // grandparent itself collapses. Dock.Avalonia unwraps a
+            // ProportionalDock when it ends up with only one non-splitter
+            // child — so when we're closing the last toolDock in
+            // center-col, both center-col AND mapper-dock disappear and
+            // the lone surviving sibling (e.g. the DocumentDock for the
+            // Game window) gets promoted directly into the great-
+            // grandparent (root-layout). Capturing that survivor lets us
+            // walk back to a real container at restore time.
+            if (grand.VisibleDockables is { } siblings)
+            {
+                foreach (var sib in siblings)
+                {
+                    if (ReferenceEquals(sib, parent)) continue;
+                    if (sib is ProportionalDockSplitter) continue;
+                    if (string.IsNullOrEmpty(sib.Id))    continue;
+                    anchorSiblingId = sib.Id;
+                    break;
+                }
+            }
+        }
+
+        _lastKnownPositions[id] = new LastKnownLocation(
+            parent.Id, idx, grandparentId, parentAlignment, parentProportion,
+            idxInGrandparent, anchorSiblingId, grandparentOrientation);
+    }
+
+    /// <summary>
+    /// Walk the dock tree (recursively, including floating windows) and
+    /// return the immediate parent IDock of <paramref name="target"/>, or
+    /// null if the target isn't in the tree. Used by
+    /// <see cref="CapturePosition"/> because <c>Dockable.Owner</c> isn't
+    /// reliably set on tools wired via the initial <c>VisibleDockables</c>
+    /// list-init path in <c>CreateLayout</c>.
+    /// </summary>
+    private static IDock? FindParentInTree(IDockable? node, IDockable target)
+    {
+        if (node is not IDock dock) return null;
+        if (dock.VisibleDockables is { } children)
+        {
+            foreach (var child in children)
+            {
+                if (ReferenceEquals(child, target)) return dock;
+                if (FindParentInTree(child, target) is { } hit) return hit;
+            }
+        }
+        if (node is IRootDock root && root.Windows is { } windows)
+        {
+            foreach (var w in windows)
+                if (w.Layout is { } layout && FindParentInTree(layout, target) is { } hit)
+                    return hit;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Walk the current dock tree and capture the position of every
+    /// registered tool into <see cref="_lastKnownPositions"/>. Called at the
+    /// end of every layout build (default + snapshot) so the cache starts
+    /// out matching whatever Dock.Avalonia just instantiated. Subsequent
+    /// drag-redocking refreshes individual entries via the
+    /// <c>DockableAdded</c> hook in <see cref="WireLastKnownPositionTracking"/>.
+    /// </summary>
+    private void CaptureAllPositions()
+    {
+        if (_root is null) return;
+        foreach (var toolId in _tools.Keys.ToArray())
+        {
+            if (FindByIdInTree(_root, toolId) is { } d)
+                CapturePosition(d);
+        }
+    }
+
+    /// <summary>
+    /// Subscribe to <c>FactoryBase.DockableAdded</c> so we refresh the
+    /// <see cref="_lastKnownPositions"/> entry whenever a dockable enters
+    /// the tree (initial layout build + drag-redock + menu-driven reopen).
+    /// Hooked once at factory construction. The hide branch of
+    /// <see cref="SetToolVisibility"/> additionally captures position
+    /// immediately before <c>CloseDockable</c>; together the two paths give
+    /// us a fresh-enough cache to restore even after drag-then-X-close.
+    /// </summary>
+    private void WireLastKnownPositionTracking()
+    {
+        DockableAdded += (_, e) =>
+        {
+            if (e.Dockable is { } d) CapturePosition(d);
+        };
+    }
+
+    /// <summary>
+    /// Walk the dock tree (recursively, including floating windows) and
+    /// return the first <see cref="IToolDock"/> encountered, or null if
+    /// none exist. Used by <see cref="SetToolVisibility"/> as the
+    /// last-resort fallback when a tool's registered parent has been
+    /// pruned AND the home-rebuild path also failed (typically a saved
+    /// layout that drops the original grandparent ids).
+    /// </summary>
+    private static IDock? FindFirstToolDockInTree(IDockable? node)
+    {
+        if (node is null) return null;
+        if (node is IToolDock td) return td;
+        if (node is IDock dock)
+        {
+            if (dock.VisibleDockables is { } children)
+                foreach (var child in children)
+                    if (FindFirstToolDockInTree(child) is { } hit)
+                        return hit;
+            if (node is IRootDock root && root.Windows is { } windows)
+                foreach (var w in windows)
+                    if (w.Layout is { } layout && FindFirstToolDockInTree(layout) is { } hit)
+                        return hit;
+        }
+        return null;
     }
 
     /// <summary>
