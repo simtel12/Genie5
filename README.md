@@ -160,6 +160,10 @@ For solo-maintainer alpha-stage projects, all three roles consolidated on the ma
 
 This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Genie 5 connects only to Simutronics' official DragonRealms authentication and game servers (`play.net` / `simutronics.net`) and, when the user configures it, to a local [Lich 5](https://github.com/elanthia-online/lich-5) proxy. Account credentials are stored locally, encrypted with AES-256-GCM, and are transmitted only to the official authentication servers. No data is collected by the Genie 5 maintainers.
 
+## Credits
+
+See [CREDITS.md](CREDITS.md) for art and non-code attributions. The app icon, status-indicator glyphs, and compass-direction icons are by [@dylb0t](https://github.com/dylb0t), donated under GPL-3.0.
+
 ## License
 
 [GPL-3.0](LICENSE). Same license as Lich 5, aligning Genie 5 with the broader DR-tooling ecosystem.

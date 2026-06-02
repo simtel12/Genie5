@@ -17,6 +17,14 @@
     <Company>Genie 5 Project</Company>
     <Copyright>Copyright © 2026 — GPL-3.0</Copyright>
 
+    <!-- ── Windows app icon ── -->
+    <!-- Used for the .exe icon in Windows Explorer + the taskbar entry +
+         the installer. macOS uses Assets/app.icns inside the .app bundle
+         (handled by publish/build-mac.sh, not MSBuild); Linux uses
+         Assets/app.png. Avalonia's Window.Icon binding in MainWindow.axaml
+         is what drives the in-app title-bar icon on all three platforms. -->
+    <ApplicationIcon>Assets/app.ico</ApplicationIcon>
+
     <!-- ── Publish settings (override per-RID on the dotnet publish CLI) ── -->
     <!-- These defaults make `dotnet publish -c Release -r win-x64 -o publish/win-x64`
          produce a single self-contained .exe with the .NET runtime + native
@@ -55,6 +63,25 @@
   <ItemGroup>
     <None Include="FodyWeavers.xml" />
     <None Include="FodyWeavers.xsd" Condition="Exists('FodyWeavers.xsd')" />
+  </ItemGroup>
+
+  <!-- ── Icon set assets ──────────────────────────────────────────────── -->
+  <!-- App icon (rendered genie lamp with "Genie 5" badge), status indicator
+       glyphs (bleeding / dead / hidden / kneeling / prone / standing / …)
+       and compass-direction icons. Donated to the project under GPL-3.0 by
+       @dylb0t — see CREDITS.md for attribution.
+
+       Layout (mirrors dylb0t's structure for easy upstream sync):
+         Assets/app.ico                — Windows EXE icon (ApplicationIcon above)
+         Assets/app.icns               — macOS .app bundle icon (consumed by publish script)
+         Assets/app.png                — Linux + Window.Icon source via avares://
+         Assets/Icons/*.png            — 23 status + compass glyphs
+         Assets/Genie5_iconset/*.png   — macOS iconutil source (regen-only, NOT embedded)
+  -->
+  <ItemGroup>
+    <AvaloniaResource Include="Assets/app.icns" />
+    <AvaloniaResource Include="Assets/app.png" />
+    <AvaloniaResource Include="Assets/Icons/*.png" />
   </ItemGroup>
 
   <ItemGroup>
