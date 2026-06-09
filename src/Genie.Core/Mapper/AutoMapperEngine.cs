@@ -39,6 +39,13 @@ public sealed class AutoMapperEngine
     // ServerRoomId → NodeId for exact room matching via <nav rm="..."/>
     private readonly Dictionary<string, int> _serverRoomIndex = new(StringComparer.OrdinalIgnoreCase);
 
+    // lowercased tag → node ids carrying it. Drives #goto @tag nearest-routing
+    // (Lich find_nearest_by_tag). Rebuilt by RebuildIndex alongside the others.
+    private readonly Dictionary<string, List<int>> _tagIndex = new();
+
+    /// <summary>All tags present in the active zone (lowercased), for UI/feedback.</summary>
+    public IReadOnlyCollection<string> KnownTags => _tagIndex.Keys;
+
     // State between room transitions
     private string  _lastTitle = string.Empty;
     private string  _lastExitKey = string.Empty; // sorted join used for change detection
@@ -701,6 +708,64 @@ public sealed class AutoMapperEngine
         return moves;
     }
 
+    /// <summary>
+    /// Nearest room carrying <paramref name="tag"/> (case-insensitive), measured
+    /// by the same weighted, skill-gated traversal as <see cref="FindPath"/>.
+    /// Returns the node — the actual walk is produced by FindPath / AutoWalk
+    /// against it. Null when the tag is unknown in this zone or no tagged room
+    /// is reachable with the character's current skills/class/level. Returns the
+    /// start room if it is itself tagged.
+    /// </summary>
+    public MapNode? FindNearestByTag(MapNode start, string tag)
+    {
+        if (string.IsNullOrWhiteSpace(tag)) return null;
+        if (!_tagIndex.TryGetValue(tag.Trim().ToLowerInvariant(), out var ids) || ids.Count == 0)
+            return null;
+        return FindNearestNode(start, ids.ToHashSet());
+    }
+
+    /// <summary>
+    /// Weighted Dijkstra from <paramref name="start"/> returning the nearest node
+    /// in <paramref name="goalIds"/>. Because the priority queue pops in
+    /// nondecreasing distance, the first goal dequeued is the nearest. Mirrors
+    /// <see cref="FindPath"/>'s cost model (1 per room) and
+    /// <see cref="ExitRequirement"/> skill-gating, so it never routes through an
+    /// exit the character can't take. Returns null if no goal is reachable.
+    /// </summary>
+    private MapNode? FindNearestNode(MapNode start, IReadOnlySet<int> goalIds)
+    {
+        if (goalIds.Contains(start.Id)) return start;
+
+        var distances = new Dictionary<int, int> { [start.Id] = 0 };
+        var queue = new PriorityQueue<int, int>();
+        queue.Enqueue(start.Id, 0);
+
+        while (queue.TryDequeue(out var currentId, out var currentDist))
+        {
+            if (currentDist > distances[currentId]) continue;            // stale
+            if (goalIds.Contains(currentId) && _zone.Nodes.TryGetValue(currentId, out var goal))
+                return goal;                                             // nearest goal — done
+            if (!_zone.Nodes.TryGetValue(currentId, out var current)) continue;
+
+            foreach (var exit in current.Exits)
+            {
+                if (!exit.DestinationId.HasValue) continue;
+                var destId = exit.DestinationId.Value;
+                if (!_zone.Nodes.ContainsKey(destId)) continue;
+                if (!ExitRequirement.Parse(exit.Requires).IsMet(Skills, CharacterClass, CharacterLevel))
+                    continue;                                            // skill-gated, skip
+
+                int newDist = currentDist + 1;                          // same baseline as FindPath
+                if (!distances.TryGetValue(destId, out var existing) || newDist < existing)
+                {
+                    distances[destId] = newDist;
+                    queue.Enqueue(destId, newDist);
+                }
+            }
+        }
+        return null;
+    }
+
     private int NextNodeId()
     {
         int max = 0;
@@ -713,6 +778,7 @@ public sealed class AutoMapperEngine
     {
         _fingerprintIndex.Clear();
         _serverRoomIndex.Clear();
+        _tagIndex.Clear();
         foreach (var node in _zone.Nodes.Values)
         {
             var fp = MapFingerprint.Compute(node.Title, node.Exits);
@@ -725,6 +791,14 @@ public sealed class AutoMapperEngine
 
             if (!string.IsNullOrEmpty(node.ServerRoomId))
                 _serverRoomIndex.TryAdd(node.ServerRoomId, node.Id);
+
+            foreach (var tag in node.Tags)
+            {
+                var key = tag.Trim().ToLowerInvariant();
+                if (key.Length == 0) continue;
+                if (!_tagIndex.TryGetValue(key, out var tlist)) { tlist = new(); _tagIndex[key] = tlist; }
+                if (!tlist.Contains(node.Id)) tlist.Add(node.Id);
+            }
         }
     }
 }

@@ -1174,7 +1174,30 @@ public class MapperViewModel : ReactiveObject
     {
         if (_engine is null) { LoadStatus = "Mapper not ready — load a zone first."; return; }
         arg = arg?.Trim() ?? "";
-        if (arg.Length == 0) { LoadStatus = "Usage: #goto <room id | label | title>"; return; }
+        if (arg.Length == 0) { LoadStatus = "Usage: #goto <room id | label | title | @tag>"; return; }
+
+        // '@tag' → walk to the NEAREST room carrying that tag (Lich
+        // find_nearest_by_tag). Needs the current room as the search origin.
+        if (arg.StartsWith('@'))
+        {
+            var tag = arg[1..].Trim();
+            if (_engine.CurrentNode is null)
+            {
+                LoadStatus = "No current room — walk one step so the mapper can match you before #goto @tag.";
+                return;
+            }
+            var nearest = _engine.FindNearestByTag(_engine.CurrentNode, tag);
+            if (nearest is null)
+            {
+                var known = string.Join(", ", _engine.KnownTags.OrderBy(t => t));
+                LoadStatus = known.Length == 0
+                    ? $"#goto: no rooms are tagged in '{_engine.ActiveZone.Name}'."
+                    : $"#goto @{tag}: no reachable room tagged '{tag}'. Known tags: {known}.";
+                return;
+            }
+            GotoNode(nearest);
+            return;
+        }
 
         var target = ResolveNode(arg);
         if (target is null)

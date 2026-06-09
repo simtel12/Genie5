@@ -78,6 +78,16 @@ public static class Genie4MapExporter
         if (!string.IsNullOrEmpty(node.Notes))        writer.WriteAttributeString("note",      node.Notes);
         if (!string.IsNullOrEmpty(node.Color))        writer.WriteAttributeString("color",     node.Color);
         if (!string.IsNullOrEmpty(node.ServerRoomId)) writer.WriteAttributeString("server_id", node.ServerRoomId);
+        // tags — Genie 5 extension, '|'-separated. Sorted (case-insensitive) so
+        // two clients emit byte-identical output for git-friendly diffs. Omitted
+        // when empty so unchanged upstream maps produce no diff.
+        if (node.Tags.Count > 0)
+        {
+            var tags = string.Join('|', node.Tags.Select(t => t.Trim())
+                                                  .Where(t => t.Length > 0)
+                                                  .OrderBy(t => t, StringComparer.OrdinalIgnoreCase));
+            if (tags.Length > 0) writer.WriteAttributeString("tags", tags);
+        }
 
         if (!string.IsNullOrEmpty(node.Description))
         {

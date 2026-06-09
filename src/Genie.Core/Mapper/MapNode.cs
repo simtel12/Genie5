@@ -13,6 +13,19 @@ public sealed class MapNode
     public string ServerRoomId { get; set; } = string.Empty;
     public List<MapExit> Exits { get; set; } = new();
 
+    /// <summary>
+    /// Free-form room tags (Lich-style: "bank", "moongate", "gravecottage").
+    /// Drive <c>#goto @tag</c> nearest-routing and
+    /// <see cref="AutoMapperEngine.FindNearestByTag"/>. Round-tripped as a
+    /// '|'-separated <c>tags="..."</c> node attribute — an additive Genie 5
+    /// extension that old Genie 4 clients ignore (same as server_id/requires).
+    /// </summary>
+    public List<string> Tags { get; set; } = new();
+
+    /// <summary>Case-insensitive tag membership test.</summary>
+    public bool HasTag(string tag) =>
+        Tags.Any(t => t.Equals(tag, StringComparison.OrdinalIgnoreCase));
+
     public MapExit? GetExit(Direction dir) => Exits.FirstOrDefault(e => e.Direction == dir);
 
     public MapExit GetOrAddExit(Direction dir, string moveCommand)

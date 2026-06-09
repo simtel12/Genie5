@@ -82,6 +82,14 @@ public static class Genie4MapImporter
             if (!string.IsNullOrEmpty(serverIdAttr))
                 node.ServerRoomId = serverIdAttr.Trim();
 
+            // tags — Genie 5 extension, '|'-separated (mirrors the note attribute).
+            // Drive #goto @tag nearest-routing. Unknown to old Genie 4 clients.
+            var tagsAttr = nodeEl.GetAttribute("tags");
+            if (!string.IsNullOrEmpty(tagsAttr))
+                foreach (var t in tagsAttr.Split('|',
+                             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    node.Tags.Add(t);
+
             // Position
             var posEl = nodeEl.SelectSingleNode("position") as XmlElement;
             if (posEl != null)
