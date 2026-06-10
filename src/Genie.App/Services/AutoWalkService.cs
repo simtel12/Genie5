@@ -121,6 +121,23 @@ public sealed class AutoWalkService : ReactiveObject
     private DispatcherTimer? _unfocusTimer;
 
     /// <summary>
+    /// Id of the room we were standing in when the most recent move was
+    /// dispatched — i.e. the room we expect this step to take us OUT of. The
+    /// step pump only advances when <see cref="AutoMapperEngine.CurrentNode"/>
+    /// becomes a different, non-null room than this.
+    ///
+    /// <para>Why this matters (#69): DR delivers a single room transition as
+    /// several parser updates — title, then compass exits, then description —
+    /// and the mapper engine fires <c>CurrentNodeChanged</c> on each one (plus
+    /// a null fire on a zone-miss). Advancing the plan on every raw event meant
+    /// one physical room arrival pumped 2-4 moves into the game's typeahead
+    /// buffer, cascading into a flood that overran the parser and stalled the
+    /// walk. Gating on a confirmed change of room identity makes each move wait
+    /// for the previous one to actually land.</para>
+    /// </summary>
+    private int? _departureNodeId;
+
+    /// <summary>
     /// Cancel the current walk. Wired to the Cancel button in the indicator
     /// strip; also fires from Esc handler in MainWindow code-behind.
     /// </summary>
@@ -184,6 +201,9 @@ public sealed class AutoWalkService : ReactiveObject
         Current = session;
         _sessionChanges.OnNext(session);
         IsCurrentPaused = false;
+        // Seed the departure room so the first dispatched move is gated
+        // against the origin, not against a stale id from a prior walk (#69).
+        _departureNodeId = origin.Id;
 
         // Kick off the first step. Subsequent steps fire from OnRoomChanged
         // when the player arrives at the expected next room.
@@ -203,6 +223,7 @@ public sealed class AutoWalkService : ReactiveObject
         FlashStatus(Current.StatusMessage);
         _sessionChanges.OnNext(Current);
         Current = null;
+        _departureNodeId = null;
         IsCurrentPaused = false;
         StopUnfocusTimer();
         StopWaitCountdown();
@@ -283,6 +304,18 @@ public sealed class AutoWalkService : ReactiveObject
     {
         if (Current is null || Current.State != AutoWalkState.Active) return;
 
+        var node = _mapEngine.CurrentNode;
+
+        // Gate on a CONFIRMED change of room identity (#69). The engine fires
+        // CurrentNodeChanged several times for a single physical room — once
+        // per parser update (title, exits, description) — and once with a null
+        // CurrentNode on a zone-miss. Only a non-null room whose id differs
+        // from the room we dispatched the last move from means we actually
+        // moved; everything else is a repeat/partial fire and must NOT pump
+        // another move (doing so floods DR's typeahead buffer and stalls).
+        if (node is null) return;
+        if (_departureNodeId is { } fromId && node.Id == fromId) return;
+
         // Any room-change implicitly clears a pending cross-zone wait —
         // either we arrived at the target zone, or we landed somewhere
         // intra-zone that progresses the plan. Either way the countdown
@@ -290,7 +323,7 @@ public sealed class AutoWalkService : ReactiveObject
         if (IsWaitingForCrossZone) StopWaitCountdown();
 
         // Did we arrive at the destination?
-        if (_mapEngine.CurrentNode?.Id == Current.Destination.Id)
+        if (node.Id == Current.Destination.Id)
         {
             Current.StepsCompleted = Current.StepsTotal;
             Current.State          = AutoWalkState.Finished;
@@ -298,6 +331,7 @@ public sealed class AutoWalkService : ReactiveObject
             FlashStatus(Current.StatusMessage);
             _sessionChanges.OnNext(Current);
             Current = null;
+            _departureNodeId = null;
             StopUnfocusTimer();
             return;
         }
@@ -351,9 +385,16 @@ public sealed class AutoWalkService : ReactiveObject
             StartWaitCountdown(step.Description, avg);
         }
 
-        // Send through ProcessInput so the same alias / trigger / command-
-        // queue pipeline runs as if the user typed it. The CommandQueue
-        // already handles RT gating, so we don't need to wait ourselves.
+        // Remember the room we're leaving so the step pump (OnRoomChanged)
+        // can tell a real arrival from the repeat/partial CurrentNodeChanged
+        // fires DR emits for a single transition (#69). Captured BEFORE the
+        // send: this is the room the next move takes us out of.
+        _departureNodeId = _mapEngine.CurrentNode?.Id;
+
+        // Send through ProcessInput so the same alias / trigger / command
+        // pipeline runs as if the user typed it. Movement is paced by the
+        // confirmed room change above — one move per room — so it stays
+        // responsive to the game rather than bursting the whole path.
         _core.Commands.ProcessInput(step.Verb);
     }
 
