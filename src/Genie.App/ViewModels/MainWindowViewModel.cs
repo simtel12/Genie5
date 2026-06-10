@@ -1923,7 +1923,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             {
                 IsConnected      = e.Kind == ConnectionEventKind.Connected;
                 ConnectionStatus = e.Kind == ConnectionEventKind.Connected
-                    ? $"Connected — {cfg.CharacterName}"
+                    ? $"Connected — {Genie.Core.Profiles.CharacterIdentity.Format(cfg.CharacterName, cfg.AccountName)}"
                     : e.Kind.ToString();
             });
 
