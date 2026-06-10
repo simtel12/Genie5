@@ -348,6 +348,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     private readonly string _logsDir;
     private string _pluginsDir = "";
 
+    /// <summary>UI-thread heartbeat that pumps <see cref="Genie.Core.Scripting.ScriptEngine.Tick"/>
+    /// so time-based script unblocks (pause / delay / waitfor) fire even with no
+    /// incoming game traffic. Started on connect, stopped on disconnect (#61).</summary>
+    private Avalonia.Threading.DispatcherTimer? _scriptHeartbeat;
+
     /// <summary>
     /// Session-scoped map of DR's <c>#NNNN</c> container-item-IDs to their
     /// human <c>title</c> (e.g. <c>#37666728 → "My Backpack"</c>). Populated
@@ -1987,6 +1992,24 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _core.EditScriptRequested     += name =>
             Avalonia.Threading.Dispatcher.UIThread.Post(() => OpenScriptInEditor(name));
 
+        // ── Script tick pump (fixes #61: scripts stall on pause/delay) ───────
+        // The engine's time-based unblocks (PAUSE, delay, WAITFOR timeout,
+        // waitfor-condition re-eval) all fire inside Scripts.Tick(), which the
+        // engine otherwise only runs on incoming game events — so a paused
+        // script with no incoming text hangs forever. The whole pipeline runs
+        // on the UI thread (the read loop has no ConfigureAwait(false)), so a
+        // DispatcherTimer is the race-free pump. ScheduleTick gives RT-precise
+        // one-shot wakeups the engine requests; the heartbeat covers the
+        // pause/delay/condition waits the engine does NOT self-schedule.
+        _core.Scripts.ScheduleTick = delay =>
+            Avalonia.Threading.DispatcherTimer.RunOnce(() => _core?.Scripts.Tick(), delay);
+
+        _scriptHeartbeat ??= new Avalonia.Threading.DispatcherTimer
+            { Interval = TimeSpan.FromMilliseconds(100) };
+        _scriptHeartbeat.Tick -= OnScriptHeartbeat;   // de-dupe across reconnects
+        _scriptHeartbeat.Tick += OnScriptHeartbeat;
+        _scriptHeartbeat.Start();
+
         // #layout … from the command bar — dock + store work happens on the
         // UI thread.
         _core.LayoutCommandRequested  += args =>
@@ -2190,9 +2213,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // after the session ends just produces a file that trails off mid-tag.
         // The user can re-toggle Record Session on the next connect.
         Recorder.Stop();
+        _scriptHeartbeat?.Stop();   // stop pumping Tick() once the session ends (#61)
         if (_core is not null)
             await _core.DisconnectAsync();
     }
+
+    /// <summary>Heartbeat handler — pumps the script engine so time-based
+    /// unblocks (pause / delay / waitfor) resume without incoming game text (#61).</summary>
+    private void OnScriptHeartbeat(object? sender, EventArgs e) => _core?.Scripts.Tick();
 
     /// <summary>
     /// Route the typed command through the full Genie pipeline:
