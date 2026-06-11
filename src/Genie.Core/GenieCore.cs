@@ -315,8 +315,8 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             clientVersion: HostVersionString);
 
         // Mirror the AutoMapper's current location into the script globals so
-        // scripts can read $roomid / $zoneid / $zonename (Genie 4 parity — the
-        // mapper-sourced reserved vars deferred from #45). $roomid is the MAPPER
+        // scripts can read $roomid / $zoneid / $zonename / $roomnote (Genie 4
+        // parity — the mapper-sourced reserved vars deferred from #45). $roomid is the MAPPER
         // node id (the numbers #goto and scripts compare against, e.g.
         // `if $roomid != 156`), distinct from the server's $gameroomid. Seeded
         // now for scripts that start before any move; refreshed on every
@@ -739,18 +739,26 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
     /// <summary>
     /// Push the AutoMapper's current room/zone into the script globals
-    /// (<c>$roomid</c> / <c>$zoneid</c> / <c>$zonename</c>). <c>$roomid</c> is the
-    /// mapper node id (what <c>#goto</c> and scripts compare against), not the
-    /// server's <c>$gameroomid</c>. Defaults to <c>"0"</c> / empty when there's
-    /// no current node (off-map), matching Genie 4 / Genie5.Kzin.
+    /// (<c>$roomid</c> / <c>$zoneid</c> / <c>$zonename</c> / <c>$roomnote</c>).
+    /// <c>$roomid</c> is the mapper node id (what <c>#goto</c> and scripts compare
+    /// against), not the server's <c>$gameroomid</c>. <c>$roomid</c> and
+    /// <c>$zoneid</c> default to <c>"0"</c> (and <c>$zonename</c>/<c>$roomnote</c>
+    /// to empty) when there's no current node / unmapped zone (off-map),
+    /// matching Genie 3/4 / Genie5.Kzin.
     /// </summary>
     private void SyncMapperGlobals()
     {
         var node = AutoMapper.CurrentNode;
         var zone = AutoMapper.ActiveZone;
         Scripts.Globals["roomid"]   = node?.Id.ToString() ?? "0";
-        Scripts.Globals["zoneid"]   = zone?.Genie4Id ?? string.Empty;
+        // $zoneid → "0" (not empty) when the active zone has no Genie 4 id,
+        // matching $roomid's off-map default and the Genie 3/4 parity SaragosDR
+        // asked for in #45 (both should read 0 when the mapper can't place you).
+        Scripts.Globals["zoneid"]   = string.IsNullOrEmpty(zone?.Genie4Id) ? "0" : zone.Genie4Id;
         Scripts.Globals["zonename"] = zone?.Name ?? string.Empty;
+        // $roomnote — the current room's map note/label (Genie 4 reserved var,
+        // the last of the deferred mapper-sourced set from #45). Empty off-map.
+        Scripts.Globals["roomnote"] = node?.Notes ?? string.Empty;
     }
 
     public async ValueTask DisposeAsync()
