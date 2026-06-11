@@ -58,6 +58,19 @@ public sealed class GameConnection : IAsyncDisposable
 
     public bool IsConnected => _tcp?.Connected ?? false;
 
+    // ── Resolved game endpoint ───────────────────────────────────────────────
+    /// <summary>
+    /// The host the client actually dialled for the game stream, set on every
+    /// (re)connect. DirectSGE → the GAMEHOST the login response returned;
+    /// LichProxy / DevReplay → the proxy/replay endpoint. Surfaced as the
+    /// <c>$gamehost</c> script global (Genie 4 parity). Empty until first connect.
+    /// </summary>
+    public string ResolvedGameHost { get; private set; } = string.Empty;
+
+    /// <summary>The port paired with <see cref="ResolvedGameHost"/>; surfaced as
+    /// <c>$gameport</c>. 0 until first connect.</summary>
+    public int ResolvedGamePort { get; private set; }
+
     // ── AI pipe toggle ───────────────────────────────────────────────────────
     /// <summary>
     /// When false, raw XML is NOT forwarded to AiRawStream.
@@ -152,6 +165,8 @@ public sealed class GameConnection : IAsyncDisposable
                     _cfg.LichProxyHost, _cfg.LichProxyPort);
                 await _tcp.ConnectAsync(_cfg.LichProxyHost, _cfg.LichProxyPort, ct);
                 _networkStream = _tcp.GetStream();
+                ResolvedGameHost = _cfg.LichProxyHost;
+                ResolvedGamePort = _cfg.LichProxyPort;
                 // Lich proxy is already authenticated; no key handshake needed.
                 break;
 
@@ -162,6 +177,8 @@ public sealed class GameConnection : IAsyncDisposable
                     _cfg.LichProxyHost, _cfg.LichProxyPort);
                 await _tcp.ConnectAsync(_cfg.LichProxyHost, _cfg.LichProxyPort, ct);
                 _networkStream = _tcp.GetStream();
+                ResolvedGameHost = _cfg.LichProxyHost;
+                ResolvedGamePort = _cfg.LichProxyPort;
                 break;
 
             default:
@@ -181,6 +198,9 @@ public sealed class GameConnection : IAsyncDisposable
 
         _log.LogInformation("SGE OK → connecting to game {Host}:{Port}",
             sgeResult.GameHost, sgeResult.GamePort);
+
+        ResolvedGameHost = sgeResult.GameHost;
+        ResolvedGamePort = sgeResult.GamePort;
 
         await _tcp!.ConnectAsync(sgeResult.GameHost, sgeResult.GamePort, ct);
         _networkStream = _tcp.GetStream();

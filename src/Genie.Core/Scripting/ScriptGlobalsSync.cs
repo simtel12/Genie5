@@ -137,6 +137,11 @@ public sealed class ScriptGlobalsSync : IDisposable
         Set("gametime",      "0");
         Set("monstercount",  "0");
         Set("monsterlist",   "");
+        // Resolved game endpoint — empty/0 until the GameConnection reports
+        // Connected, at which point GenieCore overwrites these from the live
+        // connection ($gamehost / $gameport, Genie 4 parity).
+        Set("gamehost",      "");
+        Set("gameport",      "0");
     }
 
     // ── Event dispatch ────────────────────────────────────────────────────

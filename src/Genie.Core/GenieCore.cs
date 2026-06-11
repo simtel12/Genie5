@@ -63,6 +63,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     private readonly GameStateEngine   _stateEngine;
     private readonly IDisposable       _parserFeed;
     private readonly IDisposable       _settingsInfoSub;
+    private readonly IDisposable       _gameHostSub;
     private readonly IDisposable       _gameEventSub;
     private readonly IDisposable       _pluginXmlSub;
     private readonly Plugins.GameStateView _pluginStateView;
@@ -372,6 +373,21 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                 .Take(1)
                 .Subscribe(_ => { var __ = _connection.SendCommandAsync("look"); });
         }
+
+        // ── $gamehost / $gameport ──────────────────────────────────────────────
+        // Publish the resolved game endpoint into the script globals each time
+        // the connection reports Connected (Genie 4 parity, unblocks #45). NOT
+        // Take(1) — it must refresh on every reconnect (e.g. a #connect to a
+        // different character). Seeded empty/0 by ScriptGlobalsSync.SeedInitial.
+        _gameHostSub = _connection.StateStream
+            .Where(e => e.Kind == ConnectionEventKind.Connected)
+            .Subscribe(_ =>
+            {
+                Scripts.Globals["gamehost"] = _connection.ResolvedGameHost;
+                Scripts.Globals["gameport"] = _connection.ResolvedGamePort > 0
+                    ? _connection.ResolvedGamePort.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    : "0";
+            });
 
         // ── Per-character profile directory ────────────────────────────────────
         // Switch ConfigProfileDir to Profiles/{Char}-{Acct}/ so each character
@@ -723,6 +739,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         Plugins.Shutdown();
         _parserFeed.Dispose();
         _settingsInfoSub.Dispose();
+        _gameHostSub.Dispose();
         _mapperAdapter.Dispose();
         _globalsSync.Dispose();
         Scripts.StopAll();
