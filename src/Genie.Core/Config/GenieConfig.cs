@@ -70,7 +70,6 @@ public sealed class GenieConfig
     public bool AlwaysOnTop { get; set; }
     public bool CheckForUpdates { get; set; } = true;
     public bool AutoUpdate { get; set; }
-    public bool AutoUpdateLamp { get; set; } = true;
     public string ScriptExtension { get; set; } = "cmd";
     public string ConnectScript { get; set; } = string.Empty;
 
@@ -196,68 +195,91 @@ public sealed class GenieConfig
         {
             var path = Path.IsPathRooted(fileName) ? fileName : Path.Combine(ConfigDir, fileName);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            var lines = new[]
-            {
-                $"#config {{alwaysontop}} {{{AlwaysOnTop}}}",
-                $"#config {{classicconnect}} {{{ClassicConnect}}}",
-                $"#config {{scriptchar}} {{{ScriptChar}}}",
-                $"#config {{separatorchar}} {{{SeparatorChar}}}",
-                $"#config {{commandchar}} {{{CommandChar}}}",
-                $"#config {{mycommandchar}} {{{MyCommandChar}}}",
-                $"#config {{triggeroninput}} {{{TriggerOnInput}}}",
-                $"#config {{maxrowbuffer}} {{{BufferLineSize}}}",
-                $"#config {{spelltimer}} {{{ShowSpellTimer}}}",
-                $"#config {{autolog}} {{{AutoLog}}}",
-                $"#config {{automapper}} {{{AutoMapper}}}",
-                $"#config {{automapperalpha}} {{{AutoMapperAlpha}}}",
-                $"#config {{editor}} {{{Editor}}}",
-                $"#config {{prompt}} {{{Prompt}}}",
-                $"#config {{promptbreak}} {{{PromptBreak}}}",
-                $"#config {{promptforce}} {{{PromptForce}}}",
-                $"#config {{condensed}} {{{Condensed}}}",
-                $"#config {{monstercountignorelist}} {{{IgnoreMonsterList}}}",
-                $"#config {{scripttimeout}} {{{ScriptTimeout}}}",
-                $"#config {{maxgosubdepth}} {{{MaxGoSubDepth}}}",
-                $"#config {{roundtimeoffset}} {{{RoundTimeOffset}}}",
-                $"#config {{artdir}} {{{ArtDirRaw}}}",
-                $"#config {{artrepo}} {{{ArtRepo}}}",
-                $"#config {{scriptdir}} {{{ScriptDirRaw}}}",
-                $"#config {{scriptrepo}} {{{ScriptRepo}}}",
-                $"#config {{sounddir}} {{{SoundDirRaw}}}",
-                $"#config {{mapdir}} {{{MapDirRaw}}}",
-                $"#config {{maprepo}} {{{MapRepo}}}",
-                $"#config {{plugindir}} {{{PluginDirRaw}}}",
-                $"#config {{pluginrepo}} {{{PluginRepo}}}",
-                $"#config {{configdir}} {{{ConfigDirRaw}}}",
-                $"#config {{logdir}} {{{LogDirRaw}}}",
-                $"#config {{updatemapperscripts}} {{{UpdateMapperScripts}}}",
-                $"#config {{reconnect}} {{{Reconnect}}}",
-                $"#config {{ignoreclosealert}} {{{IgnoreCloseAlert}}}",
-                $"#config {{keepinputtext}} {{{KeepInput}}}",
-                $"#config {{sizeinputtogame}} {{{SizeInputToGame}}}",
-                $"#config {{muted}} {{{!PlaySounds}}}",
-                $"#config {{abortdupescript}} {{{AbortDupeScript}}}",
-                $"#config {{parsegameonly}} {{{ParseGameOnly}}}",
-                $"#config {{servertimeout}} {{{ServerActivityTimeout}}}",
-                $"#config {{servertimeoutcommand}} {{{ServerActivityCommand}}}",
-                $"#config {{usertimeout}} {{{UserActivityTimeout}}}",
-                $"#config {{usertimeoutcommand}} {{{UserActivityCommand}}}",
-                $"#config {{autowalkpauseonunfocus}} {{{AutoWalkPauseOnUnfocus}}}",
-                $"#config {{autowalkunfocusseconds}} {{{AutoWalkUnfocusSeconds}}}",
-                $"#config {{showlinks}} {{{ShowLinks}}}",
-                $"#config {{showimages}} {{{ShowImages}}}",
-                $"#config {{weblinksafety}} {{{WebLinkSafety}}}",
-                $"#config {{connectscript}} {{{ConnectScript}}}",
-                $"#config {{autoupdate}} {{{AutoUpdate}}}",
-                $"#config {{autoupdatelamp}} {{{AutoUpdateLamp}}}",
-                $"#config {{checkforupdates}} {{{CheckForUpdates}}}",
-                $"#config {{scriptextension}} {{{ScriptExtension}}}",
-                $"#config {{frontend}} {{{FrontEndIdentifier}}}",
-            };
+            var pairs = ToConfigPairs();
+            var lines = new string[pairs.Count];
+            for (var i = 0; i < pairs.Count; i++)
+                lines[i] = $"#config {{{pairs[i].Key}}} {{{pairs[i].Value}}}";
             File.WriteAllLines(path, lines);
             return true;
         }
         catch { return false; }
+    }
+
+    /// <summary>
+    /// The complete settings.cfg key→value map as ordered (key, value) pairs.
+    /// Single source of truth shared by <see cref="Save"/> (writes one
+    /// <c>#config {key} {value}</c> line each) and <see cref="GetSetting"/>
+    /// (reads a current value). Keys match the <see cref="SetSetting"/> cases.
+    /// </summary>
+    public IReadOnlyList<(string Key, string Value)> ToConfigPairs() => new (string, string)[]
+    {
+        ("alwaysontop", AlwaysOnTop.ToString()),
+        ("classicconnect", ClassicConnect.ToString()),
+        ("scriptchar", ScriptChar.ToString()),
+        ("separatorchar", SeparatorChar.ToString()),
+        ("commandchar", CommandChar.ToString()),
+        ("mycommandchar", MyCommandChar.ToString()),
+        ("triggeroninput", TriggerOnInput.ToString()),
+        ("maxrowbuffer", BufferLineSize.ToString()),
+        ("spelltimer", ShowSpellTimer.ToString()),
+        ("autolog", AutoLog.ToString()),
+        ("automapper", AutoMapper.ToString()),
+        ("automapperalpha", AutoMapperAlpha.ToString()),
+        ("editor", Editor),
+        ("prompt", Prompt),
+        ("promptbreak", PromptBreak.ToString()),
+        ("promptforce", PromptForce.ToString()),
+        ("condensed", Condensed.ToString()),
+        ("monstercountignorelist", IgnoreMonsterList),
+        ("scripttimeout", ScriptTimeout.ToString()),
+        ("maxgosubdepth", MaxGoSubDepth.ToString()),
+        ("roundtimeoffset", RoundTimeOffset.ToString()),
+        ("artdir", ArtDirRaw),
+        ("artrepo", ArtRepo),
+        ("scriptdir", ScriptDirRaw),
+        ("scriptrepo", ScriptRepo),
+        ("sounddir", SoundDirRaw),
+        ("mapdir", MapDirRaw),
+        ("maprepo", MapRepo),
+        ("plugindir", PluginDirRaw),
+        ("pluginrepo", PluginRepo),
+        ("configdir", ConfigDirRaw),
+        ("logdir", LogDirRaw),
+        ("updatemapperscripts", UpdateMapperScripts.ToString()),
+        ("reconnect", Reconnect.ToString()),
+        ("ignoreclosealert", IgnoreCloseAlert.ToString()),
+        ("keepinputtext", KeepInput.ToString()),
+        ("sizeinputtogame", SizeInputToGame.ToString()),
+        ("muted", (!PlaySounds).ToString()),
+        ("abortdupescript", AbortDupeScript.ToString()),
+        ("parsegameonly", ParseGameOnly.ToString()),
+        ("servertimeout", ServerActivityTimeout.ToString()),
+        ("servertimeoutcommand", ServerActivityCommand),
+        ("usertimeout", UserActivityTimeout.ToString()),
+        ("usertimeoutcommand", UserActivityCommand),
+        ("autowalkpauseonunfocus", AutoWalkPauseOnUnfocus.ToString()),
+        ("autowalkunfocusseconds", AutoWalkUnfocusSeconds.ToString()),
+        ("showlinks", ShowLinks.ToString()),
+        ("showimages", ShowImages.ToString()),
+        ("weblinksafety", WebLinkSafety.ToString()),
+        ("connectscript", ConnectScript),
+        ("autoupdate", AutoUpdate.ToString()),
+        ("checkforupdates", CheckForUpdates.ToString()),
+        ("scriptextension", ScriptExtension),
+        ("frontend", FrontEndIdentifier),
+    };
+
+    /// <summary>
+    /// Current value of a settings.cfg key (case-insensitive), or <c>null</c>
+    /// if the key isn't a recognized setting. The read counterpart of
+    /// <see cref="SetSetting"/>; backs <c>#config {key}</c> get + script reads.
+    /// </summary>
+    public string? GetSetting(string key)
+    {
+        foreach (var (k, v) in ToConfigPairs())
+            if (string.Equals(k, key, StringComparison.OrdinalIgnoreCase))
+                return v;
+        return null;
     }
 
     public bool Load(string fileName = "settings.cfg")
@@ -333,7 +355,6 @@ public sealed class GenieConfig
                     break;
                 case "connectscript": ConnectScript = value; break;
                 case "autoupdate": AutoUpdate = ToBool(value); Notify(ConfigFieldUpdated.AutoUpdate); break;
-                case "autoupdatelamp": AutoUpdateLamp = ToBool(value); Notify(ConfigFieldUpdated.AutoUpdateLamp); break;
                 case "checkforupdates": CheckForUpdates = ToBool(value); Notify(ConfigFieldUpdated.CheckForUpdates); break;
                 case "scriptextension": ScriptExtension = string.IsNullOrWhiteSpace(value) ? "cmd" : value; break;
                 case "frontend":

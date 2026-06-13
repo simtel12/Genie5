@@ -112,15 +112,18 @@ public interface ICommandHost
 
     /// <summary>
     /// Run a <c>#config</c> command — the raw argument string after
-    /// <c>#config </c>.
+    /// <c>#config </c>. Operates on <c>settings.cfg</c> (<c>GenieConfig</c>),
+    /// the Genie 4 config store — NOT <c>display.json</c> (the App-only visual
+    /// store, edited via the Configuration dialog + menus).
     /// <list type="bullet">
     ///   <item>(empty) — open the Configuration dialog.</item>
-    ///   <item><c>save</c> — flush DisplaySettings to <c>display.json</c>.</item>
-    ///   <item><c>load</c> — reload DisplaySettings from <c>display.json</c>.</item>
-    ///   <item><c>edit</c> — shell-open <c>display.json</c> in the user's editor.</item>
-    ///   <item><c>&lt;key&gt;</c> / <c>&lt;key&gt; &lt;value&gt;</c> —
-    ///         get / set a specific setting (Genie 4 parity placeholder; for
-    ///         now echoes a "use the dialog" hint).</item>
+    ///   <item><c>&lt;key&gt;</c> — echo the setting's current value.</item>
+    ///   <item><c>&lt;key&gt; &lt;value&gt;</c> — set it and persist
+    ///         <c>settings.cfg</c> (Genie 4 parity).</item>
+    ///   <item><c>list</c> — dump every key and its current value.</item>
+    ///   <item><c>save</c> — flush <c>settings.cfg</c>.</item>
+    ///   <item><c>load</c> — re-read <c>settings.cfg</c> into the live config.</item>
+    ///   <item><c>edit</c> — shell-open <c>settings.cfg</c> in the user's editor.</item>
     /// </list>
     /// Aliases accepted at the command-bar layer: <c>#set</c>, <c>#setting</c>,
     /// <c>#settings</c>. Settings storage + the Configuration dialog live in

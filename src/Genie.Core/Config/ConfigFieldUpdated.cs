@@ -10,7 +10,6 @@ public enum ConfigFieldUpdated
     LogDir,
     CheckForUpdates,
     AutoUpdate,
-    AutoUpdateLamp,
     ClassicConnect,
     ImagesEnabled,
     SizeInputToGame,

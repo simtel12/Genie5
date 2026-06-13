@@ -2466,9 +2466,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _core.PluginCommandRequested  += args =>
             Avalonia.Threading.Dispatcher.UIThread.Post(() => HandlePluginCommand(args));
 
-        // #config / #set / #setting / #settings — open Configuration dialog,
-        // or save / load / edit display.json. UI-thread-bound because the
-        // dialog handler executes via ReactiveCommand.
+        // #config / #set / #setting / #settings — open the Configuration dialog
+        // (bare), or operate on settings.cfg: get/set a key, save, load, edit,
+        // list. UI-thread-bound because the dialog handler executes via
+        // ReactiveCommand and the editor launch touches process state.
         _core.ConfigCommandRequested  += args =>
             Avalonia.Threading.Dispatcher.UIThread.Post(() => HandleConfigCommand(args));
 
@@ -2921,96 +2922,126 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             return;
         }
 
+        // Everything past the bare form operates on settings.cfg (GenieConfig),
+        // the Genie 4 #config store — NOT display.json. display.json is the
+        // App-only visual store, edited via the Configuration dialog + menus.
+        var config = _core?.Config;
+        if (config is null)
+        {
+            GameText.AddSystemLine("[config] Connect to a game first — settings load with the session.");
+            return;
+        }
+
         var split = trimmed.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-        var sub   = split[0].ToLowerInvariant();
+        var sub   = split[0];                       // preserve case for the key form
+        var verb  = sub.ToLowerInvariant();
         var rest  = split.Length > 1 ? split[1].Trim() : string.Empty;
 
-        switch (sub)
+        switch (verb)
         {
             case "save":
-                // Most settings auto-save on change (each menu command calls
-                // Display.Save). #config save is the explicit form for users
-                // muscle-memoried from Genie 4. Safe to call repeatedly.
-                Display.Save(_displayPath);
-                GameText.AddSystemLine($"[config] Settings saved → {_displayPath}");
+                // #config save → flush settings.cfg. Genie 4 parity; safe to
+                // call repeatedly. (display.json auto-saves on every menu edit.)
+                if (config.Save())
+                    GameText.AddSystemLine($"[config] settings.cfg saved → {config.ConfigDir}");
+                else
+                    GameText.AddSystemLine("[config] Could not save settings.cfg.");
                 break;
 
             case "load":
-                // Replace in-place would require swapping the reactive
-                // instance everywhere, which is invasive. Echo a clear next
-                // step instead: the persisted file is what the next launch
-                // reads, and the dialog is the right surface to live-edit.
-                GameText.AddSystemLine(
-                    "[config] Display settings live-reload not supported. Restart Genie to pick up external edits to display.json.");
+            case "reload":
+                // #config load → re-read settings.cfg into the live config.
+                // Values read live (command/script chars, directories) take
+                // effect at once; those captured at startup apply on reconnect.
+                if (config.Load())
+                    GameText.AddSystemLine("[config] settings.cfg reloaded. Some settings apply on reconnect.");
+                else
+                    GameText.AddSystemLine("[config] No settings.cfg found to load.");
+                break;
+
+            case "list":
+                // #config list → dump every key and its current value.
+                GameText.AddSystemLine("[config] current settings (settings.cfg):");
+                foreach (var (k, v) in config.ToConfigPairs())
+                    GameText.AddSystemLine($"  {k} = {v}");
                 break;
 
             case "edit":
-            {
-                // Open display.json in a text editor. Fallback ladder, in order:
-                //   1. Display.EditorPath if the user has explicitly set one
-                //      (set via Configuration → Display Settings → Editor Path).
-                //   2. Notepad on Windows — always present, opens .json as
-                //      text. Skips the "Choose an app for .json" OS picker
-                //      that UseShellExecute=true would otherwise trigger.
-                //   3. macOS / Linux — try `open` / `xdg-open` with the file;
-                //      these usually route to TextEdit / the user's default
-                //      text app, not a generic file-association picker.
-                //   4. Last-resort UseShellExecute=true — only if the OS-
-                //      specific helpers above aren't available.
-                try
-                {
-                    var path = _displayPath;
-                    if (!System.IO.File.Exists(path))
-                        Display.Save(path);  // first-write — make sure there's a file to open
-
-                    var editor = Display.EditorPath;
-                    if (!string.IsNullOrWhiteSpace(editor) && System.IO.File.Exists(editor))
-                    {
-                        System.Diagnostics.Process.Start(
-                            new System.Diagnostics.ProcessStartInfo(editor, "\"" + path + "\"")
-                            { UseShellExecute = false });
-                    }
-                    else if (OperatingSystem.IsWindows())
-                    {
-                        // Notepad is always available on Windows and opens
-                        // .json files as text without the file-association
-                        // chooser dialog.
-                        System.Diagnostics.Process.Start("notepad.exe", "\"" + path + "\"");
-                    }
-                    else if (OperatingSystem.IsMacOS())
-                    {
-                        System.Diagnostics.Process.Start("open", "-t \"" + path + "\"");
-                    }
-                    else if (OperatingSystem.IsLinux())
-                    {
-                        System.Diagnostics.Process.Start("xdg-open", "\"" + path + "\"");
-                    }
-                    else
-                    {
-                        System.Diagnostics.Process.Start(
-                            new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
-                    }
-                    GameText.AddSystemLine($"[config] Opened {_displayPath}");
-                    GameText.AddSystemLine(
-                        "[config] To use a different editor, set Edit → Configuration → Display Settings → Editor Path.");
-                }
-                catch (Exception ex)
-                {
-                    GameText.AddSystemLine($"[config] Could not open editor: {ex.Message}");
-                    Diagnostics.ErrorLog.Log("ConfigCommand.Edit", ex);
-                }
+                OpenSettingsCfgInEditor(config);
                 break;
-            }
 
             default:
-                // Genie 4's #config <key> [value] uses the settings.cfg
-                // dictionary schema; ours lives on the strongly-typed
-                // DisplaySettings record. Until/unless there's demand for
-                // a script-level reflection-based getter/setter, point the
-                // user at the dialog.
-                GameText.AddSystemLine(
-                    $"[config] '#config {sub}' — script-level get/set not wired yet. Use #config (no args) to open the Configuration dialog.");
+                // #config <key>          → echo the current value
+                // #config <key> <value>  → set it and persist settings.cfg
+                if (rest.Length == 0)
+                {
+                    var current = config.GetSetting(sub);
+                    GameText.AddSystemLine(current is null
+                        ? $"[config] Unknown setting '{sub}'. Try #config list."
+                        : $"[config] {verb} = {current}");
+                }
+                else
+                {
+                    try
+                    {
+                        config.SetSetting(sub, rest);   // throws on an unrecognized key
+                        config.Save();
+                        GameText.AddSystemLine($"[config] {verb} = {config.GetSetting(sub)}  (saved)");
+                    }
+                    catch
+                    {
+                        GameText.AddSystemLine($"[config] Unknown setting '{sub}'. Try #config list.");
+                    }
+                }
                 break;
+        }
+    }
+
+    /// <summary>Open settings.cfg in an external text editor. Editor preference
+    /// ladder: explicit <see cref="DisplaySettings.EditorPath"/> → Notepad
+    /// (Windows) → open/xdg-open (macOS/Linux) → OS default. This is #config
+    /// edit's Genie 4 behavior, pointed at settings.cfg (GenieConfig) rather
+    /// than display.json.</summary>
+    private void OpenSettingsCfgInEditor(Genie.Core.Config.GenieConfig config)
+    {
+        try
+        {
+            var path = System.IO.Path.Combine(config.ConfigDir, "settings.cfg");
+            if (!System.IO.File.Exists(path))
+                config.Save();  // first-write — make sure there's a file to open
+
+            var editor = Display.EditorPath;
+            if (!string.IsNullOrWhiteSpace(editor) && System.IO.File.Exists(editor))
+            {
+                System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo(editor, "\"" + path + "\"")
+                    { UseShellExecute = false });
+            }
+            else if (OperatingSystem.IsWindows())
+            {
+                System.Diagnostics.Process.Start("notepad.exe", "\"" + path + "\"");
+            }
+            else if (OperatingSystem.IsMacOS())
+            {
+                System.Diagnostics.Process.Start("open", "-t \"" + path + "\"");
+            }
+            else if (OperatingSystem.IsLinux())
+            {
+                System.Diagnostics.Process.Start("xdg-open", "\"" + path + "\"");
+            }
+            else
+            {
+                System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+            }
+            GameText.AddSystemLine($"[config] Opened {path}");
+            GameText.AddSystemLine(
+                "[config] Edits apply on the next #config load or restart. To set a different editor, use Edit → Configuration → Display Settings → Editor Path.");
+        }
+        catch (Exception ex)
+        {
+            GameText.AddSystemLine($"[config] Could not open editor: {ex.Message}");
+            Diagnostics.ErrorLog.Log("ConfigCommand.Edit", ex);
         }
     }
 
