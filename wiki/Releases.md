@@ -4,7 +4,20 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.4 — JavaScript scripting, typed login & dev tools
+## Latest: v5.0.0-alpha.4.1 — portable-first storage
+
+A focused point release that fixes where Genie keeps its data. Previously a portable copy could still read and write the per-user OS folder (`%APPDATA%` on Windows) instead of its own; now **data beside the executable always wins**, so a portable unzip is truly self-contained.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.4.1** as a delta.
+
+**Fixes**
+
+- **Portable-first data discovery** — a copy of Genie with its data folder beside the `.exe` now runs fully local; nothing is read from or written to the per-user OS folder. The old build only did this when a `genie5.portable` marker file was present, which the release zip wasn't reliably shipping — so portable installs leaked into `%APPDATA%` ([#38](https://github.com/GenieClient/Genie5/issues/38), [#74](https://github.com/GenieClient/Genie5/issues/74)).
+- **First-run location prompt** — a fresh install with no data in either place now asks where to keep it (portable, beside the exe — the default; or your user folder). The choice persists and is never asked again. See [Application Folders](Application-Folders).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.4.1)
+
+## v5.0.0-alpha.4 — JavaScript scripting, typed login & dev tools
 
 The biggest alpha to walk the lands of Elanthia yet: `.js` scripting, connect-by-typing, and two new tools for the tinkering adventurer — plus a satchel of scripting and mapper fixes to ease the road ahead.
 
