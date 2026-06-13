@@ -1,0 +1,57 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Genie.App.Views.FirstRunLocationDialog"
+        Title="Welcome to Genie 5 — Choose where to store your data"
+        Width="540" Height="300"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        ShowInTaskbar="True">
+
+  <Grid RowDefinitions="Auto,*,Auto" Margin="22,18,22,18">
+
+    <TextBlock Grid.Row="0"
+               Text="Where should Genie keep its settings, scripts, maps and logs?"
+               FontSize="14"
+               FontWeight="SemiBold"
+               TextWrapping="Wrap"/>
+
+    <StackPanel Grid.Row="1" Spacing="12" Margin="0,14,0,0">
+
+      <TextBlock TextWrapping="Wrap" FontSize="12.5">
+        <Run Text="• Portable (recommended) — keep everything in a folder right next to the app. Best for a USB stick or a self-contained install you can move around."/>
+      </TextBlock>
+      <TextBlock x:Name="LocalPathText"
+                 TextWrapping="Wrap"
+                 FontSize="11"
+                 Opacity="0.7"
+                 Margin="12,0,0,0"/>
+
+      <TextBlock TextWrapping="Wrap" FontSize="12.5">
+        <Run Text="• User folder — store data in your account's standard application-data location. Best for a single-machine install shared by no one else."/>
+      </TextBlock>
+      <TextBlock x:Name="UserPathText"
+                 TextWrapping="Wrap"
+                 FontSize="11"
+                 Opacity="0.7"
+                 Margin="12,0,0,0"/>
+
+    </StackPanel>
+
+    <StackPanel Grid.Row="2"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8"
+                Margin="0,16,0,0">
+      <Button x:Name="PortableButton"
+              Content="_Portable (this folder)"
+              MinWidth="150"
+              IsDefault="True"
+              Click="OnPortableClick"/>
+      <Button x:Name="UserFolderButton"
+              Content="_User folder"
+              MinWidth="120"
+              Click="OnUserFolderClick"/>
+    </StackPanel>
+
+  </Grid>
+</Window>

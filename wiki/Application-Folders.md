@@ -29,9 +29,13 @@ $XDG_DATA_HOME/Genie5/      # or, if XDG_DATA_HOME is unset:
 ~/.local/share/Genie5/
 ```
 
-### Portable mode
+### Portable mode (portable-first)
 
-If a folder named `Config` exists **next to the Genie executable**, Genie 5 runs in *portable* mode and keeps everything alongside the app instead of in the per-user location. Useful for a USB-stick or self-contained install. (This is the first thing `AppPaths.Discover` checks.)
+Genie 5 resolves its data root **portable-first**: a `Config` folder (or the legacy `genie5.portable` marker) **next to the Genie executable** always wins, and everything lives alongside the app instead of in the per-user location. Useful for a USB-stick or self-contained install. (This is the first thing `AppPaths.Discover` checks — local beats the per-user folder even when both exist.)
+
+### First launch
+
+On a brand-new install — when Genie finds **no** data beside the app **and none** in the per-user folder — it asks where to set up: **Portable (this folder)** or your **User folder**. The default action is Portable. Whatever you pick is created on the spot, so the prompt only appears once; later launches just find the existing data and skip straight to it.
 
 ## What's inside
 
