@@ -25,6 +25,13 @@ public class GameTextViewModel : ReactiveObject
     // LastRowWasPrompt). Set by AddLine; only the prompt path passes true.
     private bool _lastLineWasPrompt;
 
+    // Live player status, mirrored from <indicator> XML (IndicatorEvent), used
+    // by the promptforce composer to reconstruct the prompt's status letters
+    // even when DR sends a bare ">". Roundtime ("R") is read live from
+    // GameState.Combat at compose time, not stored here.
+    private bool _stKneeling, _stSitting, _stProne, _stStunned, _stHidden,
+                 _stInvisible, _stWebbed, _stBleeding, _stJoined, _stDead;
+
     public ObservableCollection<TextLine> Lines { get; } = [];
 
     /// <summary>
@@ -117,10 +124,14 @@ public class GameTextViewModel : ReactiveObject
         //     (AddLine resets _lastLineWasPrompt for every non-prompt line), and
         //   • promptbreak — when false, suppress the standalone prompt line
         //     entirely so output flows uninterrupted (default true = show it).
-        // The displayed string is the server status indicator (the letters
-        // before ">", e.g. "R", "H") followed by Config.Prompt ("> "): a bare
-        // ">" renders as "> ", "R>" renders as "R> ". Read live so a #config
-        // prompt / #config promptbreak change applies immediately.
+        // The displayed string is the status letters followed by Config.Prompt
+        // ("> "), so a bare ">" renders as "> " and "R>" renders as "R> ".
+        //   • promptforce off — show the server's own indicator letters as-is
+        //     (the chars before ">"), so the prompt mirrors exactly what DR sent.
+        //   • promptforce on (default) — reconstruct the letters from the live
+        //     <indicator> state + roundtime, so the prompt is always accurate
+        //     even when DR sends a bare ">" while separately flagging hidden/RT.
+        // Read live so #config prompt / promptbreak / promptforce apply at once.
         core.GameEvents
             .OfType<PromptEvent>()
             .ObserveOn(RxApp.MainThreadScheduler)
@@ -130,8 +141,35 @@ public class GameTextViewModel : ReactiveObject
                 if (core.Config?.PromptBreak == false) return; // promptbreak off → no prompt line
                 if (_lastLineWasPrompt) return;                // dedup back-to-back prompts
                 var promptStr = core.Config?.Prompt ?? "> ";
-                var status = (e.Indicator ?? string.Empty).TrimEnd('>', ' ');
+                var status = core.Config?.PromptForce == true
+                    ? ComposeStatusLetters(core)
+                    : (e.Indicator ?? string.Empty).TrimEnd('>', ' ');
                 AddLine(status + promptStr, StreamColor.Main, isPrompt: true);
+            });
+
+        // ── Player status (for the promptforce composer) ──────────────────
+        // Mirror <indicator> XML into local flags. VitalsViewModel keeps its
+        // own copies for the status bar; the prompt composer needs Invisible
+        // and Joined too (absent from GameState's CharacterStatus enum), so we
+        // track all ten here rather than read GameState.ActiveStatuses.
+        core.GameEvents
+            .OfType<IndicatorEvent>()
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(e =>
+            {
+                switch (e.IndicatorId.ToUpperInvariant())
+                {
+                    case "ICONKNEELING":  _stKneeling  = e.Visible; break;
+                    case "ICONSITTING":   _stSitting   = e.Visible; break;
+                    case "ICONPRONE":     _stProne     = e.Visible; break;
+                    case "ICONSTUNNED":   _stStunned   = e.Visible; break;
+                    case "ICONHIDDEN":    _stHidden    = e.Visible; break;
+                    case "ICONINVISIBLE": _stInvisible = e.Visible; break;
+                    case "ICONWEBBED":    _stWebbed    = e.Visible; break;
+                    case "ICONBLEEDING":  _stBleeding  = e.Visible; break;
+                    case "ICONJOINED":    _stJoined    = e.Visible; break;
+                    case "ICONDEAD":      _stDead      = e.Visible; break;
+                }
             });
 
         // ── Local echoes: typed commands + system diagnostics ─────────────
@@ -199,6 +237,31 @@ public class GameTextViewModel : ReactiveObject
                 Lines[i] = new TextLine(existing.Text, existing.Color);
             }
         });
+    }
+
+    /// <summary>
+    /// Build the prompt's status-letter prefix from the live indicator flags
+    /// and current roundtime — the promptforce path. Letter order matches
+    /// Genie 4 (Core/Game.cs prompt composition): K s P S H I W ! J R. A dead
+    /// character shows "DEAD" instead of letters (Genie 4 special case).
+    /// Returns "" when nothing is active, so a bare prompt renders as just
+    /// the configured prompt string ("> ").
+    /// </summary>
+    private string ComposeStatusLetters(GenieCore core)
+    {
+        if (_stDead) return "DEAD";
+        var sb = new StringBuilder(10);
+        if (_stKneeling)  sb.Append('K');
+        if (_stSitting)   sb.Append('s');
+        if (_stProne)     sb.Append('P');
+        if (_stStunned)   sb.Append('S');
+        if (_stHidden)    sb.Append('H');
+        if (_stInvisible) sb.Append('I');
+        if (_stWebbed)    sb.Append('W');
+        if (_stBleeding)  sb.Append('!');
+        if (_stJoined)    sb.Append('J');
+        if (core.State?.Combat.InRoundTime == true) sb.Append('R');
+        return sb.ToString();
     }
 
     private void AddLine(string text, StreamColor color,
