@@ -53,7 +53,12 @@ public class App : Application
     /// </summary>
     private static async Task EnsureStorageLocationChosenAsync()
     {
-        var localDir = AppContext.BaseDirectory;
+        // ResolvePortableRoot, not AppContext.BaseDirectory: under a Velopack
+        // install the exe runs from a wiped-on-update `current\` subfolder, so
+        // the portable root (where data belongs) is its parent. Must match what
+        // AppPaths.Discover uses or the prompt would materialize Config in the
+        // wrong place.
+        var localDir = AppPaths.ResolvePortableRoot(AppContext.BaseDirectory);
         var userDir  = AppPaths.GetUserDataDirectory(AppName);
 
         if (AppPaths.HasData(localDir) || AppPaths.HasData(userDir))

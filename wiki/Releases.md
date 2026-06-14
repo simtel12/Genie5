@@ -4,7 +4,21 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.4.1 — portable-first storage
+## Latest: v5.0.0-alpha.4.2 — portable mode for the downloadable builds
+
+The alpha.4.1 fix was only half the story: it got portable-first discovery right, but the **downloadable** Windows/macOS builds are packaged so the app runs from an internal `current/` subfolder (the one with `Update.exe` beside it). Genie looked for your data *inside* that subfolder, found none, and fell back to the per-user OS folder (`%APPDATA%` on Windows) — so a portable unzip with your `Config` / `Scripts` / `Maps` beside `Genie.exe` still leaked into the user profile.
+
+Now Genie resolves its data to the **program folder** — the one holding `Genie.exe` and your data folders — which is both where you put your files and where they survive an update (the `current/` subfolder is replaced wholesale each update).
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.4.2** as a delta.
+
+**Fixes**
+
+- **Portable mode now works on the packaged downloads** — discovery resolves the data root to the program folder (beside `Genie.exe` / `Update.exe`), not the internal `current/` folder the app launches from, so a portable copy is truly self-contained and survives updates. A freshly-extracted portable build is recognized even before its first `Config` folder exists ([#38](https://github.com/GenieClient/Genie5/issues/38)).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.4.2)
+
+## v5.0.0-alpha.4.1 — portable-first storage
 
 A focused point release that fixes where Genie keeps its data. Previously a portable copy could still read and write the per-user OS folder (`%APPDATA%` on Windows) instead of its own; now **data beside the executable always wins**, so a portable unzip is truly self-contained.
 

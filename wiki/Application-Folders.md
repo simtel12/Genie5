@@ -31,7 +31,9 @@ $XDG_DATA_HOME/Genie5/      # or, if XDG_DATA_HOME is unset:
 
 ### Portable mode (portable-first)
 
-Genie 5 resolves its data root **portable-first**: a `Config` folder (or the legacy `genie5.portable` marker) **next to the Genie executable** always wins, and everything lives alongside the app instead of in the per-user location. Useful for a USB-stick or self-contained install. (This is the first thing `AppPaths.Discover` checks — local beats the per-user folder even when both exist.)
+Genie 5 resolves its data root **portable-first**: a `Config` folder (or a `genie5.portable` / `.portable` marker) **in the Genie program folder** always wins, and everything lives alongside the app instead of in the per-user location. Useful for a USB-stick, a synced cloud folder, or a self-contained install. (This is the first thing `AppPaths.Discover` checks — local beats the per-user folder even when both exist.)
+
+**Where is "the Genie program folder"?** For the **Portable** download it's the folder you extracted — the one holding `Genie.exe`, `Update.exe`, and your `Config` / `Scripts` / `Maps` folders. Internally the app actually runs from a `current\` subfolder that gets replaced on every update, so Genie deliberately keeps your data **one level up** in that program folder — where you put it, and where it survives updates. Drop your `Scripts`, `Maps`, etc. beside `Genie.exe`, not inside `current\`.
 
 ### First launch
 

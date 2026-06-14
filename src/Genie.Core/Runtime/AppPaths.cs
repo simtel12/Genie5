@@ -26,42 +26,94 @@ public sealed class AppPaths
     public const string PortableMarkerFileName = "genie5.portable";
 
     /// <summary>
-    /// Resolve the data root, <b>portable-first</b>: local (beside the exe)
-    /// always wins when it holds Genie data, then the per-user OS folder, and
-    /// only if neither exists do we fall back to creating a local install.
+    /// Velopack's own portable marker, dropped in the install root of a
+    /// portable bundle (beside <c>Update.exe</c>). We honor it as a portable
+    /// signal so a freshly-extracted Velopack portable .zip is recognized even
+    /// before any <c>Config</c> folder exists.
+    /// </summary>
+    public const string VelopackPortableMarkerFileName = ".portable";
+
+    /// <summary>
+    /// The name of the subfolder Velopack runs the app from. On a Velopack
+    /// install (Setup.exe <i>or</i> portable .zip) the executable lives in
+    /// <c>&lt;root&gt;\current\</c>, which Velopack <b>replaces wholesale on
+    /// every update</b>. Data therefore must never live there — see
+    /// <see cref="ResolvePortableRoot"/>.
+    /// </summary>
+    private const string VelopackCurrentDirName = "current";
+
+    /// <summary>
+    /// Resolve the data root, <b>portable-first</b>: local (the portable root,
+    /// see below) always wins when it holds Genie data, then the per-user OS
+    /// folder, and only if neither exists do we fall back to creating a local
+    /// install.
     ///
-    /// "Holds Genie data" means a <c>Config</c> folder (or the legacy
-    /// <see cref="PortableMarkerFileName"/> marker) is present — see
-    /// <see cref="HasData"/>. Fresh installs are normally resolved by the App's
-    /// first-run prompt, which materializes the chosen location (local vs user
-    /// folder) <i>before</i> this runs; this method's own fresh-install branch
-    /// is the headless / no-UI fallback and stays portable-first.
+    /// "Holds Genie data" means a <c>Config</c> folder (or a portable marker)
+    /// is present — see <see cref="HasData"/>. Fresh installs are normally
+    /// resolved by the App's first-run prompt, which materializes the chosen
+    /// location (local vs user folder) <i>before</i> this runs; this method's
+    /// own fresh-install branch is the headless / no-UI fallback and stays
+    /// portable-first.
     /// </summary>
     public static AppPaths Discover(string appName, string baseDirectory)
     {
         var userDir = GetUserDataDirectory(appName);
 
-        // 1. Portable-first: data living beside the executable always wins. A
-        //    copy of Genie with a Config folder (or the legacy portable marker)
-        //    next to it runs fully local — nothing is read from or written to
-        //    the per-user folder, even if that folder also holds data.
-        //    The write-guard keeps a read-only drop (e.g. Program Files) from
-        //    claiming portable mode and then failing to save.
-        if (HasData(baseDirectory) && IsDirectoryWritable(baseDirectory))
-            return new AppPaths(baseDirectory, isLocal: true);
+        // The portable data root is NOT always the exe's own directory: under a
+        // Velopack install the exe runs from a wiped-on-update `current\` folder,
+        // so portable data lives one level up in the install root. Resolve that
+        // once and use it everywhere below. See ResolvePortableRoot.
+        var localDir = ResolvePortableRoot(baseDirectory);
+
+        // 1. Portable-first: data living in the portable root always wins. A
+        //    copy of Genie with a Config folder (or a portable marker) there
+        //    runs fully local — nothing is read from or written to the per-user
+        //    folder, even if that folder also holds data. The write-guard keeps
+        //    a read-only drop (e.g. Program Files) from claiming portable mode
+        //    and then failing to save.
+        if (HasData(localDir) && IsDirectoryWritable(localDir))
+            return new AppPaths(localDir, isLocal: true);
 
         // 2. Otherwise use the per-user OS data folder if it already holds data.
         if (HasData(userDir))
             return new AppPaths(userDir, isLocal: false);
 
         // 3. Nothing anywhere yet (headless run, tests, or the first-run prompt
-        //    was skipped). Stay portable-first: keep data beside the exe when we
-        //    can write there, else fall back to the per-user folder.
-        if (IsDirectoryWritable(baseDirectory))
-            return new AppPaths(baseDirectory, isLocal: true);
+        //    was skipped). Stay portable-first: keep data in the portable root
+        //    when we can write there, else fall back to the per-user folder.
+        if (IsDirectoryWritable(localDir))
+            return new AppPaths(localDir, isLocal: true);
 
         Directory.CreateDirectory(userDir);
         return new AppPaths(userDir, isLocal: false);
+    }
+
+    /// <summary>
+    /// Map the running executable's directory to the directory portable data
+    /// should live in. For a plain layout (exe with its data folders beside it)
+    /// that's the directory itself. For a <b>Velopack</b> install the exe runs
+    /// from a <c>current\</c> subfolder that Velopack replaces on every update,
+    /// so the real portable root is its parent (the install root, beside
+    /// <c>Update.exe</c> / the <c>.portable</c> marker) — which is both where
+    /// users naturally drop their data and where it survives updates. We only
+    /// climb when the layout actually looks like Velopack's, so a normal folder
+    /// that happens to be named "current" is left untouched.
+    /// </summary>
+    public static string ResolvePortableRoot(string exeDirectory)
+    {
+        var dir = Path.TrimEndingDirectorySeparator(Path.GetFullPath(exeDirectory));
+        var parent = Path.GetDirectoryName(dir);
+
+        if (parent is not null
+            && string.Equals(Path.GetFileName(dir), VelopackCurrentDirName, StringComparison.OrdinalIgnoreCase)
+            && (File.Exists(Path.Combine(parent, "Update.exe"))
+                || File.Exists(Path.Combine(parent, VelopackPortableMarkerFileName))
+                || File.Exists(Path.Combine(parent, PortableMarkerFileName))))
+        {
+            return parent;
+        }
+
+        return dir;
     }
 
     /// <summary>
@@ -95,13 +147,14 @@ public sealed class AppPaths
 
     /// <summary>
     /// True if <paramref name="dir"/> already holds a Genie install — i.e. it
-    /// has a <c>Config</c> folder or the legacy <see cref="PortableMarkerFileName"/>
-    /// marker. This is the signal both the portable-first <see cref="Discover"/>
-    /// and the App's first-run prompt use to tell "already set up here" from
-    /// "fresh".
+    /// has a <c>Config</c> folder, the legacy <see cref="PortableMarkerFileName"/>
+    /// marker, or Velopack's <see cref="VelopackPortableMarkerFileName"/> marker.
+    /// This is the signal both the portable-first <see cref="Discover"/> and the
+    /// App's first-run prompt use to tell "already set up here" from "fresh".
     /// </summary>
     public static bool HasData(string dir)
         => File.Exists(Path.Combine(dir, PortableMarkerFileName))
+        || File.Exists(Path.Combine(dir, VelopackPortableMarkerFileName))
         || Directory.Exists(Path.Combine(dir, "Config"));
 
     /// <summary>
