@@ -273,7 +273,7 @@ public sealed class GenieConfig
     public static readonly IReadOnlySet<string> ReservedKeys =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "mycommandchar", "maxrowbuffer", "spelltimer", "autolog",
+            "mycommandchar", "maxrowbuffer", "spelltimer",
             "automapperalpha", "promptbreak", "promptforce", "condensed",
             "monstercountignorelist", "muted", "showimages",
         };

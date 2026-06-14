@@ -232,6 +232,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <c>{AppData}/Genie5/Logs/</c>. Always present (constructed once at startup);
     /// only active when toggled via <see cref="ToggleRecordingCommand"/>.</summary>
     public SessionRecorder Recorder { get; }
+
+    /// <summary>Automatic rendered-text session log (Genie 4 AutoLog). Started
+    /// on connect when <c>Config.AutoLog</c> is set; writes the game window to
+    /// <c>{AppData}/Genie5/Logs/{Char}{Game}_{date}.log</c>.</summary>
+    public SessionTextLogger AutoLogger { get; }
     public ReactiveCommand<Unit, Unit>                    ResetLayoutCommand       { get; }
     public ReactiveCommand<Unit, Unit>                    ExitCommand              { get; }
     /// <summary>
@@ -1042,6 +1047,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() => GameText.AddSystemLine(msg));
         });
+
+        // AutoLog (Genie 4) — automatic rendered-text session log. Started in
+        // ConnectAsync when Config.AutoLog is on; stopped in DisconnectAsync.
+        AutoLogger = new SessionTextLogger(_logsDir);
         Recorder.CurrentFileChanged += file =>
             Avalonia.Threading.Dispatcher.UIThread.Post(() => IsRecording = file is not null);
 
@@ -2419,6 +2428,17 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // ShowGameText / ShowEchoText / ShowScriptText at subscription time.
         GameText.DisplaySettings = Display;
         GameText.Attach(_core);
+
+        // AutoLog (Genie 4): begin the rendered-text session log if enabled.
+        // The notice is emitted BEFORE Start subscribes, so it isn't itself
+        // logged. Uses the login character/game (State.CharacterName isn't
+        // populated until the server's name push arrives a moment later).
+        if (_core.Config.AutoLog)
+        {
+            GameText.AddSystemLine("[autolog] session logging on → Logs folder. Turn off with #config autolog false.");
+            AutoLogger.Start(GameText, cfg.CharacterName, cfg.GameCode);
+        }
+
         Vitals.Attach(_core);
         Room.Attach(_core);
         Inventory.Attach(_core);
@@ -2689,6 +2709,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // after the session ends just produces a file that trails off mid-tag.
         // The user can re-toggle Record Session on the next connect.
         Recorder.Stop();
+        AutoLogger.Stop();          // close the AutoLog rendered-text file (#15)
         Perf.Detach();              // stop the overlay timer + disable metrics collection
         UserHighlights.Metrics = null;
         _scriptHeartbeat?.Stop();   // stop pumping Tick() once the session ends (#61)
