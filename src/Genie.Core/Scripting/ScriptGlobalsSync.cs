@@ -222,7 +222,14 @@ public sealed class ScriptGlobalsSync : IDisposable
             case "room title":   Set("roomname",    comp.Content ?? ""); break;
             case "room desc":    Set("roomdesc",    comp.Content ?? ""); break;
             case "room exits":   Set("roomexits",   comp.Content ?? ""); break;
-            case "room objs":    Set("roomobjs",    comp.Content ?? ""); break;
+            case "room objs":
+                Set("roomobjs", comp.Content ?? "");
+                // Monster count (Genie 4): GameStateEngine processed this same
+                // event first (it subscribes earlier), so Room.Creatures is
+                // already filtered through the ignore list here.
+                Set("monstercount", _state.Room.MonsterCount.ToString(CultureInfo.InvariantCulture));
+                Set("monsterlist",  string.Join(", ", _state.Room.Creatures));
+                break;
             case "room players": Set("roomplayers", comp.Content ?? ""); break;
             // SeedInitial wrote $stance once at construction; without this
             // case it never updated on stance changes, so scripts that read

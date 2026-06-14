@@ -200,7 +200,14 @@ public sealed class GameStateEngine : IDisposable
             case "room title":   _state.Room.Title       = comp.Content; break;
             case "room desc":    _state.Room.Description = comp.Content; break;
             case "room exits":   _state.Room.Exits       = comp.Content; break;
-            case "room objs":    _state.Room.Objects     = comp.Content; break;
+            case "room objs":
+                _state.Room.Objects = comp.Content;
+                // Monster count: filter the bold creature phrases through the
+                // ignore list (Genie 4 default "appears dead|(dead)"). Recomputes
+                // every room update — empty when nothing is bold.
+                _state.Room.Creatures    = FilterCreatures(comp.BoldNames, Config?.IgnoreMonsterList);
+                _state.Room.MonsterCount = _state.Room.Creatures.Count;
+                break;
             case "room players": _state.Room.Players     = comp.Content; break;
 
             // Stance
@@ -278,6 +285,29 @@ public sealed class GameStateEngine : IDisposable
             "defensive" => Stance.Defensive,
             _           => Stance.Unknown
         };
+
+    /// <summary>
+    /// Filter the room's bold creature phrases through the monster-count ignore
+    /// list (a Genie 4 pipe-delimited regex, default "appears dead|(dead)"). A
+    /// phrase is excluded when it matches. An empty list filters nothing; a
+    /// malformed pattern is ignored (no exclusion) rather than throwing.
+    /// </summary>
+    private static IReadOnlyList<string> FilterCreatures(
+        IReadOnlyList<string>? boldNames, string? ignoreList)
+    {
+        if (boldNames is null || boldNames.Count == 0) return System.Array.Empty<string>();
+        if (string.IsNullOrWhiteSpace(ignoreList)) return boldNames;
+
+        System.Text.RegularExpressions.Regex? rx = null;
+        try { rx = new System.Text.RegularExpressions.Regex(ignoreList,
+                       System.Text.RegularExpressions.RegexOptions.IgnoreCase); }
+        catch { return boldNames; }   // bad pattern → don't drop anything
+
+        var kept = new List<string>(boldNames.Count);
+        foreach (var name in boldNames)
+            if (!rx.IsMatch(name)) kept.Add(name);
+        return kept;
+    }
 
     public void Dispose() => _subscription.Dispose();
 }

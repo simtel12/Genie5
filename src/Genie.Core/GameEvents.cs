@@ -106,7 +106,14 @@ public sealed record CastTimeEvent(DateTimeOffset ExpiresAt) : GameEvent;
 ///   PC Encumbrance — encumbrance description
 ///   PC Status      — status effects (bleeding, stunned, etc.)
 /// </summary>
-public sealed record ComponentEvent(string ComponentId, string Content) : GameEvent;
+/// <param name="BoldNames">For components that bolded names (DR bolds creatures
+/// in <c>room objs</c>), the bold phrases incl. their trailing descriptor —
+/// e.g. "a brown lynx that is sleeping". Null when nothing was bold. Backs the
+/// monster count.</param>
+public sealed record ComponentEvent(
+    string ComponentId,
+    string Content,
+    IReadOnlyList<string>? BoldNames = null) : GameEvent;
 
 // ── Status indicators ────────────────────────────────────────────────────────
 

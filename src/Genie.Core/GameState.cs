@@ -69,6 +69,12 @@ public sealed class RoomState
     public string   Exits       { get; set; } = "";
     public string   Objects     { get; set; } = "";
     public string   Players     { get; set; } = "";
+    /// <summary>Bold creature phrases in the room (from <c>room objs</c>),
+    /// after the monster-count ignore list. Backs <c>$monsterlist</c>.</summary>
+    public IReadOnlyList<string> Creatures { get; set; } = System.Array.Empty<string>();
+    /// <summary>Number of creatures in the room after the ignore list
+    /// (Genie 4 <c>$monstercount</c>).</summary>
+    public int      MonsterCount { get; set; }
     /// <summary>Mapper room ID (from GenieClient/Maps data or &lt;nav rm="..."/&gt;).</summary>
     public int      RoomId      { get; set; }
     /// <summary>Space-separated exit directions from &lt;compass&gt; (e.g. "north south east").</summary>

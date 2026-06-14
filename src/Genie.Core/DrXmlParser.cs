@@ -109,6 +109,14 @@ public sealed class DrXmlParser : IDisposable
     private readonly List<BoldSpan> _pendingBoldSpans = new();
     private readonly Stack<int>     _boldStack        = new();
 
+    // Bold tracking for COMPONENT content (a separate buffer from the display
+    // line buffer). DR bolds creature names inside the `room objs` component;
+    // capturing the bold ranges here is what lets the monster-count feature
+    // tell a creature (bold) from an item (not bold) — the line-level bold
+    // tracking above can't, because component text never touches _textLineBuffer.
+    private readonly List<BoldSpan> _componentBoldSpans = new();
+    private readonly Stack<int>     _componentBoldStack = new();
+
     // ── Raw buffer ───────────────────────────────────────────────────────────
     private readonly System.Text.StringBuilder _rawBuffer = new(2048);
 
@@ -637,10 +645,21 @@ public sealed class DrXmlParser : IDisposable
             // pick up. Used by DR to mark unread news items in bold and
             // to emphasize keywords elsewhere.
             case "pushbold":
-                _boldStack.Push(_textLineBuffer.Length);
+                // Inside a component, text flows to _componentBuffer (not the
+                // line buffer), so track bold against that buffer instead.
+                if (_inComponent) _componentBoldStack.Push(_componentBuffer.Length);
+                else              _boldStack.Push(_textLineBuffer.Length);
                 break;
             case "popbold":
-                if (_boldStack.TryPop(out var boldStart))
+                if (_inComponent)
+                {
+                    if (_componentBoldStack.TryPop(out var cStart))
+                    {
+                        var cLen = _componentBuffer.Length - cStart;
+                        if (cLen > 0) _componentBoldSpans.Add(new BoldSpan(cStart, cLen));
+                    }
+                }
+                else if (_boldStack.TryPop(out var boldStart))
                 {
                     var spanLen = _textLineBuffer.Length - boldStart;
                     if (spanLen > 0)
@@ -761,11 +780,20 @@ public sealed class DrXmlParser : IDisposable
             case "component" when _inComponent:
             {
                 _inComponent = false;
-                var content  = System.Net.WebUtility.HtmlDecode(StripBasicXml(_componentBuffer.ToString())).Trim();
+                var raw      = _componentBuffer.ToString();
+                var content  = System.Net.WebUtility.HtmlDecode(StripBasicXml(raw)).Trim();
                 var id       = _pendingComponentId ?? "";
-                _events.OnNext(new ComponentEvent(id, content));
+                // Bold names (creatures) → each phrase runs from the bold start
+                // to the next comma/period in the raw buffer (Genie 4 captures
+                // the trailing descriptor, e.g. "a kobold that appears dead", so
+                // the ignore list can match it). Decoded; positions index the
+                // same raw buffer the spans were recorded against.
+                IReadOnlyList<string>? boldNames = ExtractBoldPhrases(raw);
+                _events.OnNext(new ComponentEvent(id, content, boldNames));
                 _pendingComponentId = null;
                 _componentBuffer.Clear();
+                _componentBoldSpans.Clear();
+                _componentBoldStack.Clear();
                 break;
             }
             case "spell" when _inSpell:
@@ -920,6 +948,31 @@ public sealed class DrXmlParser : IDisposable
     /// Strips XML formatting tags and ANSI escape codes from text,
     /// leaving only human-readable content.
     /// </summary>
+    /// <summary>
+    /// Build the bold "creature" phrases for the just-closed component from the
+    /// recorded <see cref="_componentBoldSpans"/> (positions into <paramref name="raw"/>,
+    /// the un-stripped component buffer). Each phrase runs from the bold start to
+    /// the next comma/period — capturing the trailing descriptor ("a kobold that
+    /// appears dead") so a consumer's ignore list can match it. Returns null when
+    /// the component had no bold (the common case), so non-creature components
+    /// stay allocation-free.
+    /// </summary>
+    private IReadOnlyList<string>? ExtractBoldPhrases(string raw)
+    {
+        if (_componentBoldSpans.Count == 0) return null;
+        var phrases = new List<string>(_componentBoldSpans.Count);
+        foreach (var span in _componentBoldSpans)
+        {
+            var start = Math.Clamp(span.Start, 0, raw.Length);
+            var from  = Math.Clamp(span.Start + span.Length, start, raw.Length);
+            var end   = raw.IndexOfAny(new[] { ',', '.' }, from);
+            if (end < 0) end = raw.Length;
+            var phrase = System.Net.WebUtility.HtmlDecode(raw[start..end]).Trim();
+            if (phrase.Length > 0) phrases.Add(phrase);
+        }
+        return phrases.Count > 0 ? phrases : null;
+    }
+
     private static string StripBasicXml(string input)
     {
         if (input.Contains('\x1B'))
