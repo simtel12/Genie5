@@ -20,6 +20,11 @@ public class GameTextViewModel : ReactiveObject
     // the config value is already clamped to [100, 100000].
     private int _maxLines = 2000;
 
+    // Tracks whether the most recently appended line was a game prompt, so the
+    // PromptEvent subscription can dedup consecutive prompts (Genie 4's
+    // LastRowWasPrompt). Set by AddLine; only the prompt path passes true.
+    private bool _lastLineWasPrompt;
+
     public ObservableCollection<TextLine> Lines { get; } = [];
 
     /// <summary>
@@ -104,6 +109,31 @@ public class GameTextViewModel : ReactiveObject
                 AddLine(text, StreamColor.Main, links, bolds);
             });
 
+        // ── Game prompt ───────────────────────────────────────────────────
+        // DR sends a <prompt> after every server batch (steady-state ">"), so
+        // rendering every one would flood the window. We mirror Genie 4:
+        //   • dedup — never show two prompt lines in a row; a prompt only
+        //     reappears once real output has arrived since the last one
+        //     (AddLine resets _lastLineWasPrompt for every non-prompt line), and
+        //   • promptbreak — when false, suppress the standalone prompt line
+        //     entirely so output flows uninterrupted (default true = show it).
+        // The displayed string is the server status indicator (the letters
+        // before ">", e.g. "R", "H") followed by Config.Prompt ("> "): a bare
+        // ">" renders as "> ", "R>" renders as "R> ". Read live so a #config
+        // prompt / #config promptbreak change applies immediately.
+        core.GameEvents
+            .OfType<PromptEvent>()
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(e =>
+            {
+                if (DisplaySettings?.ShowGameText == false) return;
+                if (core.Config?.PromptBreak == false) return; // promptbreak off → no prompt line
+                if (_lastLineWasPrompt) return;                // dedup back-to-back prompts
+                var promptStr = core.Config?.Prompt ?? "> ";
+                var status = (e.Indicator ?? string.Empty).TrimEnd('>', ' ');
+                AddLine(status + promptStr, StreamColor.Main, isPrompt: true);
+            });
+
         // ── Local echoes: typed commands + system diagnostics ─────────────
         // EchoLine carries non-script lines of two kinds:
         //   (a) typed-command echoes ("> look", "> n", …) — what we call "Echo"
@@ -173,11 +203,15 @@ public class GameTextViewModel : ReactiveObject
 
     private void AddLine(string text, StreamColor color,
                          IReadOnlyList<LinkSpan>? links = null,
-                         IReadOnlyList<BoldSpan>? bolds = null)
+                         IReadOnlyList<BoldSpan>? bolds = null,
+                         bool isPrompt = false)
     {
         Lines.Add(new TextLine(text, color, links, bolds));
         while (Lines.Count > _maxLines)
             Lines.RemoveAt(0);
+        // Only a prompt line arms the dedup; every other line clears it so the
+        // next prompt is allowed through (Genie 4 LastRowWasPrompt semantics).
+        _lastLineWasPrompt = isPrompt;
     }
 
     /// <summary>

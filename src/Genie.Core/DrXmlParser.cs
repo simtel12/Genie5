@@ -62,15 +62,6 @@ public sealed class DrXmlParser : IDisposable
     private readonly System.Text.StringBuilder _promptBuffer = new();
     private DateTimeOffset _pendingPromptTime = DateTimeOffset.MinValue;
 
-    // Genie 4 renders every prompt the server sends so the user can see when
-    // they're in roundtime, hidden, stunned, etc. DR sends a prompt at the
-    // end of EVERY server batch though, so a literal "emit on every prompt"
-    // policy floods the game window with ">" lines. Compromise: emit a
-    // TextEvent only when the indicator string actually changes from the
-    // last one we emitted. This surfaces every state transition (> → R>,
-    // R> → >, > → H>, etc.) without spamming the steady state.
-    private string _lastEmittedPromptText = "";
-
     // ── Text line accumulation ───────────────────────────────────────────────
     // EmitChunks (GameConnection) splits at every '>' boundary, so inline
     // formatting tags like <pushBold/>, <d>text</d> break a single text line
@@ -269,18 +260,9 @@ public sealed class DrXmlParser : IDisposable
         {
             // Wizard plain-text mode: this line IS the indicator. StormFront
             // mode prompts arrive as <prompt>…</prompt> XML and never reach here.
+            // As in the XML branch, emit only the PromptEvent — GameTextViewModel
+            // owns whether/how the prompt is rendered (Config.Prompt + promptbreak).
             _events.OnNext(new PromptEvent(DateTimeOffset.MinValue, promptCandidate));
-
-            // Surface in the game window on state change only — same policy
-            // as the XML branch. In WIZ mode the bare-text line was previously
-            // suppressed entirely (early return before the TextEvent below);
-            // with state-change gating we now show transitions to the user
-            // without flooding on every steady-state ">".
-            if (promptCandidate != _lastEmittedPromptText)
-            {
-                _events.OnNext(new TextEvent(_activeStream, promptCandidate, null, null));
-                _lastEmittedPromptText = promptCandidate;
-            }
             return;
         }
 
@@ -909,15 +891,10 @@ public sealed class DrXmlParser : IDisposable
                     var indicator = System.Net.WebUtility
                         .HtmlDecode(_promptBuffer.ToString()).Trim();
                     _events.OnNext(new PromptEvent(_pendingPromptTime, indicator));
-
-                    // Surface the indicator in the game window on state change
-                    // only — see _lastEmittedPromptText for rationale.
-                    if (indicator.Length > 0 && indicator != _lastEmittedPromptText)
-                    {
-                        _events.OnNext(new TextEvent(_activeStream, indicator, null, null));
-                        _lastEmittedPromptText = indicator;
-                    }
-
+                    // Displaying the prompt in the game window is an App-layer
+                    // concern: GameTextViewModel subscribes to PromptEvent and
+                    // applies Config.Prompt + promptbreak dedup. Core stays
+                    // UI-free and never decides when a prompt line is shown.
                     _promptBuffer.Clear();
                     _inPrompt = false;
                 }
