@@ -20,6 +20,20 @@ public sealed class CommandEngine
     private readonly EventQueue   _eventQueue;
     private readonly ICommandHost _host;
 
+    // Re-entrancy guard for ProcessInput. Alias expansion
+    // (AliasEngine.TryProcess) and trigger actions
+    // (TriggerEngineFinal.ProcessLine) both dispatch back through
+    // ProcessInput on the SAME (UI) thread, so a self-referencing alias — or a
+    // trigger whose action re-fires its own pattern — recurses on the call
+    // stack until it throws StackOverflowException. That's UNCATCHABLE: it
+    // kills the process instantly with no dialog and no crash-log entry (#40 —
+    // "crashes with no error message"). We cap the synchronous depth and abort
+    // with a diagnostic well before the stack blows. 100 is far above any
+    // legitimate alias/trigger nesting (which is single-digit) yet far below
+    // the frame count that would overflow.
+    private int _processInputDepth;
+    private const int MaxProcessInputDepth = 100;
+
     // ── Engines wired after construction ─────────────────────────────────────
     // GenieCore creates the command engine first (so other engines can route
     // through it) and then back-fills these references. Each one is nullable
@@ -69,44 +83,62 @@ public sealed class CommandEngine
     public void ProcessInput(string input, string? echoOverride = null)
     {
         if (string.IsNullOrWhiteSpace(input)) return;
-        // Expand $variables BEFORE splitting on the separator so a value
-        // that happens to contain `;` doesn't accidentally fragment the
-        // command. Matches Genie 4's ParseGlobalVars-then-ParseCommand
-        // ordering (Core/Command.cs:233).
-        input = _host.ExpandVariables(input);
-        var commands = input.Split(_config.SeparatorChar);
 
-        // Echo override only applies to single-command, plain-send pipeline
-        // paths. If the input fan-outs into multiple commands via the
-        // separator (e.g. an alias expanded mid-flight) we drop the override
-        // — there's no meaningful 1:1 echo-text mapping at that point.
-        var applyOverride = echoOverride is not null && commands.Length == 1;
-
-        foreach (var raw in commands)
+        // Re-entrancy guard (#40): abort a runaway alias/trigger recursion
+        // before it StackOverflows and silently kills the client.
+        if (_processInputDepth >= MaxProcessInputDepth)
         {
-            var command = raw.Trim();
-            if (command.Length == 0) continue;
-            if (command[0] == _config.CommandChar)
+            var shown = input.Length > 80 ? input[..80] + "…" : input;
+            _host.Echo($"[command] re-entrancy limit ({MaxProcessInputDepth}) hit on '{shown}' — aborting a runaway alias/trigger loop before it crashes the client. Check for a self-referencing alias or a trigger whose action re-fires its own pattern.");
+            return;
+        }
+
+        _processInputDepth++;
+        try
+        {
+            // Expand $variables BEFORE splitting on the separator so a value
+            // that happens to contain `;` doesn't accidentally fragment the
+            // command. Matches Genie 4's ParseGlobalVars-then-ParseCommand
+            // ordering (Core/Command.cs:233).
+            input = _host.ExpandVariables(input);
+            var commands = input.Split(_config.SeparatorChar);
+
+            // Echo override only applies to single-command, plain-send pipeline
+            // paths. If the input fan-outs into multiple commands via the
+            // separator (e.g. an alias expanded mid-flight) we drop the override
+            // — there's no meaningful 1:1 echo-text mapping at that point.
+            var applyOverride = echoOverride is not null && commands.Length == 1;
+
+            foreach (var raw in commands)
             {
-                HandleInternalCommand(command[1..]);
+                var command = raw.Trim();
+                if (command.Length == 0) continue;
+                if (command[0] == _config.CommandChar)
+                {
+                    HandleInternalCommand(command[1..]);
+                }
+                else if (command[0] == _config.ScriptChar)
+                {
+                    // ScriptChar (default '.') invokes a script by name. Genie 4
+                    // parity: `.foo arg1 arg2` runs Scripts/foo.cmd with `arg1
+                    // arg2` as %1 / %2 / etc. The host owns the script engine,
+                    // so we just pass the rest through.
+                    _host.RunScript(command[1..]);
+                }
+                else if (Aliases is not null && Aliases.TryProcess(command))
+                {
+                    // Alias matched and was dispatched recursively.
+                }
+                else
+                {
+                    _host.SendToGame(command, true,
+                        echoOverride: applyOverride ? echoOverride : null);
+                }
             }
-            else if (command[0] == _config.ScriptChar)
-            {
-                // ScriptChar (default '.') invokes a script by name. Genie 4
-                // parity: `.foo arg1 arg2` runs Scripts/foo.cmd with `arg1
-                // arg2` as %1 / %2 / etc. The host owns the script engine,
-                // so we just pass the rest through.
-                _host.RunScript(command[1..]);
-            }
-            else if (Aliases is not null && Aliases.TryProcess(command))
-            {
-                // Alias matched and was dispatched recursively.
-            }
-            else
-            {
-                _host.SendToGame(command, true,
-                    echoOverride: applyOverride ? echoOverride : null);
-            }
+        }
+        finally
+        {
+            _processInputDepth--;
         }
     }
 
