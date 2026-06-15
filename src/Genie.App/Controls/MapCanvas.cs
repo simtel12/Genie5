@@ -573,6 +573,22 @@ public class MapCanvas : Control
             return;
         }
 
+        // Ctrl+Left-Click on a room = Go Here (walk to it) — the same action as
+        // the right-click "Go Here" menu item (NodeClickedCommand). A held
+        // modifier can't mis-fire the way a plain left-click would, so this
+        // restores the Genie 4 click-to-walk muscle memory without the
+        // accidental-walk problem that pushed Go Here onto the context menu.
+        // Works in both navigate and edit modes and takes priority over
+        // select / drag / pan.
+        if (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            var node = HitTest(e.GetPosition(this));
+            if (node is not null && NodeClickedCommand?.CanExecute(node) == true)
+                NodeClickedCommand.Execute(node);
+            e.Handled = true;
+            return;
+        }
+
         if (props.IsLeftButtonPressed && EditMode)
         {
             // Edit mode: left-click selects the hit node (or clears selection on
