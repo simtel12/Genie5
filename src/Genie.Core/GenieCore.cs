@@ -589,6 +589,10 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         Scripts.Globals.TryRemove(name, out _);
     }
 
+    // ConcurrentDictionary is itself an IReadOnlyDictionary; enumeration is
+    // thread-safe, so #var can list these while the parser thread updates them.
+    IReadOnlyDictionary<string, string> ICommandHost.GetGlobalVariables() => Scripts.Globals;
+
     /// <summary>
     /// Simple <c>$name</c> expansion against <see cref="ScriptEngine.Globals"/>
     /// and the user variable store. Walks the text once, replaces each

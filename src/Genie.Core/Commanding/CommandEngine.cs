@@ -674,8 +674,12 @@ public sealed class CommandEngine
     /// <summary>
     /// Genie 4 parity for <c>#var</c>. Supports:
     /// <list type="bullet">
-    /// <item><c>#var</c> — list all user variables.</item>
-    /// <item><c>#var {name} {value}</c> — set (or replace).</item>
+    /// <item><c>#var</c> — list all variables: user-defined plus reserved/
+    /// live-state ones ($health, $roomid, the status flags, …) tagged
+    /// <c>(reserved)</c> (#72).</item>
+    /// <item><c>#var {name}</c> — show variables matching {name}, including a
+    /// reserved one (e.g. <c>#var health</c>).</item>
+    /// <item><c>#var {name} {value}</c> — set (or replace) a user variable.</item>
     /// <item><c>#var remove {name}</c> — drop (also via <c>#unvar name</c>).</item>
     /// <item><c>#var clear</c> — drop all user variables (reserved/live-state vars are not affected).</item>
     /// <item><c>#var save</c> / <c>#var load</c> — round-trip <c>variables.cfg</c>.</item>
@@ -733,15 +737,31 @@ public sealed class CommandEngine
         _host.Echo("Variables: ");
         if (!string.IsNullOrEmpty(filter)) _host.Echo($"Filter: {filter}");
 
+        bool Match(string key) => string.IsNullOrEmpty(filter)
+            || key.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
+
         int shown = 0;
+
+        // User-defined variables (the #var-managed set).
         foreach (var kvp in Variables.Store.GetAll().OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase))
         {
             if (kvp.Value.Scope != VariableScope.User) continue;
-            if (!string.IsNullOrEmpty(filter) &&
-                kvp.Key.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0) continue;
+            if (!Match(kvp.Key)) continue;
             _host.Echo($"{kvp.Key}={kvp.Value.Value}");
             shown++;
         }
+
+        // Reserved / live-state variables ($health, $roomid, $zoneid, the status
+        // flags, hands, clock family, …) mirrored from the game stream into the
+        // script globals, plus any #tvar session-globals. Genie 4 lists these
+        // with a "(reserved)" tag and a $ prefix (#72).
+        foreach (var kvp in _host.GetGlobalVariables().OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!Match(kvp.Key)) continue;
+            _host.Echo($"(reserved) ${kvp.Key}={kvp.Value}");
+            shown++;
+        }
+
         if (shown == 0) _host.Echo("None.");
     }
 

@@ -65,6 +65,15 @@ public interface ICommandHost
     void RemoveGlobalVariable(string name);
 
     /// <summary>
+    /// The reserved / live-state script variables ($health, $roomid, $zoneid,
+    /// the status flags, hands, clock family, …) mirrored from the game stream
+    /// into the script engine's Globals (plus any <c>#tvar</c> session-globals).
+    /// A read-only view for <c>#var</c> to list them alongside user variables
+    /// (#72). Empty in Console builds with no live session.
+    /// </summary>
+    System.Collections.Generic.IReadOnlyDictionary<string, string> GetGlobalVariables();
+
+    /// <summary>
     /// Expand <c>$name</c> references to their current global value (from
     /// the script engine's Globals — populated by <c>#var</c>/<c>#tvar</c>
     /// and the live-game-state mirror). Matches Genie 4's
