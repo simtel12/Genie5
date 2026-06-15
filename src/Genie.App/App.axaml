@@ -318,12 +318,12 @@
                            Foreground="#cdd" FontSize="11" FontWeight="SemiBold"/>
                 <TextBlock TextWrapping="Wrap"
                            Foreground="#aab" FontSize="11"
-                           Text="The mapper filters out climbs/swims/etc you can't take. Genie 5 needs to see a `skills` reply once to know your ranks — otherwise every gated exit is assumed reachable."/>
+                           Text="The mapper filters out climbs/swims/etc you can't take. Genie 5 needs to read your `info` and `exp all` once to know your guild, circle, and skill ranks — otherwise every gated exit is assumed reachable."/>
                 <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,3,0,0">
                   <Button Content="Fetch skills now" FontSize="11" Padding="8,2"
                           Background="#1e3a1e" Foreground="#cdd"
                           Command="{Binding ViewModel.FetchSkillsCommand}"
-                          ToolTip.Tip="Sends `skills` to the game now. The reply primes the pathfinder's skill table."/>
+                          ToolTip.Tip="Sends `info` and `exp all` to the game now. The replies prime the pathfinder's guild, circle, and skill tables."/>
                   <Button Content="Skip" FontSize="11" Padding="8,2"
                           Command="{Binding ViewModel.DismissSkillsPromptCommand}"
                           ToolTip.Tip="Dismiss for this session — will prompt again next launch."/>

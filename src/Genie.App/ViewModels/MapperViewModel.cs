@@ -637,15 +637,16 @@ public class MapperViewModel : ReactiveObject
             .Subscribe(_ => AutoWalk.Cancel("connection lost"));
 
         // ── Skills prompt wiring ──────────────────────────────────────
-        // The skill-weighted pathfinder works best when it knows the
-        // character's rank in every relevant skill. DR only emits
-        // `<component id='exp X'>` events when the user types `info`,
-        // `skills`, or naturally during play (skill ticks). Rather than
-        // silently auto-firing `skills` on connect (verb-spam), we
-        // surface a one-time banner asking the user to run it.
+        // The skill-weighted pathfinder — and the Edit Exit dialog's Guild /
+        // skill gating — work best with the character's guild, circle, and
+        // full skill ranks. DR surfaces guild + circle via `info` and the
+        // complete skill-rank set via `exp all` (the `<component id='exp X'>`
+        // events for all 53 skills). Rather than silently auto-firing on
+        // connect (verb-spam), we surface a one-time banner asking the user.
         FetchSkillsCommand = ReactiveCommand.Create(() =>
         {
-            _commands?.ProcessInput("skills");
+            _commands?.ProcessInput("info");      // guild + circle → class / level gating
+            _commands?.ProcessInput("exp all");   // all skill ranks → skill gating
             ShowSkillsPrompt = false;   // hide immediately; data will arrive shortly
         });
         DismissSkillsPromptCommand = ReactiveCommand.Create(() =>
