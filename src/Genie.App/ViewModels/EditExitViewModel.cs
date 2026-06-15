@@ -37,6 +37,11 @@ public sealed class EditExitViewModel : ReactiveObject
     public ObservableCollection<SkillRequirementRow> SkillRequirements { get; }
         = new();
 
+    /// <summary>Canonical DR skill names backing each row's skill dropdown —
+    /// lets authors pick instead of free-type (avoids typos the pathfinder's
+    /// exact-name match would silently ignore).</summary>
+    public IReadOnlyList<string> AvailableSkills => Genie.Core.Skills.DrSkills.All;
+
     [Reactive] public string RequiredClass { get; set; } = "";
     [Reactive] public int?   MinLevel      { get; set; }
     [Reactive] public int?   RtCost        { get; set; }

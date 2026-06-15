@@ -53,9 +53,13 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:SkillRequirementRow">
                 <Grid ColumnDefinitions="*,Auto,80,Auto">
-                  <TextBox Grid.Column="0" Text="{Binding Skill}"
-                           Watermark="Skill name (e.g. Climbing)"
-                           FontSize="12"/>
+                  <AutoCompleteBox Grid.Column="0" Text="{Binding Skill, Mode=TwoWay}"
+                                   ItemsSource="{ReflectionBinding $parent[ItemsControl].DataContext.AvailableSkills}"
+                                   FilterMode="Contains"
+                                   MinimumPrefixLength="0"
+                                   Watermark="Skill (type to filter, e.g. Athletics)"
+                                   FontSize="12"
+                                   ToolTip.Tip="Pick a DragonRealms skill — type to filter the list. A free-typed name is allowed for skills not yet in the list."/>
                   <TextBlock Grid.Column="1" Text="≥" VerticalAlignment="Center"
                              Margin="6,0,4,0" Foreground="#888"/>
                   <NumericUpDown Grid.Column="2" Value="{Binding MinRank}"
