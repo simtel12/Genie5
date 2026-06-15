@@ -67,7 +67,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:SkillRequirementRow">
-                <Grid ColumnDefinitions="*,Auto,80,Auto">
+                <Grid ColumnDefinitions="*,Auto,120,Auto">
                   <AutoCompleteBox Grid.Column="0" Text="{Binding Skill, Mode=TwoWay}"
                                    ItemsSource="{ReflectionBinding $parent[ItemsControl].DataContext.AvailableSkills}"
                                    FilterMode="Contains"
