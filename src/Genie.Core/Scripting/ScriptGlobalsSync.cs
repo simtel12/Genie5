@@ -103,9 +103,14 @@ public sealed class ScriptGlobalsSync : IDisposable
         Set("encumbrance",   _state.Vitals.Encumbrance.ToString(CultureInfo.InvariantCulture));
         Set("fatigue",       _state.Vitals.StaminaFatigue.ToString(CultureInfo.InvariantCulture));   // alias
 
-        // Combat / casting
-        Set("roundtime",     "0");
-        Set("casttime",      "0");
+        // Combat / casting. The *remaining aliases mirror Genie 4's
+        // $casttimeremaining (the live countdown SaragosDR called out in #45);
+        // our values are already computed as seconds-remaining, so the alias
+        // tracks the base var.
+        Set("roundtime",          "0");
+        Set("roundtimeremaining", "0");
+        Set("casttime",           "0");
+        Set("casttimeremaining",  "0");
         Set("preparedspell", _state.Combat.PreparedSpell);
         Set("stance",        _state.Combat.Stance.ToString().ToLowerInvariant());
 
@@ -155,8 +160,8 @@ public sealed class ScriptGlobalsSync : IDisposable
             case ComponentEvent comp:  OnComponent(comp);  break;
             case CompassEvent comp:    OnCompass(comp);    break;
             case NavEvent nav:         Set("gameroomid", nav.RoomId ?? string.Empty); break;
-            case RoundTimeEvent rt:    Set("roundtime", SecondsRemaining(rt.ExpiresAt)); break;
-            case CastTimeEvent ct:     Set("casttime",  SecondsRemaining(ct.ExpiresAt)); break;
+            case RoundTimeEvent rt:    { var s = SecondsRemaining(rt.ExpiresAt); Set("roundtime", s); Set("roundtimeremaining", s); break; }
+            case CastTimeEvent ct:     { var s = SecondsRemaining(ct.ExpiresAt); Set("casttime",  s); Set("casttimeremaining",  s); break; }
             case SpellEvent sp:        Set("preparedspell", sp.SpellName ?? string.Empty); break;
             case PromptEvent p:        OnPrompt(p);                                           break;
         }

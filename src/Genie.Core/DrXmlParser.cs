@@ -100,6 +100,12 @@ public sealed class DrXmlParser : IDisposable
     private readonly List<BoldSpan> _pendingBoldSpans = new();
     private readonly Stack<int>     _boldStack        = new();
 
+    // <preset id='X'>…</preset> spans, tracked exactly like bold: push the
+    // buffer position (and id) on the open tag, record a PresetSpan over the
+    // accumulated text on the close tag. EmitLine attaches them to the line.
+    private readonly List<PresetSpan>          _pendingPresetSpans = new();
+    private readonly Stack<(int Pos, string Id)> _presetStack      = new();
+
     // Bold tracking for COMPONENT content (a separate buffer from the display
     // line buffer). DR bolds creature names inside the `room objs` component;
     // capturing the bold ranges here is what lets the monster-count feature
@@ -250,6 +256,11 @@ public sealed class DrXmlParser : IDisposable
             : null;
         _pendingBoldSpans.Clear();
 
+        IReadOnlyList<PresetSpan>? presetSpans = _pendingPresetSpans.Count > 0
+            ? _pendingPresetSpans.ToArray()
+            : null;
+        _pendingPresetSpans.Clear();
+
         if (stripped.Length == 0) return;
 
         // Bare-text prompt line (">", "H>", "HR>"). Trim leading whitespace
@@ -273,7 +284,7 @@ public sealed class DrXmlParser : IDisposable
         if (guildMatch.Success)
             _events.OnNext(new GuildEvent(guildMatch.Groups[1].Value.Trim()));
 
-        _events.OnNext(new TextEvent(_activeStream, stripped, links, boldSpans));
+        _events.OnNext(new TextEvent(_activeStream, stripped, links, boldSpans, presetSpans));
     }
 
     private void ParseTag(string tag)
@@ -679,6 +690,7 @@ public sealed class DrXmlParser : IDisposable
             // ── Text styling spans ───────────────────────────────────────────
             case "preset":
                 _currentPresetId = r["id"] ?? "";
+                _presetStack.Push((_textLineBuffer.Length, _currentPresetId));
                 break;
 
             // ── Room navigation ──────────────────────────────────────────────
@@ -872,6 +884,15 @@ public sealed class DrXmlParser : IDisposable
                 break;
 
             case "preset":
+                // Record the preset span over the text accumulated since the
+                // open tag BEFORE any flush, so a roomDesc flush emits the line
+                // with its span attached.
+                if (_presetStack.TryPop(out var openPreset))
+                {
+                    var len = _textLineBuffer.Length - openPreset.Pos;
+                    if (len > 0)
+                        _pendingPresetSpans.Add(new PresetSpan(openPreset.Pos, len, openPreset.Id));
+                }
                 // Only flush for presets where the following text is a new line
                 // (roomDesc → exits follow; inv → next item follows).
                 // For whisper/speech the quoted content is a continuation on the

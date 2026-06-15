@@ -121,6 +121,22 @@ public static class DefaultHighlights
     }
 
     /// <summary>
+    /// Active session's preset palette (<c>roomDesc</c>, <c>whisper</c>,
+    /// <c>speech</c> … → colour). Set by <c>MainWindowViewModel</c> at connect,
+    /// like <see cref="UserHighlights.Engine"/>. When set, <see cref="Tokenize"/>
+    /// colours each line's preset spans as the BASE colour (highlights win on
+    /// top). Null when no session is connected.
+    /// </summary>
+    public static Genie.Core.Presets.PresetEngine? PresetEngine { get; set; }
+
+    /// <summary>Map an XML preset id to its palette key. The lookup is
+    /// case-insensitive (so <c>roomDesc</c>→<c>roomdesc</c>, <c>roomName</c>→
+    /// <c>roomname</c> resolve directly); only <c>whisper</c> needs remapping to
+    /// the plural palette key <c>whispers</c>.</summary>
+    private static string MapPresetKey(string xmlId) =>
+        string.Equals(xmlId, "whisper", StringComparison.OrdinalIgnoreCase) ? "whispers" : xmlId;
+
+    /// <summary>
     /// Split <paramref name="text"/> into a sequence of styled <see cref="Inline"/>s.
     /// Each character is colored by the first matching rule; runs of identical-color
     /// characters collapse into a single <see cref="Run"/>. Built-in defaults run
@@ -139,7 +155,8 @@ public static class DefaultHighlights
     /// </summary>
     public static IReadOnlyList<Inline> Tokenize(string text,
                                                  IReadOnlyList<LinkSpan>? links = null,
-                                                 IReadOnlyList<BoldSpan>? boldSpans = null)
+                                                 IReadOnlyList<BoldSpan>? boldSpans = null,
+                                                 IReadOnlyList<PresetSpan>? presetSpans = null)
     {
         if (string.IsNullOrEmpty(text))
             return new[] { new Run(string.Empty) };
@@ -207,6 +224,25 @@ public static class DefaultHighlights
                 metrics.Time(PipelineStage.Highlights, ApplyUserHighlights);
             else
                 ApplyUserHighlights();
+        }
+
+        // ── Preset colours (base layer) ──────────────────────────────────
+        // Apply preset span colours LAST with ??= so built-in and user
+        // highlights win where they fired; presets fill the remaining chars of
+        // a preset region (room descriptions, whispers, speech, …) with their
+        // palette colour. "Default"/unknown palette entries leave the text its
+        // normal foreground.
+        if (presetSpans is { Count: > 0 } && PresetEngine is { } presets)
+        {
+            foreach (var span in presetSpans)
+            {
+                if (span.Length <= 0) continue;
+                var brush = GetUserBrush(presets.GetForeground(MapPresetKey(span.PresetId)));
+                if (brush is null) continue;
+                var ps = Math.Max(0, span.Start);
+                var pe = Math.Min(text.Length, span.Start + span.Length);
+                for (int i = ps; i < pe; i++) brushes[i] ??= brush;
+            }
         }
 
         // Order link spans by start position so we can emit non-link runs

@@ -23,11 +23,18 @@ public abstract record GameEvent;
 /// — most visibly to flag unread items in the <c>news</c> listing. Null
 /// when the line had no bold markup; never empty.
 /// </param>
+/// <param name="PresetSpans">
+/// Optional preset-styled regions carried by <c>&lt;preset id="..."&gt;</c> …
+/// <c>&lt;/preset&gt;</c> markers (roomDesc, whisper, speech, roomName, …). The
+/// parser records each region's id + offsets so the renderer can apply that
+/// preset's configured colour. Null when the line had no preset markup.
+/// </param>
 public sealed record TextEvent(
     string Stream,
     string Text,
-    IReadOnlyList<LinkSpan>? Links     = null,
-    IReadOnlyList<BoldSpan>? BoldSpans = null
+    IReadOnlyList<LinkSpan>? Links       = null,
+    IReadOnlyList<BoldSpan>? BoldSpans   = null,
+    IReadOnlyList<PresetSpan>? PresetSpans = null
 ) : GameEvent;
 
 /// <summary>
@@ -60,6 +67,15 @@ public sealed record LinkSpan(int Start, int Length, string Command, bool IsUrl 
 /// the byte offsets so the renderer can apply <c>FontWeight.Bold</c>.
 /// </summary>
 public sealed record BoldSpan(int Start, int Length);
+
+/// <summary>
+/// A preset-styled region inside a <see cref="TextEvent"/>. Carried by
+/// <c>&lt;preset id="..."&gt;</c> … <c>&lt;/preset&gt;</c> markers. The parser
+/// records the region's offsets and the preset <see cref="PresetId"/> (e.g.
+/// "roomDesc", "whisper", "speech") so the renderer can colour it from the
+/// configured preset palette (<c>Genie.Core.Presets.PresetEngine</c>).
+/// </summary>
+public sealed record PresetSpan(int Start, int Length, string PresetId);
 
 // ── Vitals ───────────────────────────────────────────────────────────────────
 

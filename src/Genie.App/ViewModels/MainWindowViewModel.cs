@@ -2373,6 +2373,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         LoadSavedConfiguration(_core);
         UserHighlights.Engine  = _core.Highlights;
         UserHighlights.Metrics = _core.Metrics;   // time the render-path highlight pass
+        Highlighting.DefaultHighlights.PresetEngine = _core.Presets;  // preset colours (#19)
 
         // ── Performance: attach the overlay + apply per-component safety ──────
         // Push the user's current safety choices onto the freshly-built engines

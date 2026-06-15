@@ -111,9 +111,10 @@ public class GameTextViewModel : ReactiveObject
                 // they refer to positions in the original text. Same rule for
                 // link and bold spans.
                 var unchanged = ReferenceEquals(text, e.Text);
-                var links     = unchanged ? e.Links     : null;
-                var bolds     = unchanged ? e.BoldSpans : null;
-                AddLine(text, StreamColor.Main, links, bolds);
+                var links     = unchanged ? e.Links       : null;
+                var bolds     = unchanged ? e.BoldSpans   : null;
+                var presets   = unchanged ? e.PresetSpans : null;
+                AddLine(text, StreamColor.Main, links, bolds, presets);
             });
 
         // ── Game prompt ───────────────────────────────────────────────────
@@ -267,9 +268,10 @@ public class GameTextViewModel : ReactiveObject
     private void AddLine(string text, StreamColor color,
                          IReadOnlyList<LinkSpan>? links = null,
                          IReadOnlyList<BoldSpan>? bolds = null,
+                         IReadOnlyList<PresetSpan>? presets = null,
                          bool isPrompt = false)
     {
-        Lines.Add(new TextLine(text, color, links, bolds));
+        Lines.Add(new TextLine(text, color, links, bolds, presets));
         while (Lines.Count > _maxLines)
             Lines.RemoveAt(0);
         // Only a prompt line arms the dedup; every other line clears it so the
@@ -302,7 +304,8 @@ public class GameTextViewModel : ReactiveObject
 /// </summary>
 public record TextLine(string Text, StreamColor Color,
                        IReadOnlyList<LinkSpan>? Links = null,
-                       IReadOnlyList<BoldSpan>? BoldSpans = null)
+                       IReadOnlyList<BoldSpan>? BoldSpans = null,
+                       IReadOnlyList<PresetSpan>? PresetSpans = null)
 {
     public bool IsEcho => Color == StreamColor.System;
 
@@ -314,7 +317,7 @@ public record TextLine(string Text, StreamColor Color,
     /// <see cref="Inline"/>s can only belong to one parent, so we don't cache.
     /// </summary>
     public IReadOnlyList<Inline> Inlines =>
-        IsEcho ? [new Run(Text)] : DefaultHighlights.Tokenize(Text, Links, BoldSpans);
+        IsEcho ? [new Run(Text)] : DefaultHighlights.Tokenize(Text, Links, BoldSpans, PresetSpans);
 }
 
 public enum StreamColor { Main, Logons, Talk, Whisper, Thought, Combat, Familiar, System }
