@@ -94,7 +94,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                     DataContext = new ConnectDialogViewModel(
                         ViewModel.Profiles,
                         ViewModel.SaveProfiles,
-                        ViewModel.LastConnectionConfig)
+                        ViewModel.LastConnectionConfig,
+                        ViewModel.ReportConnectionFailure)
                 };
                 var result = await dlg.ShowDialog<ConnectResult?>(this);
                 ctx.SetOutput(result);

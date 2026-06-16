@@ -2336,6 +2336,19 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         }
     }
 
+    /// <summary>
+    /// Show a connection/login failure reason in the Game window so it's visible
+    /// and persistent — not just a transient title-bar "Error" or a dialog status
+    /// that vanishes on close. Used by the connect path (the <c>Error</c>
+    /// ConnectionEvent) and by the Connect dialog's character-fetch failure, so
+    /// the user always sees *why* a login failed regardless of how they tried.
+    /// </summary>
+    public void ReportConnectionFailure(string? detail)
+    {
+        if (!string.IsNullOrWhiteSpace(detail))
+            GameText.AddSystemLine($"✖ Connection failed: {detail}");
+    }
+
     private async Task ConnectAsync(ConnectionConfig cfg, ConnectionProfile? profile)
     {
         if (_core is not null)
@@ -2385,8 +2398,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 // already-logged-in / in-game / unavailable, TLS-handshake and
                 // timeout failures with host:port). Without this the user has no
                 // idea why login failed.
-                if (e.Kind == ConnectionEventKind.Error && !string.IsNullOrWhiteSpace(e.Message))
-                    GameText.AddSystemLine($"✖ Connection failed: {e.Message}");
+                if (e.Kind == ConnectionEventKind.Error)
+                    ReportConnectionFailure(e.Message);
 
                 // Close any in-flight analyst capture when the session ends, so
                 // its meta sidecar is written rather than left dangling.

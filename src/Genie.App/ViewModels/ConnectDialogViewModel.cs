@@ -31,6 +31,10 @@ public class ConnectDialogViewModel : ReactiveObject
 {
     private readonly ProfileStore? _store;
     private readonly Action?       _onStoreChanged;
+    /// <summary>Optional sink for auth/connection failures during character
+    /// fetch, so the host can mirror the reason into the persistent Game window
+    /// (the dialog's own status line vanishes when it closes).</summary>
+    private readonly Action<string>? _onAuthFailure;
 
     /// <summary>The four DR instances offered by the SGE landing page.</summary>
     public static readonly GameInstance[] Instances =
@@ -159,10 +163,12 @@ public class ConnectDialogViewModel : ReactiveObject
     public ConnectDialogViewModel(
         ProfileStore? store,
         Action? onStoreChanged,
-        ConnectionConfig? lastConnection)
+        ConnectionConfig? lastConnection,
+        Action<string>? onAuthFailure = null)
     {
         _store          = store;
         _onStoreChanged = onStoreChanged;
+        _onAuthFailure  = onAuthFailure;
 
         // ── Load profiles into the dropdown ────────────────────────────────
         if (_store is not null)
@@ -384,6 +390,10 @@ public class ConnectDialogViewModel : ReactiveObject
         catch (Exception ex)
         {
             FetchStatus = $"Failed: {ex.Message}";
+            // Mirror the reason into the persistent Game window — the dialog's
+            // status line disappears when the user closes the dialog, leaving
+            // them with no record of why the login failed.
+            _onAuthFailure?.Invoke(ex.Message);
         }
         finally
         {
