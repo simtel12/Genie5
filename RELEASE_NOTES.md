@@ -1,75 +1,49 @@
-# Genie 5 — v5.0.0-alpha.6
+# Genie 5 — v5.0.0-alpha.6.1
 
-The **Weighted Travel** release. The auto-walker now routes by *effort*, not raw
-hop count — it avoids brutal open-water swims and cliff climbs when a bridge or
-gate exists, paces reliably through identical-looking rooms, and recovers from a
-stuck move instead of hanging. To make the routing smart, we need your help
-filling in **Exit Details** (see *Help wanted* below).
+The **Secure Login** release. Genie now signs in over an **encrypted TLS
+connection** — the same secure path Lich 5 uses — and falls back to the legacy
+plaintext login only if the secure port is blocked. A **padlock in the title
+bar** tells you which you got. This point release also lands a clutch of fixes
+on top of [Weighted Travel](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.6):
+the updater no longer freezes at 70%, your config files stay human-readable, and
+`#var` stops chattering when scripts set variables.
 
 > **Alpha software.** Expect rough edges. Builds are **unsigned** — Windows
 > SmartScreen will warn on first launch (More info → Run anyway). Signing is
 > tracked in #33.
 
-## ✨ New since alpha.5
+## ✨ New since alpha.6
 
-- **Weighted Travel** — the pathfinder now scores routes by effort, not just the
-  number of rooms:
-  - **Avoids high-roundtime terrain.** A one-hop open-water swim (15s of
-    "flounder" roundtime per stroke) or a cliff/wall climb no longer beats a
-    slightly longer dry route over a bridge or through a gate.
-  - **Server-uid pacing.** In stretches of identical-looking rooms (lava fields,
-    marshes) the walker now tracks the live server room id, so it keeps moving
-    instead of stalling where the map can't tell two rooms apart.
-  - **Stuck-move recovery.** A per-step watchdog fails a stuck auto-walk
-    cleanly (and signals `#goto`-driven scripts) instead of hanging forever.
-  - **Cross-zone transitions** follow boundary-room map notes, so a route can
-    walk from one zone into the next without stopping at the edge.
-- **`#goto` script compatibility** — the engine emits the Genie 4 automapper
-  signals (`YOU HAVE ARRIVED!` / `AUTOMAPPER MOVEMENT FAILED` /
-  `DESTINATION NOT FOUND`), so power-travel scripts like `travel.cmd` drive the
-  mapper correctly instead of hanging in their `matchwait`.
-- **Edit Exit — Skill / Environment / Guild** — right-click an exit → **Edit
-  Exit** is reorganised into three clear sections, each with dropdowns:
-  - **Skill** — required trained ranks (Athletics, Climbing, …) from a
-    searchable list of all 53 DR skills.
-  - **Environment** — how the exit is traversed (Bridge, Boat, Rope, Ladder,
-    Ford, …) plus its RT cost and boat/ferry wait window.
-  - **Guild** — guild-restricted routes (Thief passages, Trader caravans, Ranger
-    trails, Moon Mage portals) and a minimum level.
-- **Fetch skills** — the mapper's "Fetch skills now" banner now sends `info` +
-  `exp all`, priming the pathfinder with your guild, circle, and full skill ranks
-  in one click.
-- **Stability** — `travel.cmd` and other alias/trigger-heavy scripts no longer
-  crash the client (#40 — command re-entrancy guard).
-- **Live Audit** (`#audit on`) — tees the raw XML stream and parsed events to a
-  diagnostic log, so travel/mapper issues can be reproduced from one file.
-- **Mapper quality of life** — **Ctrl+Click** a room to walk there (Go Here);
-  the Mapper floats by default when you open it without a saved dock location.
-
-## 📋 Help wanted — fill in Exit Details
-
-Weighted Travel is only as good as the data behind it. Map arcs ship today with
-**no** skill / environment / timing information, so the pathfinder falls back to
-sensible guesses. You can make it precise:
-
-1. Open the **Mapper**, find an exit that needs detail — a river swim, a climb, a
-   boat, a guild-only passage.
-2. **Right-click the exit → Edit Exit.**
-3. Fill in what you know:
-   - **Skill** — e.g. the river crossing needs *Athletics ≥ 50* (and note the
-     ranks often differ by direction — upstream is harder than down).
-   - **Environment** — *Swim* / *Bridge* / *Boat* and its **RT cost** (or wait
-     window for scheduled boats).
-   - **Guild** — restrict the route to *Thief*, *Trader*, *Ranger*, *Moon Mage*…
-4. **Save.** It persists into the zone XML and rides along with the community
-   Maps repo, so everyone's routing gets smarter over time.
-
-These fields are Genie 5 extensions that **old Genie 4 clients ignore**, so
-edited maps stay fully backward-compatible.
+- **Secure (TLS) login.** Genie authenticates over TLS (`eaccess.play.net:7910`,
+  certificate-pinned) by default, so your password travels inside an encrypted
+  tunnel instead of the old lightly-obfuscated plaintext scheme (#61).
+  - **Padlock indicator.** The title bar shows **🔒** with *"Connected over TLS
+    (encrypted)"* on a secure login, or **🔓** with *"login was obfuscated, not
+    encrypted"* when it had to fall back.
+  - **Automatic fallback.** If the secure port is blocked (firewall, network
+    filter), Genie doesn't fail the login — it drops to the legacy plaintext
+    path and shows the 🔓 so you know what happened.
+- **Clearer connection failures.** A failed or refused login now surfaces the
+  actual reason in the game window (bad password, already-logged-in, billing,
+  timed-out…) instead of a generic error.
+- **`#config conndebug`** — opt-in connect trace. Turn it on and the next login
+  prints each protocol step (TLS handshake, key exchange, auth, character list,
+  game select) with timings into the game window, so a stalled login can be
+  pinned to an exact step and pasted into a bug report. Off by default.
+- **Updater: no more frozen 70%** (#60) — the in-app Core updater now reports
+  real phase-based progress and has a stall watchdog, so it no longer appears to
+  hang partway through an update.
+- **Quieter `#var` / `#tvar`** — variables echo *"Variable set:"* only when you
+  type the command yourself, not every time a script, trigger, or alias sets one
+  (community report).
+- **Readable config files** (#78) — settings are written with a relaxed JSON
+  encoder, so regex patterns and non-ASCII (UTF-8) text in your config stay
+  human-readable instead of being escaped into `\u00NN` soup. Thanks to VTCifer
+  for the report.
 
 ## ✅ What works
 
-Connection (Direct SGE / Lich proxy / dev-replay), the StormFront XML parser and
+Connection (Secure SGE / Lich proxy / dev-replay), the StormFront XML parser and
 live GameState, the full Genie 4 `.cmd` script engine plus JavaScript `.js`
 scripts, the rules engines (`#alias` / `#trigger` / `#highlight` / `#substitute`
 / `#gag` / `#macro` / `#class` / `#var`) with `.cfg` persistence, the AutoMapper
@@ -100,4 +74,4 @@ Grab the installer or portable build for your platform from the assets below:
 | macOS (Intel) | `03-macOS-Intel-Genie5.dmg` | `03-…-Portable.zip` |
 | Linux (x64) | `04-Linux-Genie5.AppImage` | — |
 
-**Full changelog:** https://github.com/GenieClient/Genie5/compare/v5.0.0-alpha.5...v5.0.0-alpha.6
+**Full changelog:** https://github.com/GenieClient/Genie5/compare/v5.0.0-alpha.6...v5.0.0-alpha.6.1

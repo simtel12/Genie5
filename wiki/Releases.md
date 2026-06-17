@@ -4,7 +4,42 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.5 — prompts, scene art, preset colours & scripting parity
+## Latest: v5.0.0-alpha.6.1 — secure login & fixes
+
+Genie now signs in over an **encrypted TLS connection** — the same secure path Lich 5 uses — falling back to the legacy plaintext login only if the secure port is blocked. A **padlock** in the title bar (🔒 encrypted / 🔓 obfuscated fallback) tells you which you got. Riding along: a quieter `#var`, human-readable config files, and an updater that no longer freezes at 70%.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.6.1** as a delta.
+
+**Connecting**
+
+- **Secure (TLS) login** — authentication runs over `eaccess.play.net:7910` with certificate pinning, so your password travels inside an encrypted tunnel instead of the old lightly-obfuscated plaintext scheme ([#61](https://github.com/GenieClient/Genie5/issues/61)). If the secure port is blocked, Genie **falls back automatically** to plaintext rather than failing — and shows a 🔓 so you know.
+- **Padlock indicator** — 🔒 *"Connected over TLS (encrypted)"* or 🔓 *"login was obfuscated, not encrypted"* in the title bar and game window. See [Connecting](Connecting#secure-tls-login--the-padlock).
+- **Clearer connection failures** — a refused or failed login surfaces the actual reason (bad password, already-logged-in, billing, timeout…) in the game window instead of a generic error.
+- **`#config conndebug`** — opt-in connect trace: the next login prints each protocol step with timings into the game window, ideal for diagnosing a stalled login. Off by default. See [Troubleshooting](Troubleshooting#connecting).
+
+**Fixes**
+
+- **Updater no longer freezes at 70%** — the Core updater reports real phase-based progress and has a stall watchdog ([#60](https://github.com/GenieClient/Genie5/issues/60)).
+- **Quieter `#var` / `#tvar`** — echoes *"Variable set:"* only when you type it, not every time a script, trigger, or alias sets a variable.
+- **Readable config files** ([#78](https://github.com/GenieClient/Genie5/issues/78)) — settings write with a relaxed JSON encoder, so regex patterns and UTF-8 text stay legible instead of escaped into `\u00NN` soup. Thanks to VTCifer for the report.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.6.1)
+
+## v5.0.0-alpha.6 — Weighted Travel
+
+The auto-walker now routes by **effort**, not raw hop count — it avoids brutal open-water swims and cliff climbs when a bridge or gate exists, paces reliably through identical-looking rooms, and recovers from a stuck move instead of hanging.
+
+- **Weighted pathfinding** — routes score high-roundtime terrain (swims, climbs) against drier alternatives, so a one-hop flounder-swim no longer beats a slightly longer bridge route.
+- **Server-uid pacing** — in stretches of identical rooms (lava fields, marshes) the walker tracks the live server room id and keeps moving instead of stalling.
+- **Stuck-move recovery** — a per-step watchdog fails a stuck auto-walk cleanly (and signals `#goto`-driven scripts) instead of hanging.
+- **Cross-zone transitions** follow boundary-room map notes, so a route can walk from one zone into the next.
+- **`#goto` script compatibility** — the engine emits the Genie 4 automapper signals (`YOU HAVE ARRIVED!` / `MOVEMENT FAILED` / `DESTINATION NOT FOUND`) so power-travel scripts like `travel.cmd` drive the mapper correctly.
+- **Edit Exit — Skill / Environment / Guild** — right-click an exit → **Edit Exit** is reorganised into three carded sections with dropdowns (all 53 DR skills, traversal environments, guild routes), so the community can fill in the **Exit Details** the pathfinder routes on.
+- **Live Audit** (`#audit on`) and **Ctrl+Click a room to walk there**.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.6)
+
+## v5.0.0-alpha.5 — prompts, scene art, preset colours & scripting parity
 
 A hearty feast of a release: the game **prompt** now shows in the window, notable rooms bloom with **scene artwork**, descriptions and whispers wear their **preset colours**, and the scripting larder is fully stocked with reserved `$variables` — plus a round of Genie 4 parity across the mapper and `#config`.
 
