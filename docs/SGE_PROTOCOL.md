@@ -1,8 +1,11 @@
 # SGE protocol notes
 
 Wire-level documentation for the Simutronics Game Entry (SGE) login flow at
-`eaccess.play.net:7900`. Verified against the [Genie 4 source][genie4] and
-confirmed via live testing on DragonRealms.
+`eaccess.play.net` (TLS on `:7910`, plaintext on `:7900`). Verified against the
+[Genie 4 source][genie4] and [Lich 5][lich] and confirmed via live testing on
+DragonRealms.
+
+[lich]: https://github.com/elanthia-online/lich-5
 
 [genie4]: https://github.com/GenieClient
 
@@ -14,15 +17,48 @@ response that *looks* fine until login mysteriously fails.
 
 ## Transport
 
-- Endpoint: `eaccess.play.net:7900` — plain TCP, **no TLS**. Port 7900 does
-  not respond to a TLS ClientHello; do not wrap the connection in `SslStream`.
-- Server sends **nothing** on connect. The client must initiate.
+The **same SGE handshake** is served on two ports with different transports.
+Genie tries TLS first and falls back to plaintext.
+
+| Port | Transport | Notes |
+|---|---|---|
+| `eaccess.play.net:7910` | **TLS** (preferred) | The port Lich 5 uses. Wrapped in `SslStream`, peer cert validated against a pinned self-signed certificate. The password still travels the SGE scheme, but inside an encrypted tunnel. |
+| `eaccess.play.net:7900` | **plain TCP** (fallback) | No TLS — port 7900 does not respond to a TLS ClientHello, so never wrap *this* port in `SslStream`. The password is only XOR-obfuscated with a key the server sends in the clear. |
+
+- Server sends **nothing** on connect on either port. The client must initiate.
+- `ConnectionConfig.UseTls` (default **true**) selects 7910. On any TLS-side
+  failure that isn't a credential rejection, `SgeAuthClient` logs the reason
+  and retries the whole login on 7900. A bad password does **not** trigger
+  fallback (it would just fail again).
+
+### ⚠️ Framing differs between the two ports — this is not cosmetic
+
+This bit silently broke TLS login and is the single most important thing to
+know here:
+
+- **Plaintext (7900)** terminates each response with a trailing `\n`.
+- **TLS (7910)** is **record-framed and sends responses *without* a trailing
+  `\n`.** Each logical response arrives as one (or more) TLS records; there is
+  no newline to wait for.
+
+A naïve `StreamReader.ReadLineAsync()` works fine on 7900 but **blocks forever
+on 7910** — it waits for an end-of-line byte that never comes, so login appears
+to hang and only "recovers" when the server eventually closes the socket
+(EOF). The fix is to read raw bytes and stop on **either** a `\n` (plaintext)
+**or** a brief read-idle after a record arrives (TLS). See
+`SgeAuthClient.ReadLineAsync(stream, useTls, ct)`. Likewise, the 32-byte key in
+step 1 is followed by a trailing `\n` **only on plaintext** — the key-read must
+not block waiting for that newline over TLS.
+
+> Earlier notes called the two transports "byte-for-byte identical." They are
+> not: the *handshake bytes* match, but the *framing* (trailing newlines) does
+> not. Treat 7910 as record-framed.
 
 ## Handshake sequence
 
 | Step | Client sends | Server responds |
 |---|---|---|
-| 1 | `K\n` | 32 raw key bytes + trailing `\n` (33 bytes total over plain TCP) |
+| 1 | `K\n` | 32 raw key bytes (+ trailing `\n` over **plaintext only** → 33 bytes; over **TLS** just the 32 bytes, no newline — see Framing above) |
 | 2 | `A\t{ACCOUNT_UPPER}\t` + encrypted-password-bytes + `\n` | `A\tMONIL\tKEY\t{hash}\t{full name}` on success; `A\t\tPASSWORD` or `A\t\tUNKNOWN…` on failure |
 | 3 | `M\n` | game list |
 | 4 | `G\tDR\n` | game selected (read and discard the `PREMIUM`/`FREE_TO_PLAY` + URL fields) |

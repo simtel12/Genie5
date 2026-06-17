@@ -27,6 +27,21 @@ Genie performs the Simutronics **SGE** handshake itself: it exchanges an encrypt
 
 The wire-level details are documented for developers in [SGE_PROTOCOL.md](https://github.com/GenieClient/Genie5/blob/main/docs/SGE_PROTOCOL.md).
 
+### Secure (TLS) login — the padlock
+
+Genie logs in over an **encrypted TLS connection** by default (the same secure
+login Lich 5 uses). You can tell which transport a session used at a glance:
+
+| Indicator | Meaning |
+| --- | --- |
+| 🔒 in the title bar + *"Connected over TLS (encrypted)"* | Your login was encrypted end-to-end — the normal, preferred case. |
+| 🔓 + *"login was obfuscated, not encrypted"* | Genie couldn't reach the secure endpoint and fell back to the legacy plaintext login. It still works, but the password is only lightly obfuscated in transit. |
+
+The fallback is automatic — if the secure endpoint is blocked (by a firewall or
+network filter) Genie won't fail the login, it just drops to the older path and
+shows the 🔓 so you know. Seeing 🔓 every time usually means something on your
+network is blocking the secure port; the connection trace below can confirm it.
+
 ## Profiles
 
 A **profile** is a saved connection so you don't retype next time. Save one from the Connect dialog; it stores the account, game, character, and (optionally) the password.
@@ -58,6 +73,18 @@ Replay mode feeds a previously **recorded** raw-XML session back through the eng
 | Connect hangs then fails | Network/firewall blocking `play.net`, or the game is down for maintenance. Genie retries the **initial** connect a few times, then stops. |
 
 Genie translates the server's raw `PROBLEM` codes into the friendly reasons above. More in [Troubleshooting & FAQ](Troubleshooting).
+
+**Capturing a connection trace.** If a login hangs or you're stuck on the 🔓
+plaintext fallback and want to know why, turn on the step-by-step connect trace:
+
+```
+#config conndebug true
+```
+
+The next connect prints each protocol step (TLS handshake, key exchange, auth,
+character list, game select) with timings straight into the game window, so a
+stall can be pinned to an exact step — ideal to paste into a bug report. It's
+**off by default**; turn it back off with `#config conndebug false`.
 
 ## Related
 
