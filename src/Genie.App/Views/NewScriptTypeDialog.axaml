@@ -1,0 +1,49 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Genie.App.Views.NewScriptTypeDialog"
+        Title="New Script"
+        Width="440" Height="240"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False">
+
+  <Grid RowDefinitions="Auto,*,Auto" Margin="20,16,20,16">
+
+    <!-- Prompt: which script is being created (filled in by Show). -->
+    <TextBlock Grid.Row="0"
+               x:Name="PromptText"
+               TextWrapping="Wrap"
+               FontSize="13"
+               Margin="0,0,0,12"/>
+
+    <!-- Supported file types. Keep this list in sync with
+         MainWindowViewModel.SupportedScriptExtensions. .cmd is the default. -->
+    <StackPanel Grid.Row="1" Spacing="6">
+      <RadioButton x:Name="CmdOption" GroupName="type" IsChecked="True"
+                   Content=".cmd  —  Genie/Wizard script (default)"/>
+      <RadioButton x:Name="IncOption" GroupName="type"
+                   Content=".inc  —  include / helper fragment"/>
+      <RadioButton x:Name="JsOption" GroupName="type"
+                   Content=".js  —  JavaScript array script"/>
+    </StackPanel>
+
+    <!-- Create is the default action (Enter); Cancel carries Esc / close-box. -->
+    <StackPanel Grid.Row="2"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8"
+                Margin="0,16,0,0">
+      <Button x:Name="CreateButton"
+              Content="_Create"
+              MinWidth="88"
+              IsDefault="True"
+              Click="OnCreate"/>
+      <Button x:Name="CancelButton"
+              Content="_Cancel"
+              MinWidth="88"
+              IsCancel="True"
+              Click="OnCancel"/>
+    </StackPanel>
+
+  </Grid>
+</Window>

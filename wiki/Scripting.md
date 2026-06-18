@@ -94,8 +94,35 @@ Type `#vars` at the command bar to see the full live list. The complete table is
 #scripts              # list running scripts
 #stop myscript        # stop one script
 #stopall              # stop everything
-#edit myscript        # open it in your editor (set via Display Settings)
+#edit myscript        # open it in your editor (creates it if new — see below)
 ```
+
+### Creating a new script
+
+`#edit` doubles as "new script": if the name doesn't exist yet, Genie creates
+an empty file and opens it (matching Genie 4). How the type is chosen:
+
+- **`#edit foo.js`** — an explicit supported extension (`.cmd`, `.inc`, `.js`)
+  is honoured directly: `foo.js` is created.
+- **`#edit foo`** — no extension given, so a small dialog asks which supported
+  type to create (`.cmd` is the default). Cancelling creates nothing.
+
+Names are bare file names under the `Scripts` folder; path separators and `..`
+are rejected.
+
+### Choosing an editor
+
+`#edit` (and the ✏ icon on the Script Bar) opens the script in an external
+editor. Genie resolves which editor to use in this order, falling back to the
+next rung if one isn't set or fails to launch:
+
+1. **Display Settings → Editor Path** — *Edit → Configuration → Display
+   Settings*. A full path, e.g. `C:\Program Files\Notepad++\notepad++.exe`.
+2. **`#config editor <path>`** — the Genie 4-parity command, stored in
+   `settings.cfg`. Accepts a full path or a bare executable on your `PATH`
+   (e.g. `code`, `notepad++.exe`).
+3. **OS default** — Notepad on Windows, the default text editor via `open -t`
+   on macOS, or `xdg-open` on Linux.
 
 A **Script Bar** above the command bar shows what's running, with stop/edit controls; it hides itself when nothing is running.
 

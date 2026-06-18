@@ -6,6 +6,11 @@ CLAUDE.md
 .cursorrules
 .aider*
 
+# ─── Dev scratch screenshots (root-level, underscore-prefixed) ────────────
+# Throwaway UI captures taken while iterating (e.g. _mdi_tabbed.png). Kept out
+# of both repos — name any keeper screenshot without the leading underscore.
+/_*.png
+
 # ─── .NET / Visual Studio / Rider build artefacts ──────────────────────────
 bin/
 obj/

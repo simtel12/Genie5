@@ -74,11 +74,12 @@ public interface ICommandHost
     System.Collections.Generic.IReadOnlyDictionary<string, string> GetGlobalVariables();
 
     /// <summary>
-    /// Toggle the Live Audit diagnostic log (the <c>#audit</c> command) — tees
+    /// Set the Live Audit diagnostic mode (the <c>#audit</c> command) — tees
     /// raw XML + parsed events + live zone/room to a log file for real-time
-    /// troubleshooting. Returns the log file path.
+    /// troubleshooting; <see cref="Diagnostics.AuditMode.XmlHunting"/> adds the
+    /// tag-coverage pass. Returns the log file path.
     /// </summary>
-    string SetLiveAudit(bool on);
+    string SetLiveAudit(Diagnostics.AuditMode mode);
 
     /// <summary>
     /// Expand <c>$name</c> references to their current global value (from

@@ -3166,11 +3166,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         }
     }
 
-    /// <summary>Open settings.cfg in an external text editor. Editor preference
-    /// ladder: explicit <see cref="DisplaySettings.EditorPath"/> → Notepad
-    /// (Windows) → open/xdg-open (macOS/Linux) → OS default. This is #config
-    /// edit's Genie 4 behavior, pointed at settings.cfg (GenieConfig) rather
-    /// than display.json.</summary>
+    /// <summary>Open settings.cfg in an external text editor, using the shared
+    /// <see cref="LaunchExternalEditor"/> resolution ladder (Display Settings →
+    /// Editor Path → <c>#config editor</c> → OS default). This is #config edit's
+    /// Genie 4 behavior, pointed at settings.cfg (GenieConfig) rather than
+    /// display.json.</summary>
     private void OpenSettingsCfgInEditor(Genie.Core.Config.GenieConfig config)
     {
         try
@@ -3179,33 +3179,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             if (!System.IO.File.Exists(path))
                 config.Save();  // first-write — make sure there's a file to open
 
-            var editor = Display.EditorPath;
-            if (!string.IsNullOrWhiteSpace(editor) && System.IO.File.Exists(editor))
-            {
-                System.Diagnostics.Process.Start(
-                    new System.Diagnostics.ProcessStartInfo(editor, "\"" + path + "\"")
-                    { UseShellExecute = false });
-            }
-            else if (OperatingSystem.IsWindows())
-            {
-                System.Diagnostics.Process.Start("notepad.exe", "\"" + path + "\"");
-            }
-            else if (OperatingSystem.IsMacOS())
-            {
-                System.Diagnostics.Process.Start("open", "-t \"" + path + "\"");
-            }
-            else if (OperatingSystem.IsLinux())
-            {
-                System.Diagnostics.Process.Start("xdg-open", "\"" + path + "\"");
-            }
-            else
-            {
-                System.Diagnostics.Process.Start(
-                    new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
-            }
+            LaunchExternalEditor(path);
             GameText.AddSystemLine($"[config] Opened {path}");
             GameText.AddSystemLine(
-                "[config] Edits apply on the next #config load or restart. To set a different editor, use Edit → Configuration → Display Settings → Editor Path.");
+                "[config] Edits apply on the next #config load or restart. To set a different editor, use \"#config editor <path>\" or Edit → Configuration → Display Settings → Editor Path.");
         }
         catch (Exception ex)
         {
@@ -3512,16 +3489,75 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     }
 
     /// <summary>
-    /// Opens the named script file in the user-configured external editor
-    /// (<see cref="DisplaySettings.EditorPath"/>) or, when none is set,
-    /// in the OS default handler for <c>.cmd</c> files.
+    /// Resolves the external editor for opening script/config files and launches
+    /// it on <paramref name="file"/>. Preference ladder, first that launches wins:
+    /// <list type="number">
+    ///   <item>Display Settings → Editor Path (<see cref="DisplaySettings.EditorPath"/>)</item>
+    ///   <item><c>#config editor</c> (<see cref="Genie.Core.Config.GenieConfig.Editor"/>) — Genie 4 parity</item>
+    ///   <item>OS default plain-text editor (notepad / <c>open -t</c> / xdg-open)</item>
+    /// </list>
+    /// Each configured candidate is launched inside try/catch; if it throws (stale
+    /// path, or the Windows-only <c>"notepad.exe"</c> default on macOS/Linux) the
+    /// next rung is attempted. A bare executable name (e.g. <c>code</c>,
+    /// <c>notepad++.exe</c>) resolves via PATH because <c>UseShellExecute=false</c>.
+    /// Never shell-launches the file directly: the Windows shell association for
+    /// <c>.cmd</c> would EXECUTE it instead of opening it for editing (issue #63).
+    /// Returns a human-readable description of whatever launched.
+    /// </summary>
+    private string LaunchExternalEditor(string file)
+    {
+        // 1) explicit GUI override, then 2) the #config editor value.
+        foreach (var candidate in new[] { Display.EditorPath, _core?.Config?.Editor })
+        {
+            if (string.IsNullOrWhiteSpace(candidate)) continue;
+            try
+            {
+                System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo(candidate, $"\"{file}\"")
+                    { UseShellExecute = false });
+                return candidate;
+            }
+            catch (Exception ex)
+            {
+                // Stale path or wrong-OS default — log and fall to the next rung.
+                Diagnostics.ErrorLog.Log($"LaunchExternalEditor({candidate})", ex);
+            }
+        }
+
+        // 3) OS default plain-text editor.
+        if (OperatingSystem.IsWindows())
+            System.Diagnostics.Process.Start("notepad.exe", $"\"{file}\"");
+        else if (OperatingSystem.IsMacOS())
+            // -t opens in the default TEXT editor regardless of extension.
+            System.Diagnostics.Process.Start("open", $"-t \"{file}\"");
+        else
+            // Linux doesn't treat `.cmd` as executable, so xdg-open routes it to
+            // the text/plain handler (a text editor).
+            System.Diagnostics.Process.Start("xdg-open", $"\"{file}\"");
+        return "OS default";
+    }
+
+    /// <summary>Script file extensions the engine accepts, in lookup priority
+    /// order: <c>.cmd</c> (Genie/Wizard dialect), <c>.inc</c> (include helpers),
+    /// <c>.js</c> (JavaScript array scripts). Used by <see cref="OpenScriptInEditor"/>
+    /// for both existing-file lookup and the new-script type picker — keep in
+    /// sync with <see cref="Views.NewScriptTypeDialog"/>.</summary>
+    public static readonly string[] SupportedScriptExtensions = { ".cmd", ".inc", ".js" };
+
+    /// <summary>
+    /// Opens the named script in the user-configured external editor
+    /// (Display Settings → Editor Path, then <c>#config editor</c>; see
+    /// <see cref="LaunchExternalEditor"/> for the full ladder).
     /// <para>
-    /// Looks up <c>{ScriptsDir}/{name}.cmd</c> first, then <c>.inc</c>.
-    /// If neither exists, surfaces a system line in the Game window so
-    /// the user knows nothing happened (rather than a silent failure).
+    /// Lookup: if <paramref name="name"/> carries a supported extension that
+    /// exact file is used; otherwise <c>{name}.cmd</c> → <c>.inc</c> → <c>.js</c>
+    /// are tried in turn. When no file exists the script is <b>created</b> first
+    /// (Genie 4 <c>#edit</c> parity): the typed extension is used if given, else
+    /// a small dialog asks which supported type to create. Cancelling the dialog
+    /// creates nothing.
     /// </para>
     /// </summary>
-    public void OpenScriptInEditor(string name)
+    public async void OpenScriptInEditor(string name)
     {
         if (_core is null || string.IsNullOrWhiteSpace(name)) return;
 
@@ -3532,48 +3568,69 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             return;
         }
 
-        // Try .cmd first, then .inc helpers, then .js array scripts.
-        var candidate = Path.Combine(dir, name + ".cmd");
-        if (!File.Exists(candidate))
-            candidate = Path.Combine(dir, name + ".inc");
-        if (!File.Exists(candidate))
-            candidate = Path.Combine(dir, name + ".js");
-        if (!File.Exists(candidate))
+        name = name.Trim();
+
+        // Script names are bare basenames living directly under ScriptsDir.
+        // Reject anything that could escape it (path separators, `..`, or a
+        // rooted/drive-qualified path) before we ever touch the filesystem.
+        if (name.IndexOfAny(new[] { '/', '\\' }) >= 0
+            || name.Contains("..")
+            || Path.IsPathRooted(name))
         {
-            GameText.AddSystemLine(
-                $"[editor] script not found: '{name}' (looked for {name}.cmd, {name}.inc, {name}.js in {dir})");
+            GameText.AddSystemLine($"[editor] invalid script name: '{name}'");
             return;
+        }
+
+        // Did the user type an explicit supported extension (e.g. `foo.js`)?
+        var typedExt = Path.GetExtension(name);
+        var hasSupportedExt =
+            SupportedScriptExtensions.Contains(typedExt, StringComparer.OrdinalIgnoreCase);
+        var baseName = hasSupportedExt ? Path.GetFileNameWithoutExtension(name) : name;
+
+        // Locate an existing file.
+        string? candidate = null;
+        if (hasSupportedExt)
+        {
+            var p = Path.Combine(dir, baseName + typedExt);
+            if (File.Exists(p)) candidate = p;
+        }
+        else
+        {
+            foreach (var ext in SupportedScriptExtensions)
+            {
+                var p = Path.Combine(dir, baseName + ext);
+                if (File.Exists(p)) { candidate = p; break; }
+            }
+        }
+
+        // Not found → create it (Genie 4 #edit parity). Honour the typed
+        // extension; otherwise ask which supported type to create.
+        if (candidate is null)
+        {
+            var ext = hasSupportedExt
+                ? typedExt.ToLowerInvariant()
+                : await PromptForScriptTypeAsync(baseName);
+            if (ext is null) return;  // user cancelled the type picker
+
+            candidate = Path.Combine(dir, baseName + ext);
+            try
+            {
+                // Seed an empty file — parity with Genie 4's create-on-edit.
+                File.WriteAllText(candidate, string.Empty);
+                GameText.AddSystemLine($"[editor] created '{Path.GetFileName(candidate)}'");
+            }
+            catch (Exception ex)
+            {
+                ErrorLog.Log("OpenScriptInEditor.Create", ex);
+                GameText.AddSystemLine(
+                    $"[editor] could not create '{baseName + ext}': {ex.Message}");
+                return;
+            }
         }
 
         try
         {
-            var editorPath = Display.EditorPath;
-            if (!string.IsNullOrWhiteSpace(editorPath) && File.Exists(editorPath))
-            {
-                // Configured editor: invoke it with the file path as a
-                // single argument. Works for Notepad++, VS Code, Sublime,
-                // any GUI editor that takes a file path.
-                System.Diagnostics.Process.Start(editorPath, $"\"{candidate}\"");
-            }
-            else
-            {
-                // No configured editor. Do NOT shell-launch the file: on Windows
-                // the shell association for `.cmd` is "run as a batch script"
-                // (cmd.exe), so UseShellExecute would EXECUTE the script instead
-                // of opening it for editing (issue #63). Open it in a plain text
-                // editor explicitly instead.
-                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                        System.Runtime.InteropServices.OSPlatform.Windows))
-                    System.Diagnostics.Process.Start("notepad.exe", $"\"{candidate}\"");
-                else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                             System.Runtime.InteropServices.OSPlatform.OSX))
-                    // -t opens in the default TEXT editor regardless of extension.
-                    System.Diagnostics.Process.Start("open", $"-t \"{candidate}\"");
-                else
-                    // Linux doesn't treat `.cmd` as executable, so xdg-open routes
-                    // it to the text/plain handler (a text editor).
-                    System.Diagnostics.Process.Start("xdg-open", $"\"{candidate}\"");
-            }
+            LaunchExternalEditor(candidate);
             GameText.AddSystemLine($"[editor] opened '{Path.GetFileName(candidate)}'");
         }
         catch (Exception ex)
@@ -3581,6 +3638,20 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             ErrorLog.Log("OpenScriptInEditor", ex);
             GameText.AddSystemLine($"[editor] failed to open '{name}': {ex.Message}");
         }
+    }
+
+    /// <summary>Asks the user which supported script type to create for a new
+    /// script, via <see cref="Views.NewScriptTypeDialog"/>. Returns the chosen
+    /// extension (incl. dot) or null on cancel. When no desktop window is
+    /// available (headless/tests) falls back to the default <c>.cmd</c> dialect
+    /// rather than blocking.</summary>
+    private async Task<string?> PromptForScriptTypeAsync(string baseName)
+    {
+        var owner = (Avalonia.Application.Current?.ApplicationLifetime
+            as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        if (owner is null) return ".cmd";
+
+        return await Views.NewScriptTypeDialog.Show(owner, baseName);
     }
 
     /// <summary>

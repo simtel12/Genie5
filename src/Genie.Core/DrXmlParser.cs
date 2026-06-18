@@ -443,6 +443,47 @@ public sealed class DrXmlParser : IDisposable
         // resulting TextEvent.
     };
 
+    // ── Tag-coverage classification (for `#audit xmlhunting`) ────────────────
+    // Source of truth for "are we using 100% of the XML?". Three buckets:
+    //   • Consumed       — produces a typed GameEvent (the HandleElement switch).
+    //   • DroppedData     — IN _settingsTags but carries real game data we don't
+    //                       yet consume (injuries <image>/<skin>, server dialogs,
+    //                       <style> markers, exp <compDef>, …). The hunt targets.
+    //   • DroppedSetting  — the Wrayth settings dump; correctly discarded.
+    //   • Unknown         — neither handled nor skipped → emits UnknownTagEvent.
+    // Keep <see cref="_handledTags"/> in sync with the HandleElement switch.
+    private static readonly HashSet<string> _handledTags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "a", "casttime", "clearstream", "compass", "component", "container",
+        "d", "dir", "endsetup", "indicator", "inv", "left", "nav", "openwindow",
+        "output", "popbold", "popstream", "preset", "progressbar", "prompt",
+        "pushbold", "pushstream", "resource", "right", "roundtime",
+        "settingsinfo", "spell", "streamwindow",
+    };
+
+    // Subset of _settingsTags that actually carries game data we drop today —
+    // the coverage gaps "#audit xmlhunting" exists to surface. (Skip behaviour
+    // is unchanged; this set only drives classification.)
+    private static readonly HashSet<string> _droppedDataTags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image", "skin", "style", "compdef", "dialogdata", "opendialog",
+        "radio", "detach", "playerid", "exposecontainer", "clearcontainer",
+    };
+
+    /// <summary>How the parser treats a given element name — see the bucket
+    /// notes above. Backs the <c>#audit xmlhunting</c> coverage diagnostic.</summary>
+    public enum TagFate { Consumed, DroppedData, DroppedSetting, Unknown }
+
+    /// <summary>Classify an element name by what the parser does with it.
+    /// Case-insensitive. The single source of truth for XML coverage.</summary>
+    public static TagFate ClassifyTag(string name)
+    {
+        if (_handledTags.Contains(name))     return TagFate.Consumed;
+        if (_droppedDataTags.Contains(name)) return TagFate.DroppedData;
+        if (_settingsTags.Contains(name))    return TagFate.DroppedSetting;
+        return TagFate.Unknown;
+    }
+
     private void HandleElement(XmlReader r, string rawTag)
     {
         var name = r.Name.ToLowerInvariant();

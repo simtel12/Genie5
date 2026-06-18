@@ -4,7 +4,25 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.6.1 — secure login & fixes
+## Latest: v5.0.0-alpha.6.2 — type-ahead & script editing
+
+Genie now shows a live **type-ahead counter** in the command bar, and that limit finally matches your **account tier** (free 1 / premium 2 / +LTB 3) and self-corrects from the server. Script editing also gets friendlier: `#edit` opens your chosen editor — including the Genie 4 `#config editor` setting that used to be ignored — and **creates a new script** when one doesn't exist yet.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.6.2** as a delta.
+
+**Command bar**
+
+- **Type-ahead pip counter** — a counter between the roundtime badge and the input box shows the per-account type-ahead cap as pips (filled = queued ahead of the game, hollow = free slots). Dim when idle, **amber** at the cap, so you can see when the game is lagging your typing.
+- **Tier-accurate type-ahead** — the limit is seeded from your account tier (free = 1 line, premium = 2, premium + LTB = 3) and self-calibrates if the server reports a different cap, so the auto-walker stops overrunning the buffer on free/premium accounts.
+
+**Scripting**
+
+- **Editor selection that works** — `#edit` and the ✏ Script Bar icon open your editor in a clear order: Display Settings → Editor Path, then `#config editor`, then your OS default. The Genie 4 `#config editor` setting is now honoured instead of silently ignored. See [Scripting](Scripting#choosing-an-editor).
+- **Create-on-edit** — `#edit <name>` on a script that doesn't exist creates it (Genie 4 parity). An explicit extension (`#edit foo.js`) is used directly; otherwise a small dialog asks which supported type to create (`.cmd` / `.inc` / `.js`). See [Scripting](Scripting#creating-a-new-script).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.6.2)
+
+## v5.0.0-alpha.6.1 — secure login & fixes
 
 Genie now signs in over an **encrypted TLS connection** — the same secure path Lich 5 uses — falling back to the legacy plaintext login only if the secure port is blocked. A **padlock** in the title bar (🔒 encrypted / 🔓 obfuscated fallback) tells you which you got. Riding along: a quieter `#var`, human-readable config files, and an updater that no longer freezes at 70%.
 

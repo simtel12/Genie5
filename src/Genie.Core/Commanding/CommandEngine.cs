@@ -316,16 +316,26 @@ public sealed class CommandEngine
                 break;
             case "audit":
             {
-                // #audit on|off — Live Audit diagnostic log (raw XML + events +
-                // zone/room) for real-time troubleshooting.
+                // #audit on|off|xmlhunting — Live Audit diagnostic log (raw XML +
+                // events + zone/room) for real-time troubleshooting. xmlhunting
+                // adds the XML tag-coverage pass (flags data DR sends that the
+                // parser doesn't consume).
                 var sub = parts.Count > 1 ? parts[1].ToLowerInvariant() : "";
-                if (sub is "on" or "off")
+                var mode = sub switch
                 {
-                    var path = _host.SetLiveAudit(sub == "on");
-                    _host.Echo($"[audit] live audit {sub.ToUpperInvariant()} → {path}");
+                    "on"                              => (Diagnostics.AuditMode?)Diagnostics.AuditMode.On,
+                    "off"                             => Diagnostics.AuditMode.Off,
+                    "xmlhunting" or "xml" or "hunt"   => Diagnostics.AuditMode.XmlHunting,
+                    _                                 => null,
+                };
+                if (mode is { } m)
+                {
+                    var path = _host.SetLiveAudit(m);
+                    var label = m == Diagnostics.AuditMode.XmlHunting ? "XML HUNTING" : m.ToString().ToUpperInvariant();
+                    _host.Echo($"[audit] live audit {label} → {path}");
                 }
                 else
-                    _host.Echo("Usage: #audit on | off");
+                    _host.Echo("Usage: #audit on | off | xmlhunting");
                 break;
             }
             case "mapper":
