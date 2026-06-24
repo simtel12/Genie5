@@ -161,7 +161,23 @@ public static class ScriptParser
             if (t.StartsWith("include ", StringComparison.OrdinalIgnoreCase))
             {
                 var incName = t[8..].Trim();
-                var path    = ResolveIncludePath(scriptsDir, incName);
+
+                // `include` is a parse-time splice for .cmd/.inc script fragments.
+                // A .js file fed here would be spliced in as command lines and run
+                // verbatim through the .cmd interpreter — the JavaScript engine never
+                // sees it, so every line (function bodies, comments, …) gets sent to
+                // the game (issue #104). Reject it with an actionable error instead of
+                // silently mangling the script.
+                if (incName.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
+                {
+                    var jsBase = Path.GetFileNameWithoutExtension(incName);
+                    output.Add((origin, i + 1,
+                        $"echo [script] include: '{incName}' is a JavaScript file — " +
+                        $"'include' only loads .cmd/.inc scripts. Run it directly with .{jsBase}"));
+                    continue;
+                }
+
+                var path = ResolveIncludePath(scriptsDir, incName);
                 if (path != null)
                 {
                     var subOrigin = Path.GetFileNameWithoutExtension(path);
