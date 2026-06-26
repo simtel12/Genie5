@@ -1,3 +1,56 @@
+# Genie 5 — v5.0.0-alpha.7.3
+
+The **Windows & Maps** release — Genie 4-style per-window controls (a right-click
+window menu with timestamps and a Name List Only filter), the window-chrome
+settings reorganized under the Layout menu, map landmark labels, and a mapper
+routing fix.
+
+> **Alpha software.** Builds are **unsigned** for most platforms — Windows
+> SmartScreen will warn on first launch (More info → Run anyway). Signing is
+> tracked in #33.
+
+## ✨ New since alpha.7.2
+
+- **Per-window right-click menu (#90)** — right-click any window for the Genie 4
+  window menu: **Clear**, **Time Stamp**, **Name List Only**, and **Close**. Each
+  window shows only the items it actually supports.
+- **Per-window timestamps (#90)** — turn on **Time Stamp** (from that right-click
+  menu, or Configuration → Layout → Windows) and every new line in that window is
+  prefixed with `[HH:mm:ss]`. Works on the main Game window and every stream/log
+  window; existing scrollback isn't re-stamped, and bare prompts are left alone.
+- **Name List Only** — filter a window down to just the lines that mention a name
+  in your Names list (a clean arrivals / whispers feed). Remembered per window.
+- **Window controls moved to the Layout menu** — Hands Strip, Roundtime / Hands
+  position, Status Bar, Zone / Room ID, Windowed Mode, and Guild in Title Bar now
+  live under **Layout** (alongside save/load arrangement); the **Window** menu is
+  now just the panel show/hide list. The per-window settings in Configuration also
+  moved under a new **Layout → Windows** sub-tab, matching Genie 4.
+- **Map labels** — landmark text the map author placed (gate names, shop names,
+  guild houses) is now imported, drawn on the map, and preserved on export.
+
+## 🐛 Fixes
+
+- **Skill / class / circle-gated routing now enforces (#95)** — the pathfinder
+  reads your guild and circle from the live game (once you've run `info`), so a
+  route is correctly steered around climbs, swims, or guild passages your
+  character can't take. Previously that data was read once at startup and never
+  refreshed, so the gates never took effect.
+
+## ⬇️ Downloads
+
+Grab the installer or portable build for your platform from the assets below:
+
+| Platform | Installer | Portable |
+|---|---|---|
+| Windows | `01-Windows-Genie5-Setup.exe` | `01-Windows-Genie5-Portable.zip` |
+| macOS (Apple Silicon) | `02-macOS-Apple-Silicon-Genie5.dmg` | `02-…-Portable.zip` |
+| macOS (Intel) | `03-macOS-Intel-Genie5.dmg` | `03-…-Portable.zip` |
+| Linux (x64) | `04-Linux-Genie5.AppImage` | — |
+
+**Full changelog:** https://github.com/GenieClient/Genie5/compare/v5.0.0-alpha.7.2...v5.0.0-alpha.7.3
+
+---
+
 # Genie 5 — v5.0.0-alpha.7.2
 
 The **JavaScript libraries** release. Keep a library of JavaScript functions in a
