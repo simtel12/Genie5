@@ -1595,6 +1595,20 @@ static async Task<bool> RunParseRepro(ILoggerFactory lf)
     core.Commands.ProcessInput("#parse SIGNAL_ABC");                     // should wake it
     bool cPass = scriptOut.Concat(echoed).Any(e => e.Contains("GOT_SIGNAL", StringComparison.Ordinal));
 
+    // Test E — issue #113's EXACT repro: a "caller" script parks on `waitforre
+    // ^YOU ARRIVED\!`; a separate "travel" script ends with `put #parse YOU
+    // ARRIVED!`. The scripted #parse (re-entrant, regex match) must wake the
+    // concurrently-waiting caller. This is the hang dylb0t reported.
+    File.WriteAllText(Path.Combine(core.Config.ScriptDir, "caller113.cmd"),
+        "waitforre ^YOU ARRIVED\\!\necho TRAVEL_DONE_113\n");
+    File.WriteAllText(Path.Combine(core.Config.ScriptDir, "travel113.cmd"),
+        "put #parse YOU ARRIVED!\n");
+    core.Scripts.TryStart("caller113", System.Array.Empty<string>());   // parks at waitforre
+    bool callerParked = core.Scripts.Instances.Any(i =>
+        i.Name.Equals("caller113", StringComparison.OrdinalIgnoreCase));
+    core.Scripts.TryStart("travel113", System.Array.Empty<string>());   // emits the #parse → wakes caller
+    bool ePass = scriptOut.Concat(echoed).Any(e => e.Contains("TRAVEL_DONE_113", StringComparison.Ordinal));
+
     var checks = new List<(string name, bool pass, string detail)>
     {
         ("Typed #parse fires a global #trigger (+ $1 capture)", aPass,        "expected echo 'CAUGHT:kobold'"),
@@ -1602,6 +1616,8 @@ static async Task<bool> RunParseRepro(ILoggerFactory lf)
         ("Scripted `put #parse` fires the global #trigger",     bPass,        "expected echo 'CAUGHT:dragon'"),
         ("Script parked at waitfor before injection",           parkedAtWait, "waittest blocked on 'waitfor SIGNAL_ABC'"),
         ("Typed #parse resolves a running script's waitfor",    cPass,        "expected script output 'GOT_SIGNAL'"),
+        ("#113: caller parked on waitforre before travel runs", callerParked, "caller113 blocked on 'waitforre ^YOU ARRIVED\\!'"),
+        ("#113: scripted put #parse wakes another script's waitforre", ePass, "expected script output 'TRAVEL_DONE_113'"),
     };
 
     Console.WriteLine();
