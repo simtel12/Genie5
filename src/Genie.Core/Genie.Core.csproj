@@ -45,6 +45,12 @@
          the user's MapsDirectory has no ZoneConnections.xml yet.
          See ZoneConnectionsRepository.Load() for the extraction path. -->
     <EmbeddedResource Include="Mapper\Resources\ZoneConnections.baseline.xml" />
+
+    <!-- Circle Calculator data: guild requirement tables + custom sort groups.
+         Shipped embedded as defaults; a user copy in the active config dir
+         overrides. See CircleData.ReadData(). -->
+    <EmbeddedResource Include="Extensions\Builtin\CircleCalc\Resources\CircleReqs.xml" />
+    <EmbeddedResource Include="Extensions\Builtin\CircleCalc\Resources\SortGroups.xml" />
   </ItemGroup>
 
 </Project>

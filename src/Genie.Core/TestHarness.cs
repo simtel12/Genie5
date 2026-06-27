@@ -50,6 +50,8 @@ using Genie.Core;
 using Genie.Core.AI;
 using Genie.Core.Connection;
 using Genie.Core.Events;
+using Genie.Core.Extensions;
+using Genie.Core.Extensions.Builtin.CircleCalc;
 using Genie.Core.Mapper;
 using Microsoft.Extensions.Logging;
 
@@ -318,6 +320,18 @@ switch (mode)
         // surfacing any localeCompare-magnitude gap.
         var okjs = RunJsInteropRepro();
         Environment.ExitCode = okjs ? 0 : 1;
+        return;
+    }
+
+    case "CIRCLECALC":
+    {
+        // Circle Calculator (VTCifer's plugin, ported to a sibling-of-Experience
+        // built-in extension): offline, embedded-data end-to-end proof — /calc and
+        // /sort drive the right exp/info verbs, the dump parses, the requirement
+        // math + skill sort run, guild auto-detect resolves from `info`, and a
+        // custom group filters correctly. No live game needed.
+        var okcc = RunCircleCalcRepro();
+        Environment.ExitCode = okcc ? 0 : 1;
         return;
     }
 
@@ -1540,6 +1554,116 @@ function findIndex(arrayname, srch) {
     return allPass;
 }
 
+// ── CIRCLECALC — VTCifer's Circle Calculator, ported to a built-in extension ──
+// Offline, embedded-data end-to-end check (no game): drives CircleCalcExtension
+// through /calc + /sort with a synthetic exp dump and a mock IExtensionHost,
+// proving the verb each command sends, the dump parse, the requirement math, the
+// skill sort, guild auto-detect from `info`, and custom-group filtering.
+static bool RunCircleCalcRepro()
+{
+    var host = new CcMockHost();          // ConfigDir "" → embedded CircleReqs/SortGroups only
+    var ext  = new CircleCalcExtension();
+    ext.Initialize(host);
+
+    // Synthetic Barbarian exp dump with FIXED ranks so the totals are exactly known:
+    //   TDP per skill = rank*(rank+1)/2 ; ΣTDP/200 (int); the pct sits below the
+    //   floor so it changes neither total.
+    //   50,40,100,30,60,20 → ΣTDP 9650 → /200 = 48 ; ΣRanks = 300.
+    string[] dump =
+    {
+        "Circle: 50    TDPs:    48",
+        "      Shield Usage:    50 20% pondering         Light Armor:     40 10% learning",
+        "       Small Edged:   100 50% analyzing       Parry Ability:     30 05% clear",
+        "           Evasion:    60 33% thinking             Tactics:      20 00% clear",
+    };
+    void Feed() { foreach (var l in dump) ext.OnGameLine(l); ext.OnPrompt(); }
+
+    // 1) /calc <guild> → sends `exp 0`, parses, runs the requirement math.
+    host.Reset();
+    ext.OnSlashCommand("/calc barbarian");
+    bool sentExp0 = host.Sent.Contains("exp 0");
+    Feed();
+    var calc = host.Echoes;
+    bool calcShape = calc.Any(l => l.StartsWith("Requirements for Circle", StringComparison.Ordinal))
+                  && calc.Any(l => l.Contains("TDPs Gained:"))
+                  && calc.Any(l => l.Contains("Total Ranks:"));
+    bool calcTotals = calc.Any(l => l.Contains("TDPs Gained:") && l.Contains("48"))
+                   && calc.Any(l => l.Contains("Total Ranks:") && l.Contains("300"));
+
+    // 2) /calc (no guild) → `info`, auto-detect guild, then `exp 0` + result.
+    host.Reset();
+    ext.OnSlashCommand("/calc");
+    bool sentInfo = host.Sent.Contains("info");
+    ext.OnGameLine("  Name: Renucci the Mighty          Guild: Barbarian");
+    bool sentExp0AfterInfo = host.Sent.Contains("exp 0");
+    Feed();
+    bool autoDetect = host.Echoes.Any(l => l.StartsWith("Requirements for Circle", StringComparison.Ordinal));
+
+    // 3) /sort → `exp all`, highest-rank first, labelled "all skillsets".
+    host.Reset();
+    ext.OnSlashCommand("/sort");
+    bool sentExpAll = host.Sent.Contains("exp all");
+    Feed();
+    var rows = host.Echoes.Where(l => l.Contains(" - ")).ToList();
+    bool sortDesc  = rows.Count >= 2 && rows[0].Contains("Small Edged");   // 100 is top
+    bool sortLabel = host.Echoes.Any(l => l.Contains("TDPs Gained from all skillsets"));
+
+    // 4) /sort <group> → filters to the custom group's skills. The Defenses group
+    //    excludes Small Edged / Tactics from our dump and keeps Shield Usage / Evasion / …
+    host.Reset();
+    ext.OnSlashCommand("/sort defense");
+    Feed();
+    var defRows = host.Echoes.Where(l => l.Contains(" - ")).ToList();
+    bool groupFilter = defRows.Any(l => l.Contains("Shield Usage"))
+                    && defRows.All(l => !l.Contains("Small Edged"))
+                    && host.Echoes.Any(l => l.Contains("Defenses"));
+
+    // 5) Unknown guild is rejected cleanly, with no exp round-trip.
+    host.Reset();
+    ext.OnSlashCommand("/calc notaguild");
+    bool unknown = host.Echoes.Any(l => l.Contains("unknown guild")) && !host.Sent.Contains("exp 0");
+
+    // 6) $CircleCalc.Guild (a #var) is honored — /calc with no arg uses it and skips
+    //    the `info` auto-detect round-trip entirely.
+    host.Reset();
+    host.UserVars["CircleCalc.Guild"] = "barbarian";
+    ext.OnSlashCommand("/calc");
+    bool cfgGuild = host.Sent.Contains("exp 0") && !host.Sent.Contains("info");
+    Feed();
+    host.UserVars.Clear();
+
+    var checks = new List<(string name, bool pass, string detail)>
+    {
+        ("/calc <guild> sends `exp 0`",                 sentExp0,    "verb"),
+        ("calc output has the expected shape",          calcShape,   "Requirements/TDPs/Total"),
+        ("calc totals exact (TDPs 48, Ranks 300)",      calcTotals,  "math"),
+        ("/calc auto-detects guild via `info`",         sentInfo && sentExp0AfterInfo && autoDetect, "info→exp 0"),
+        ("/sort sends `exp all`, descending order",     sentExpAll && sortDesc, "Small Edged top"),
+        ("/sort labels the skillset",                   sortLabel,   "all skillsets"),
+        ("/sort <group> filters to the group's skills", groupFilter, "Defenses"),
+        ("unknown guild rejected, no exp sent",         unknown,     "guard"),
+        ("$CircleCalc.Guild (#var) honored, no `info`", cfgGuild,    "config"),
+    };
+
+    Console.WriteLine();
+    Console.WriteLine("============ CIRCLE CALCULATOR (built-in) ============");
+    var allPass = true;
+    foreach (var (name, pass, detail) in checks)
+    {
+        allPass &= pass;
+        Console.ForegroundColor = pass ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine($"  [{(pass ? "PASS" : "FAIL")}] {name,-46} — {detail}");
+    }
+    Console.ResetColor();
+    Console.WriteLine("======================================================");
+    Console.ForegroundColor = allPass ? ConsoleColor.Green : ConsoleColor.Red;
+    Console.WriteLine(allPass
+        ? "[CIRCLECALC] /calc + /sort run end-to-end off embedded data — port wired correctly."
+        : "[CIRCLECALC] a check failed — see the table above.");
+    Console.ResetColor();
+    return allPass;
+}
+
 // ── PARSE — #parse Genie 4 fidelity, end-to-end through a real offline GenieCore ──
 // Genie 4's #parse fed three per-line legs (running scripts' waitfor/match, the
 // global user-trigger list, and plugins) and worked from BOTH the command bar and
@@ -2111,4 +2235,26 @@ static void GenerateFeDiff(string fileA, string fileB, string outFile)
     sb.AppendLine("- **Caveat 2**: server-side state (NPCs in room, time of day, weather, who's online) drifts between recordings. Small Δ values may just be noise. Look for systematic patterns, not single-tag deltas.");
 
     File.WriteAllText(outFile, sb.ToString());
+}
+
+/// <summary>Minimal in-memory <see cref="IExtensionHost"/> for the CIRCLECALC repro:
+/// captures echoes and sent commands, and forces embedded-data only (no config-dir
+/// override) so the test never depends on a user's local files.</summary>
+sealed class CcMockHost : IExtensionHost
+{
+    public List<string> Echoes { get; } = new();
+    public List<string> Sent   { get; } = new();
+    public IDictionary<string, string> Globals { get; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> UserVars { get; } =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    public void Echo(string text)             => Echoes.Add(text);
+    public void SendCommand(string command)   => Sent.Add(command);
+    public void SetWindow(string window, string content) { }
+    public string ConfigDir => "";
+    public void Log(string message) { }
+    public string? GetUserVar(string name) => UserVars.TryGetValue(name, out var v) ? v : null;
+
+    public void Reset() { Echoes.Clear(); Sent.Clear(); }
 }

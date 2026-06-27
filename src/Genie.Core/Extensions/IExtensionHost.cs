@@ -18,4 +18,11 @@ public interface IExtensionHost
 
     /// <summary>Write to the diagnostic log (not the game window).</summary>
     void Log(string message);
+
+    /// <summary>Read a persistent user variable (a <c>#var</c> value, resolved as
+    /// <c>$name</c>), or null when the name isn't a user variable. Distinct from
+    /// <see cref="Globals"/>, which holds only live game-state + <c>#tvar</c> session
+    /// globals — Genie 4 plugin settings like <c>$CircleCalc.Guild</c> live in the
+    /// persistent store. Default returns null for hosts that don't expose it.</summary>
+    string? GetUserVar(string name) => null;
 }

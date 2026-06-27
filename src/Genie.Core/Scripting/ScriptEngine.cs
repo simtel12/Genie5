@@ -151,6 +151,10 @@ public sealed class ScriptEngine
         Extensions.Register(new SpellTimerExtension());
         Extensions.Register(new ExperienceExtension());
         Extensions.Register(new TimeTrackerExtension());
+        // Circle Calculator: a command-driven sibling of Experience (/calc, /sort).
+        // No dock panel and always on (like InfoTracker), so it isn't in the
+        // settings tracker-toggle gate.
+        Extensions.Register(new global::Genie.Core.Extensions.Builtin.CircleCalc.CircleCalcExtension());
         Directory.CreateDirectory(_scriptsDir);
 
         _js = new JsScriptRuntime(
@@ -186,6 +190,7 @@ public sealed class ScriptEngine
             => _engine.SetWindow?.Invoke(window, content);
         public string ConfigDir                     => _engine.Config?.ConfigDir ?? _engine._scriptsDir;
         public void Log(string message)             => _engine._echo(message);
+        public string? GetUserVar(string name)      => _engine.UserVarLookup?.Invoke(name);
     }
 
     /// <summary>Wired by the host to the named-window seam (GenieCore's

@@ -21,13 +21,15 @@ public sealed class PluginManager
         new(StringComparer.OrdinalIgnoreCase);
     private readonly IPluginHost                             _host;
 
-    /// <summary>Plugin ids that have been absorbed into Core as built-in trackers
-    /// (Spell Timer, Experience, Time Tracker). A leftover DLL with one of these
-    /// ids is skipped at registration so it can't shadow the in-Core version.</summary>
+    /// <summary>Plugin ids that have been absorbed into Core as built-in extensions
+    /// (Spell Timer, Experience, Time Tracker, Circle Calculator). A leftover DLL
+    /// with one of these ids is skipped at registration so it can't shadow the
+    /// in-Core version.</summary>
     private static readonly IReadOnlySet<string> RetiredPluginIds =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "genie.spelltimer", "genie.experience", "genie.timetracker",
+            "genie.circlecalc",
         };
 
     public PluginManager(IPluginHost host) => _host = host;
