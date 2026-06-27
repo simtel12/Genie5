@@ -321,6 +321,18 @@ switch (mode)
         return;
     }
 
+    case "PARSE":
+    {
+        // #parse Genie 4 fidelity: drives a REAL offline GenieCore and proves the
+        // injected line reaches all three per-line legs (global triggers + running
+        // scripts' waitfor) from BOTH a typed command-bar #parse and a scripted
+        // `put #parse`, while never echoing the raw line. Closes the gaps where
+        // Genie 5's #parse only fed the script engine and only from scripts.
+        var okp = await RunParseRepro(loggerFactory);
+        Environment.ExitCode = okp ? 0 : 1;
+        return;
+    }
+
     case "LICH":
         connCfg = new ConnectionConfig
         {
@@ -1524,6 +1536,89 @@ function findIndex(arrayname, srch) {
           "            .length() rewrite works AND localeCompare returns ±1. Option A holds."
         : "[JSINTEROP] a check failed — if only the SORTS failed, modern Jint's\n" +
           "            localeCompare isn't returning ±1 (needs the §6 companion fix).");
+    Console.ResetColor();
+    return allPass;
+}
+
+// ── PARSE — #parse Genie 4 fidelity, end-to-end through a real offline GenieCore ──
+// Genie 4's #parse fed three per-line legs (running scripts' waitfor/match, the
+// global user-trigger list, and plugins) and worked from BOTH the command bar and
+// scripts. Genie 5's #parse used to feed only the script engine, only from scripts.
+// This drives the real CommandEngine "parse" case → GenieCore.InjectParsedLine →
+// Triggers/Scripts wiring (no game connection) and asserts the closed gaps.
+static async Task<bool> RunParseRepro(ILoggerFactory lf)
+{
+    // Fresh data root so a prior run's saved triggers/config don't bleed in.
+    var root = Path.Combine(ResultsDir, "parse_repro");
+    try { if (Directory.Exists(root)) Directory.Delete(root, true); } catch { /* best effort */ }
+    Directory.CreateDirectory(root);
+
+    await using var core = new GenieCore(dataDirectoryOverride: root, aiConfig: null, loggerFactory: lf);
+
+    var echoed    = new List<string>();   // host echoes (incl. a trigger action's #echo)
+    var scriptOut = new List<string>();   // script-originated output (echo from inside a script)
+    core.EchoLine         += s => echoed.Add(s);
+    core.ScriptOutputLine += s => scriptOut.Add(s);
+
+    // A global user trigger defined OUTSIDE any script (the leg #parse used to skip).
+    core.Commands.ProcessInput("#trigger {You see a (\\w+)} {#echo CAUGHT:$1}");
+
+    // Test A — a TYPED #parse from the command bar fires the global trigger and
+    // its capture group expands. (Closes: typed #parse unhandled + triggers not fed.)
+    core.Commands.ProcessInput("#parse You see a kobold.");
+    bool aPass = echoed.Any(e => e.Contains("CAUGHT:kobold", StringComparison.Ordinal));
+
+    // Test D — negative: #parse must NOT echo the raw injected line itself (no echo,
+    // no leak to the window). The only legitimate echoes carrying our text are the
+    // "Trigger added" confirmation and the trigger's "CAUGHT:" action output.
+    bool noRawEcho = !echoed.Any(e =>
+        e.Contains("You see a kobold", StringComparison.Ordinal) &&
+        !e.StartsWith("Trigger added", StringComparison.Ordinal));
+
+    // Test B — a SCRIPTED #parse (via `put #parse`, since a bare '#' line is a .cmd
+    // comment) fires the same global trigger → proves the scripted path goes through
+    // the full host pipeline, not the old script-only feed. (Closes: plugins/triggers
+    // not fed from scripted #parse.)
+    File.WriteAllText(Path.Combine(core.Config.ScriptDir, "parsefire.cmd"),
+        "put #parse You see a dragon.\n");
+    core.Scripts.TryStart("parsefire", System.Array.Empty<string>());   // self-ticks, runs the put synchronously
+    bool bPass = echoed.Any(e => e.Contains("CAUGHT:dragon", StringComparison.Ordinal));
+
+    // Test C — the SCRIPTS leg: a running script's `waitfor` is resolved by a typed
+    // #parse, exactly as a real game line would. Proves injected text reaches script
+    // waiters (not just triggers).
+    File.WriteAllText(Path.Combine(core.Config.ScriptDir, "waittest.cmd"),
+        "waitfor SIGNAL_ABC\necho GOT_SIGNAL\n");
+    core.Scripts.TryStart("waittest", System.Array.Empty<string>());    // parks at waitfor
+    bool parkedAtWait = core.Scripts.Instances.Any(i =>
+        i.Name.Equals("waittest", StringComparison.OrdinalIgnoreCase));
+    core.Commands.ProcessInput("#parse SIGNAL_ABC");                     // should wake it
+    bool cPass = scriptOut.Concat(echoed).Any(e => e.Contains("GOT_SIGNAL", StringComparison.Ordinal));
+
+    var checks = new List<(string name, bool pass, string detail)>
+    {
+        ("Typed #parse fires a global #trigger (+ $1 capture)", aPass,        "expected echo 'CAUGHT:kobold'"),
+        ("#parse does NOT echo the raw injected line",          noRawEcho,    "no 'You see a kobold' echo leaked to the window"),
+        ("Scripted `put #parse` fires the global #trigger",     bPass,        "expected echo 'CAUGHT:dragon'"),
+        ("Script parked at waitfor before injection",           parkedAtWait, "waittest blocked on 'waitfor SIGNAL_ABC'"),
+        ("Typed #parse resolves a running script's waitfor",    cPass,        "expected script output 'GOT_SIGNAL'"),
+    };
+
+    Console.WriteLine();
+    Console.WriteLine("================= #parse FIDELITY (Genie 4 parity) =================");
+    var allPass = true;
+    foreach (var (name, pass, detail) in checks)
+    {
+        allPass &= pass;
+        Console.ForegroundColor = pass ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine($"  [{(pass ? "PASS" : "FAIL")}] {name,-52} — {detail}");
+    }
+    Console.ResetColor();
+    Console.WriteLine($"  host echoes : {string.Join(" | ", echoed)}");
+    Console.WriteLine($"  script out  : {string.Join(" | ", scriptOut)}");
+    Console.WriteLine("===================================================================");
+    Console.ForegroundColor = allPass ? ConsoleColor.Green : ConsoleColor.Red;
+    Console.WriteLine(allPass ? "[PARSE] ALL CHECKS PASSED" : "[PARSE] SOME CHECKS FAILED");
     Console.ResetColor();
     return allPass;
 }
