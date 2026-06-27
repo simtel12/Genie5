@@ -137,6 +137,11 @@ public sealed class GameStateEngine : IDisposable
                 _state.LastPrompt = prompt.ServerTime;
                 break;
 
+            // ── Main-window text (e.g. the `exp all` skill table) ─────────
+            case TextEvent text:
+                ApplyText(text);
+                break;
+
             // ── Unknown tags → logged for AI training analysis ────────────
             case UnknownTagEvent unk:
                 _log.LogDebug("UnknownTag [{Name}]: {Raw}", unk.TagName, unk.RawXml);
@@ -250,6 +255,49 @@ public sealed class GameStateEngine : IDisposable
         // "Climbing" rather than "climbing" — minor cosmetic.
         var displayName = char.ToUpperInvariant(skillName[0]) + skillName.Substring(1);
         _state.LiveSkills.SetRank(displayName, rank);
+    }
+
+    // ── `exp all` / `exp` text table → skill ranks ─────────────────────────────
+    // The per-skill <component id='exp X'> push only carries skills the character
+    // is ACTIVELY learning — it is EMPTY for every other skill (verified against
+    // recorded sessions: a full `exp all` yields ~54 empty exp components and only
+    // rexp/tdp/favor with content). The authoritative full rank list is the text
+    // table that `exp all` prints to the main window. Without parsing it the
+    // SkillStore stays empty after a manual `exp all`, so the pathfinder gets no
+    // ranks and the Mapper's "fetch your skills" banner never auto-dismisses
+    // (the banner hides on SkillStore.Changed). We parse the table here, bracketed
+    // by its "Showing all skills…" header and "Total Ranks Displayed:" footer so
+    // ordinary game text is never mistaken for a skill row.
+    private bool _inExpTable;
+
+    // Matches one "SkillName:  RANK PCT%" entry. Skill names are Title-Case and may
+    // contain spaces ("Shield Usage", "Twohanded Edged"); a row carries two columns,
+    // so Matches() is run globally over the line. The rank is the first integer, the
+    // percent (toward next rank) is discarded.
+    private static readonly System.Text.RegularExpressions.Regex ExpTableRowRegex =
+        new(@"(?<name>[A-Z][A-Za-z]*(?: [A-Z][A-Za-z]*)*):\s+(?<rank>\d+)\s+\d+%",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private void ApplyText(TextEvent te)
+    {
+        var text = te.Text;
+        if (string.IsNullOrEmpty(text)) return;
+
+        if (text.Contains("Showing all skills", StringComparison.Ordinal))
+        {
+            _inExpTable = true;
+            return;
+        }
+        if (!_inExpTable) return;
+        if (text.Contains("Total Ranks Displayed", StringComparison.Ordinal))
+        {
+            _inExpTable = false;
+            return;
+        }
+
+        foreach (System.Text.RegularExpressions.Match m in ExpTableRowRegex.Matches(text))
+            if (int.TryParse(m.Groups["rank"].Value, out var rank))
+                _state.LiveSkills.SetRank(m.Groups["name"].Value, rank);
     }
 
     // ── Indicator → Status flags ──────────────────────────────────────────────
