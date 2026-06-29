@@ -345,6 +345,30 @@ public sealed class GenieConfig
     /// wired to any behaviour — see <see cref="ReservedKeys"/>.</summary>
     public static bool IsReserved(string key) => ReservedKeys.Contains(key);
 
+    /// <summary>
+    /// Display grouping for <c>#config list</c> — ordered category headers, each
+    /// naming the settings.cfg keys that print under it (keys are alphabetised
+    /// within a section by the listing). Keys are matched against
+    /// <see cref="ToConfigPairs"/>; any key not named here falls into a trailing
+    /// "Other" bucket, so a newly-added setting is never silently dropped from
+    /// the listing. <b>When you add a key to <see cref="ToConfigPairs"/>, add it
+    /// to the right section here too.</b> The order of the sections is the order
+    /// they print in.
+    /// </summary>
+    public static readonly IReadOnlyList<(string Category, string[] Keys)> ConfigCategories = new (string, string[])[]
+    {
+        ("Connection",       new[] { "classicconnect", "conndebug", "connectscript", "frontend", "reconnect" }),
+        ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines" }),
+        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety" }),
+        ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "triggeroninput", "scripttimeout", "maxgosubdepth", "abortdupescript", "scriptextension", "editor" }),
+        ("Mapper",           new[] { "automapper", "automapperalpha", "updatemapperscripts" }),
+        ("Auto-Walk",        new[] { "autowalkpauseonunfocus", "autowalkunfocusseconds" }),
+        ("Sound / TTS",      new[] { "muted", "ttsvoice", "ttsvoicedir", "ttsread", "ttsreadstreams" }),
+        ("Logging",          new[] { "autolog" }),
+        ("Updates",          new[] { "autoupdate", "checkforupdates" }),
+        ("Directories",      new[] { "scriptdir", "sounddir", "artdir", "mapdir", "plugindir", "configdir", "logdir" }),
+    };
+
     public bool Load(string fileName = "settings.cfg")
     {
         var path = Path.IsPathRooted(fileName) ? fileName : Path.Combine(ConfigDir, fileName);

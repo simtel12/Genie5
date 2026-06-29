@@ -3743,14 +3743,45 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 break;
 
             case "list":
-                // #config list → dump every key and its current value. Keys whose
-                // feature isn't wired yet are flagged "(reserved)" so the listing
-                // doesn't imply they do something. See GenieConfig.ReservedKeys.
+                // #config list → dump every key and its current value, grouped
+                // under category headers (Connection / Display / Scripting / …)
+                // so the long listing is scannable. Keys whose feature isn't
+                // wired yet are flagged "(reserved)" so the listing doesn't
+                // imply they do something. See GenieConfig.ReservedKeys and
+                // GenieConfig.ConfigCategories.
                 GameText.AddSystemLine("[config] current settings (settings.cfg) — (reserved) = not yet wired:");
-                foreach (var (k, v) in config.ToConfigPairs())
-                    GameText.AddSystemLine(
-                        Genie.Core.Config.GenieConfig.IsReserved(k) ? $"  {k} = {v}  (reserved)"
-                                                                    : $"  {k} = {v}");
+                {
+                    var pairs = config.ToConfigPairs()
+                                      .ToDictionary(p => p.Key, p => p.Value, StringComparer.OrdinalIgnoreCase);
+                    var shown = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                    // Print one category at a time, alphabetised within the
+                    // section and column-aligned to that section's widest key.
+                    void EmitGroup(string header, IEnumerable<string> keys)
+                    {
+                        var present = keys.Where(pairs.ContainsKey)
+                                          .OrderBy(k => k, StringComparer.OrdinalIgnoreCase)
+                                          .ToList();
+                        if (present.Count == 0) return;
+                        var pad = present.Max(k => k.Length);
+                        GameText.AddSystemLine("");
+                        GameText.AddSystemLine($"[{header}]");
+                        foreach (var k in present)
+                        {
+                            shown.Add(k);
+                            var line = $"  {k.PadRight(pad)} = {pairs[k]}";
+                            GameText.AddSystemLine(
+                                Genie.Core.Config.GenieConfig.IsReserved(k) ? $"{line}  (reserved)" : line);
+                        }
+                    }
+
+                    foreach (var (category, keys) in Genie.Core.Config.GenieConfig.ConfigCategories)
+                        EmitGroup(category, keys);
+
+                    // Catch-all: any key not assigned to a category above (e.g. a
+                    // newly added setting) so the listing always covers every key.
+                    EmitGroup("Other", pairs.Keys.Where(k => !shown.Contains(k)));
+                }
                 break;
 
             case "edit":
