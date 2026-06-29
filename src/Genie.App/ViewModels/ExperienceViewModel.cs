@@ -30,8 +30,10 @@ public class ExperienceViewModel : ReactiveObject
         "(no experience data yet — train a skill, or type 'exp')";
 
     /// <summary>Slider position (0 Full … 4 Brief). Snapped to whole steps by the
-    /// slider; setting a new level routes through <c>#config experiencedensity N</c>
-    /// so it applies, persists, and re-renders exactly like typing the command.</summary>
+    /// slider; a new level is applied + persisted <b>quietly</b> — straight to config,
+    /// not through <c>#config</c> — so dragging doesn't spam the Game window with
+    /// "[config] … (saved)" lines. The config change still fires the tracker notify,
+    /// which re-renders the panel live.</summary>
     public double DensityValue
     {
         get => _densityValue;
@@ -44,7 +46,8 @@ public class ExperienceViewModel : ReactiveObject
             if (_core is not null && level != _appliedLevel)
             {
                 _appliedLevel = level;
-                _core.Commands.ProcessInput($"#config experiencedensity {level}");
+                _core.Config.SetSetting("experiencedensity", level.ToString(), showException: false);
+                _core.Config.Save();
             }
         }
     }

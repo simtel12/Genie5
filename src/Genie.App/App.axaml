@@ -844,17 +844,16 @@
         <!-- Per-panel density slider (public #125). Snaps 0 Full … 4 Brief and -->
         <!-- writes #config experiencedensity, so the slider, the command line,  -->
         <!-- and settings.cfg stay in sync.                                      -->
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="8,4">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,140,Auto" Margin="8,2">
           <TextBlock Grid.Column="0" Text="Density" VerticalAlignment="Center"
-                     Margin="0,0,8,0" Opacity="0.7"/>
+                     Margin="0,0,6,0" FontSize="11" Opacity="0.7"/>
           <Slider Grid.Column="1" Minimum="0" Maximum="4"
                   TickFrequency="1" IsSnapToTickEnabled="True"
-                  TickPlacement="BottomRight"
                   VerticalAlignment="Center"
                   Value="{Binding ViewModel.DensityValue, Mode=TwoWay}"/>
           <TextBlock Grid.Column="2" Text="{Binding ViewModel.DensityLabel}"
-                     VerticalAlignment="Center" Margin="8,0,0,0"
-                     MinWidth="84"/>
+                     VerticalAlignment="Center" Margin="6,0,0,0"
+                     FontSize="11" MinWidth="68"/>
         </Grid>
         <ScrollViewer HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
