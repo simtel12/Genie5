@@ -191,6 +191,7 @@ public sealed class ScriptEngine
         public string ConfigDir                     => _engine.Config?.ConfigDir ?? _engine._scriptsDir;
         public void Log(string message)             => _engine._echo(message);
         public string? GetUserVar(string name)      => _engine.UserVarLookup?.Invoke(name);
+        public string? GetConfig(string key)        => _engine.Config?.GetSetting(key);
     }
 
     /// <summary>Wired by the host to the named-window seam (GenieCore's

@@ -25,4 +25,11 @@ public interface IExtensionHost
     /// globals — Genie 4 plugin settings like <c>$CircleCalc.Guild</c> live in the
     /// persistent store. Default returns null for hosts that don't expose it.</summary>
     string? GetUserVar(string name) => null;
+
+    /// <summary>Read a persisted <c>#config</c> / settings.cfg value by key (the same
+    /// keys <c>#config list</c> shows, e.g. <c>experiencedensity</c>), or null when the
+    /// host has no config or the key is unknown. Lets an extension respond to a
+    /// <c>#config</c> setting at render time without depending on <c>GenieConfig</c>
+    /// directly. Default returns null for hosts that don't expose config.</summary>
+    string? GetConfig(string key) => null;
 }

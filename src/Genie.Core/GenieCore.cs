@@ -876,7 +876,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             switch (ext.Name)
             {
                 case "SpellTimer":  ext.Enabled = Config.ShowSpellTimer;  break;
-                case "Experience":  ext.Enabled = Config.ShowExperience;  break;
+                case "Experience":
+                    ext.Enabled = Config.ShowExperience;
+                    // Density (and any other render-affecting setting) changed: re-render
+                    // now so the View → Density menu / #config give instant feedback.
+                    if (ext is Extensions.Builtin.ExperienceExtension exp) exp.Refresh();
+                    break;
                 case "TimeTracker": ext.Enabled = Config.ShowTimeTracker; break;
             }
         }

@@ -138,6 +138,14 @@ public sealed class ExperienceExtension : IGameExtension
         _host.SetWindow(WindowName, Render());
     }
 
+    /// <summary>Re-render the panel immediately (without waiting for the next prompt) —
+    /// used when <c>#config experiencedensity</c> changes so the View → Density menu and
+    /// the command give instant feedback. No-op while disabled.</summary>
+    public void Refresh()
+    {
+        if (_enabled) _host?.SetWindow(WindowName, Render());
+    }
+
     public bool OnSlashCommand(string input)
     {
         var t = input.Trim();
@@ -189,6 +197,40 @@ public sealed class ExperienceExtension : IGameExtension
         return 0;
     }
 
+    /// <summary>Experience-window line density (Genie 4 EXPTracker parity), read live
+    /// from <c>#config experiencedensity</c> so the slider / command / settings.cfg all
+    /// drive one value. Clamped 0–4; an unset or unparseable value falls back to
+    /// 0 = Full.</summary>
+    private int Density() =>
+        int.TryParse(_host.GetConfig("experiencedensity"), out var d) ? Math.Clamp(d, 0, 4) : 0;
+
+    /// <summary>Render one learning row at the given density. 0 = Full (rank, %,
+    /// learning word, count); 1 = drop the <c>(n/34)</c> count; 2 = numbers only
+    /// (rank + %); 3 = short skill name + rank + %; 4 = Brief (short name + rank).
+    /// Column widths match within a name style so the list stays aligned.</summary>
+    internal static string FormatLine(string name, int rank, int percent, int mindstate, int density) =>
+        density switch
+        {
+            >= 4 => $"{ShortName(name),-12} {rank,3}",
+            3    => $"{ShortName(name),-12} {rank,3} {percent,2}%",
+            2    => $"{name,-18} {rank,3} {percent,2}%",
+            1    => $"{name,-18} {rank,3} {percent,2}%  {MindStates[mindstate]}",
+            _    => $"{name,-18} {rank,3} {percent,2}%  {MindStates[mindstate]} ({mindstate}/34)",
+        };
+
+    /// <summary>Compact skill name for the short/brief densities: every word except
+    /// the last is clipped to a 2-letter prefix ("Small Edged" → "Sm Edged",
+    /// "Twohanded Blunt" → "Tw Blunt"); single-word names ("Astrology") are left whole.
+    /// Deterministic and table-free, so it covers any skill DR adds.</summary>
+    internal static string ShortName(string name)
+    {
+        var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length <= 1) return name;
+        for (int i = 0; i < words.Length - 1; i++)
+            if (words[i].Length > 2) words[i] = words[i].Substring(0, 2);
+        return string.Join(' ', words);
+    }
+
     private string Render()
     {
         List<KeyValuePair<string, SkillInfo>> learning;
@@ -199,12 +241,12 @@ public sealed class ExperienceExtension : IGameExtension
                 .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
+        var density = Density();
         var sb = new StringBuilder();
         sb.Append("Learning: ").Append(learning.Count).Append('\n');
         sb.Append("──────────────────────────────────────\n");
         foreach (var (name, info) in learning)
-            sb.AppendLine(
-                $"{name,-18} {info.Rank,3} {info.Percent,2}%  {MindStates[info.Mindstate]} ({info.Mindstate}/34)");
+            sb.AppendLine(FormatLine(name, info.Rank, info.Percent, info.Mindstate, density));
         if (learning.Count == 0)
             sb.Append("(nothing learning — train a skill, or type 'exp')");
         return sb.ToString().TrimEnd();
