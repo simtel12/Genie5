@@ -208,7 +208,19 @@
          self-describing. Each field collapses when empty so the panel doesn't
          show blank rows for sections the current room lacks. -->
     <DataTemplate DataType="docking:RoomTool">
-      <ScrollViewer>
+      <!-- Wrapped in a Grid with the ScrollViewer pinned to the Grid's actual
+           bounds, mirroring the Game-text document (above). In MDI/windowed
+           mode every panel is hosted by the DocumentControl MDI host, which
+           measures content with INFINITE width — so a bare ScrollViewer hands
+           its content unbounded width and TextWrapping="Wrap" never kicks in
+           (regression #124, MDI only; docked mode's ToolControl host already
+           constrains width). Pinning Width to $parent[Grid].Bounds.Width forces
+           a finite width in both modes so every field wraps. -->
+      <Grid>
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      Width="{Binding $parent[Grid].Bounds.Width}"
+                      Height="{Binding $parent[Grid].Bounds.Height}">
         <StackPanel Spacing="4" Margin="8">
           <SelectableTextBlock Text="{Binding ViewModel.Title}"       FontWeight="Bold" Foreground="#ccc" TextWrapping="Wrap"/>
           <SelectableTextBlock Text="{Binding ViewModel.Description}" Foreground="#aaa" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
@@ -220,7 +232,8 @@
           <SelectableTextBlock Text="{Binding ViewModel.Objects}" Foreground="#aaa" FontSize="11" TextWrapping="Wrap"
                                IsVisible="{Binding ViewModel.Objects, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         </StackPanel>
-      </ScrollViewer>
+        </ScrollViewer>
+      </Grid>
     </DataTemplate>
 
     <!-- ── Mobs ───────────────────────────────────────────────────────────── -->
