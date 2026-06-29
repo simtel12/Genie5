@@ -25,6 +25,47 @@ permissions:
   id-token: write          # SignPath uses GitHub's OIDC token for origin verification
 
 jobs:
+  notes:
+    name: Extract this tag's section from RELEASE_NOTES.md
+    runs-on: ubuntu-latest
+    # RELEASE_NOTES.md is a cumulative changelog (every version stacked, newest
+    # on top). Publishing the whole file as the release body made every Release
+    # page show its version PLUS all older ones. This job slices out only the
+    # section whose heading matches the current tag and publishes that as the
+    # body — keeping the in-repo file as the full changelog. Runs on Linux so
+    # awk/sed are guaranteed; the result is shared with every platform job.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Slice out the current version's notes
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          # Capture from the "# Genie 5 … <tag>" heading down to (but not
+          # including) the next top-level "# Genie 5" heading.
+          awk -v tag="$tag" '
+            $0 ~ ("^# Genie 5 .* " tag "$") { capture=1; print; next }
+            capture && /^# Genie 5 / { exit }
+            capture { print }
+          ' RELEASE_NOTES.md > RELEASE_BODY.md
+          # Trim trailing blank lines and the "---" section separator.
+          awk '{ a[NR]=$0 }
+               END { n=NR
+                     while (n>0 && (a[n] ~ /^[[:space:]]*$/ || a[n] ~ /^---[[:space:]]*$/)) n--
+                     for (i=1;i<=n;i++) print a[i] }' RELEASE_BODY.md > RELEASE_BODY.trimmed
+          mv RELEASE_BODY.trimmed RELEASE_BODY.md
+          if [ ! -s RELEASE_BODY.md ]; then
+            echo "::error::No RELEASE_NOTES.md section found for tag $tag — add a '# Genie 5 — $tag' heading before tagging."
+            exit 1
+          fi
+          echo "----- release body for $tag -----"
+          cat RELEASE_BODY.md
+      - name: Upload extracted body
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-body
+          path: RELEASE_BODY.md
+          if-no-files-found: error
+
   publish:
     name: Publish self-contained win-x64
     runs-on: windows-latest
@@ -60,7 +101,7 @@ jobs:
   velopack:
     name: Velopack package + upload to Release
     runs-on: windows-latest
-    needs: publish
+    needs: [publish, notes]
     permissions:
       contents: write
     steps:
@@ -123,6 +164,11 @@ jobs:
           if (Test-Path Genie5-win-Setup.exe)     { Move-Item Genie5-win-Setup.exe     "01-Windows-Genie5-Setup.exe" }
           if (Test-Path Genie5-win-Portable.zip)  { Move-Item Genie5-win-Portable.zip  "01-Windows-Genie5-Portable.zip" }
 
+      - name: Download extracted release body
+        uses: actions/download-artifact@v4
+        with:
+          name: release-body
+
       - name: Attach Velopack assets to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -134,11 +180,12 @@ jobs:
           files: velopack-releases/*
           fail_on_unmatched_files: true
           generate_release_notes: false   # auto-gen off
-          body_path: RELEASE_NOTES.md      # curated, version-controlled notes
+          body_path: RELEASE_BODY.md       # this tag's section only (see notes job)
 
   velopack-linux:
     name: Velopack package — Linux x64
     runs-on: ubuntu-latest
+    needs: notes
     permissions:
       contents: write
     steps:
@@ -190,6 +237,11 @@ jobs:
           cd velopack-releases
           [ -f Genie5.AppImage ] && mv Genie5.AppImage "04-Linux-Genie5.AppImage" || true
 
+      - name: Download extracted release body
+        uses: actions/download-artifact@v4
+        with:
+          name: release-body
+
       - name: Attach Velopack Linux assets to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -202,11 +254,12 @@ jobs:
           files: velopack-releases/*
           fail_on_unmatched_files: true
           generate_release_notes: false
-          body_path: RELEASE_NOTES.md
+          body_path: RELEASE_BODY.md
 
   velopack-osx-arm64:
     name: Velopack package — macOS Apple Silicon (arm64)
     runs-on: macos-latest
+    needs: notes
     permissions:
       contents: write
     steps:
@@ -283,6 +336,11 @@ jobs:
           [ -f Genie5-osx-Setup.pkg    ] && mv Genie5-osx-Setup.pkg    "02-macOS-Apple-Silicon-Genie5-Setup.pkg" || true
           [ -f Genie5-osx-Portable.zip ] && mv Genie5-osx-Portable.zip "02-macOS-Apple-Silicon-Genie5-Portable.zip" || true
 
+      - name: Download extracted release body
+        uses: actions/download-artifact@v4
+        with:
+          name: release-body
+
       - name: Attach Velopack macOS arm64 assets to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -295,11 +353,12 @@ jobs:
           files: velopack-releases/*
           fail_on_unmatched_files: true
           generate_release_notes: false
-          body_path: RELEASE_NOTES.md
+          body_path: RELEASE_BODY.md
 
   velopack-osx-x64:
     name: Velopack package — macOS Intel (x64)
     runs-on: macos-latest
+    needs: notes
     permissions:
       contents: write
     steps:
@@ -371,6 +430,11 @@ jobs:
           [ -f Genie5-osx-x64-Setup.pkg    ] && mv Genie5-osx-x64-Setup.pkg    "03-macOS-Intel-Genie5-Setup.pkg" || true
           [ -f Genie5-osx-x64-Portable.zip ] && mv Genie5-osx-x64-Portable.zip "03-macOS-Intel-Genie5-Portable.zip" || true
 
+      - name: Download extracted release body
+        uses: actions/download-artifact@v4
+        with:
+          name: release-body
+
       - name: Attach Velopack macOS x64 assets to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -382,7 +446,7 @@ jobs:
           files: velopack-releases/*
           fail_on_unmatched_files: true
           generate_release_notes: false
-          body_path: RELEASE_NOTES.md
+          body_path: RELEASE_BODY.md
 
   sign:
     name: Sign with SignPath Foundation
