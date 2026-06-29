@@ -1,3 +1,105 @@
+# Genie 5 — v5.0.0-alpha.7.6
+
+The **Genie 4 script-language parity** release — a pass over the script
+interpreter to match Genie 4 behaviour where Genie 5 silently diverged. Verified
+against the community script corpus (Tirost DR-Genie-Scripts + EtherianDR, ~130
+scripts) and locked behind a new unit-test project.
+
+> **Alpha software.** Builds are **unsigned** for most platforms — Windows
+> SmartScreen will warn on first launch (More info → Run anyway). Signing is
+> tracked in #33.
+
+Some of these are **behaviour changes** — a script written against the older
+Genie 5 behaviour may need a tweak.
+
+## ⚠️ Behaviour changes (Genie 4 parity)
+
+- **`match(a, b)` is now exact, case-sensitive equality** — it previously behaved
+  like a case-insensitive `contains` (substring).
+- **String predicates are now case-sensitive** — `contains`, `instr`/`instring`,
+  `startswith`, `endswith`. (Real scripts are unaffected: their needles already
+  match the game text's case.)
+- **`indexof` / `lastindexof` are now 1-based** — a hit returns its position
+  starting at **1**, and **not-found returns 0** (was 0-based, with -1 for
+  not-found). This makes the common `if !indexof(haystack, needle)` idiom
+  ("needle absent") behave as it does in Genie 4.
+- **`if_N` now means "at least N arguments were passed"** (`argcount >= N`), not
+  "%N is set". `%argcount` / `$argcount` are now available, and `shift` keeps the
+  count and rebuilds `%0`.
+
+## ✨ New operators & functions (Genie 4 parity)
+
+- Operators **`eq`** (≡ `=`) and **`<>`** (≡ `!=`).
+- Function aliases **`instr`/`instring`** (boolean `contains`), **`substring`**
+  (≡ `substr`), **`defined`** (≡ `def`).
+
+## ⏸️ Deferred
+
+- **The `do` command is not implemented, and is deferred indefinitely.** Genie 4's
+  `do` re-sends a command until a response matches — but **no script in the
+  community corpus uses it** (~130 scripts, including GenieHunter/hunt.cmd). A
+  stray `do` line is now safely **ignored with a warning** instead of being sent
+  to the game. It will only be built if a valid use case appears — **if you need
+  `do`, please [open an issue](https://github.com/GenieClient/Genie5/issues)** so
+  it can be prioritised.
+
+## ⬇️ Downloads
+
+Grab the installer or portable build for your platform from the assets below:
+
+| Platform | Installer | Portable |
+|---|---|---|
+| Windows | `01-Windows-Genie5-Setup.exe` | `01-Windows-Genie5-Portable.zip` |
+| macOS (Apple Silicon) | `02-macOS-Apple-Silicon-Genie5.dmg` | `02-…-Portable.zip` |
+| macOS (Intel) | `03-macOS-Intel-Genie5.dmg` | `03-…-Portable.zip` |
+| Linux (x64) | `04-Linux-Genie5.AppImage` | — |
+
+**Full changelog:** https://github.com/GenieClient/Genie5/compare/v5.0.0-alpha.7.5...v5.0.0-alpha.7.6
+
+---
+
+# Genie 5 — v5.0.0-alpha.7.5
+
+The **Text-to-Speech** release — Genie can now *read the game aloud* with
+offline neural voices: no cloud, no API key. Plus a `send` timing parity fix
+and a `#goto` shorthand-matching fix.
+
+> **Alpha software.** Builds are **unsigned** for most platforms — Windows
+> SmartScreen will warn on first launch (More info → Run anyway). Signing is
+> tracked in #33.
+
+## ✨ New since alpha.7.4
+
+- **Offline neural text-to-speech** — a new **`#speak <text>`** command plus a
+  built-in **voice installer** that downloads high-quality neural voices which
+  run entirely on your machine (no cloud, no API key). A streaming player +
+  queue speaks lines in order without blocking the game.
+- **Per-stream read-aloud** — pick which streams Genie reads aloud (e.g. speech,
+  whispers, thoughts) so you hear the parts you care about and mute the rest.
+- **Per-segment leading delay for `send` (#parity)** — `send` now honours a
+  leading delay per segment, matching Genie 4's timing behaviour.
+
+## 🐛 Fixes
+
+- **`#goto` matches note-label and title shorthands (#115)** — `#goto <text>`
+  now resolves against map note-labels and room-title shorthands by prefix, so
+  a partial name jumps you to the right room.
+
+## ⬇️ Downloads
+
+Grab the installer or portable build for your platform from the assets below:
+
+| Platform | Installer | Portable |
+|---|---|---|
+| Windows | `01-Windows-Genie5-Setup.exe` | `01-Windows-Genie5-Portable.zip` |
+| macOS (Apple Silicon) | `02-macOS-Apple-Silicon-Genie5.dmg` | `02-…-Portable.zip` |
+| macOS (Intel) | `03-macOS-Intel-Genie5.dmg` | `03-…-Portable.zip` |
+| Linux (x64) | `04-Linux-Genie5.AppImage` | — |
+
+**Full changelog:** https://github.com/GenieClient/Genie5/compare/v5.0.0-alpha.7.4...v5.0.0-alpha.7.5
+
+---
+
 # Genie 5 — v5.0.0-alpha.7.4
 
 The **Circle Calculator & Raw XML** release — a built-in guild circle calculator,

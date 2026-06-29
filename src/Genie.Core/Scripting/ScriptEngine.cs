@@ -340,7 +340,13 @@ public sealed class ScriptEngine
 
         for (int i = 0; i < args.Count; i++)
             inst.Vars[(i + 1).ToString()] = args[i];
+        // Genie4 parity (Script.cs:2114-2118): missing %1..%9 default to "" so
+        // a direct read of an unpassed arg yields empty (not undefined), and
+        // %argcount holds the real arg count — the authority for if_N/shift.
+        for (int i = args.Count + 1; i <= 9; i++)
+            inst.Vars[i.ToString()] = string.Empty;
         inst.Vars["0"] = string.Join(" ", args);
+        inst.Vars["argcount"] = args.Count.ToString(CultureInfo.InvariantCulture);
         inst.Vars["scriptname"] = name;
 
         // Seed the $-scope with the same values so $1..$9 work at the top
@@ -971,8 +977,13 @@ public sealed class ScriptEngine
         if (lower.Length == 4 && lower.StartsWith("if_") && char.IsDigit(lower[3]))
         {
             var key = lower[3..];
-            bool present = inst.Vars.TryGetValue(key, out var v) && !string.IsNullOrEmpty(v);
-            DbgEcho(inst, 3, $"if_{key} (%%{key}=\"{v ?? ""}\") = {present}");
+            // Genie4 parity (Script.cs:3817): if_N is `argcount >= N`, NOT
+            // "%N is present and non-empty". They diverge only when a numbered
+            // var was set manually (e.g. `var 3 x`) or an arg was passed empty.
+            int n = key[0] - '0';
+            int ac = GetArgCount(inst);
+            bool present = ac >= n;
+            DbgEcho(inst, 3, $"if_{key} (argcount={ac} >= {n}) = {present}");
             // The parser may have rewritten `if_N <stmt>` / `if_N then <stmt>`
             // into block form prefixed with " then" so BuildIfMaps could
             // treat it as a regular block-if. Strip the leading `then`
@@ -1356,20 +1367,24 @@ public sealed class ScriptEngine
             case "shift":
             {
                 // Shifts %1→drop, %2→%1, etc. — for walking command-line args.
-                // Genie4 shifts up to argcount, which can exceed 9 (e.g. an
-                // 11-move walk). Find the highest numeric arg currently set
-                // and shift the entire range so values past %9 migrate down.
-                int max = 0;
-                for (int k = 1; k <= 99; k++)
-                    if (inst.Vars.ContainsKey(k.ToString())) max = k;
-                for (int k = 1; k < max; k++)
+                // Genie4 parity (Script.cs:2949 EvalShift): driven by argcount
+                // (which can exceed 9, e.g. an 11-move walk), it decrements the
+                // count, clears the vacated top slot to "" (not remove), and
+                // rebuilds %0 from the remaining args.
+                int ac = GetArgCount(inst);
+                if (ac > 0)
                 {
-                    if (inst.Vars.TryGetValue((k + 1).ToString(), out var nv))
-                        inst.Vars[k.ToString()] = nv;
-                    else
-                        inst.Vars.Remove(k.ToString());
+                    for (int k = 1; k < ac; k++)
+                        inst.Vars[k.ToString()] =
+                            inst.Vars.TryGetValue((k + 1).ToString(), out var nv) ? nv : string.Empty;
+                    inst.Vars[ac.ToString()] = string.Empty;
+                    inst.Vars["argcount"] = (ac - 1).ToString(CultureInfo.InvariantCulture);
+                    var sb = new StringBuilder();
+                    for (int k = 1; k < ac; k++)
+                        if (inst.Vars.TryGetValue(k.ToString(), out var av) && av.Length > 0)
+                            sb.Append(sb.Length > 0 ? " " : "").Append(av);
+                    inst.Vars["0"] = sb.ToString();
                 }
-                if (max > 0) inst.Vars.Remove(max.ToString());
                 return true;
             }
 
@@ -1542,6 +1557,17 @@ public sealed class ScriptEngine
                 DbgEcho(inst, 4, $"{lower} {vn.Trim()} = \"{inst.Vars.GetValueOrDefault(vn.Trim(), "")}\" (expr: {expr})");
                 return true;
             }
+
+            case "do":
+                // Genie 4's `do` (re-send a command until $repeatregex matches)
+                // is intentionally NOT implemented: zero usage across the whole
+                // community corpus (Tirost + EtherianDR, ~130 scripts incl.
+                // hunt.cmd). This guard consumes the line so a stray `do` warns
+                // instead of silently leaking "do …" to the game via the default
+                // case below. If a real need surfaces, build the full retry loop
+                // (needs $repeatregex + a flood-safety cap) — see backlog group D.
+                _echo($"[script] {inst.Name}:{lineNo} 'do' command is not supported — line ignored");
+                return true;
 
             default:
             {
@@ -1984,6 +2010,13 @@ public sealed class ScriptEngine
             return (0.0, seg.Trim());
         return (d, seg[i..].Trim());
     }
+
+    /// <summary>The current Genie4 <c>%argcount</c> for this instance — the
+    /// number of args the script was launched with, decremented by <c>shift</c>.
+    /// Stored as the local var <c>argcount</c> (G4 parity); 0 if absent/unparsable.</summary>
+    private static int GetArgCount(ScriptInstance inst)
+        => inst.Vars.TryGetValue("argcount", out var s)
+           && int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n : 0;
 
     private static (string cmd, string rest) SplitCmd(string s)
     {

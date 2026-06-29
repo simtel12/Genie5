@@ -10,7 +10,8 @@ namespace Genie.Core.Scripting;
 ///
 /// Supports:
 ///   - literals: numbers, "strings", true/false
-///   - operators: || && ! == != = &lt; &gt; &lt;= &gt;= + - * / %
+///   - operators: || && ! == != &lt;&gt; eq = &lt; &gt; &lt;= &gt;= + - * / %
+///                 (Genie4 word op `eq` ≡ `=`; `&lt;&gt;` ≡ `!=`)
 ///   - functions: matchre(s,pat)*, contains, startswith, endswith,
 ///                tolower, toupper, len, count, abs, min, max
 ///   - bare identifiers: returned as the literal text (after %var/$var
@@ -166,18 +167,29 @@ internal sealed class ScriptExpression
     private object ParseCmp()
     {
         var l = ParseAdd();
-        // Order matters: 2-char ops before 1-char.
-        foreach (var op in new[] { "==", "!=", "<=", ">=", "=", "<", ">" })
+        // Order matters: 2-char ops before 1-char. "<>" (Genie4 not-equal) sits
+        // with the 2-char ops, before "<", so "<" can't shadow it.
+        foreach (var op in new[] { "==", "!=", "<>", "<=", ">=", "=", "<", ">" })
         {
             int save = _pos;
             SkipWs();
             if (Match(op))
             {
                 var r = ParseAdd();
-                return Compare(l, r, op);
+                return Compare(l, r, op == "<>" ? "!=" : op);   // map <> → !=
             }
             _pos = save;
         }
+        // Genie4 word operator: `eq` ≡ `=` (equality). Word-boundary matched
+        // (like and/or/not) so it can't fire inside an identifier such as
+        // "equipment"; a quoted "eq" value is untouched.
+        int eqSave = _pos;
+        if (MatchWord("eq"))
+        {
+            var r = ParseAdd();
+            return Compare(l, r, "=");
+        }
+        _pos = eqSave;
         return l;
     }
 
@@ -400,9 +412,15 @@ internal sealed class ScriptExpression
                     frame[i] = m.Groups[i].Value;
                 return true;
             }
-            case "contains":   return A(0).IndexOf(A(1), StringComparison.OrdinalIgnoreCase) >= 0;
-            case "startswith": return A(0).StartsWith(A(1), StringComparison.OrdinalIgnoreCase);
-            case "endswith":   return A(0).EndsWith(A(1),   StringComparison.OrdinalIgnoreCase);
+            // Genie4 parity: the string predicates are case-SENSITIVE (Eval.cs
+            // uses no comparer). Ordinal — matching Compare()'s ==/= — keeps the
+            // game's ASCII text deterministic. instr/instring are boolean
+            // "contains" aliases (NOT a position).
+            case "instr":
+            case "instring":
+            case "contains":   return A(0).IndexOf(A(1), StringComparison.Ordinal) >= 0;
+            case "startswith": return A(0).StartsWith(A(1), StringComparison.Ordinal);
+            case "endswith":   return A(0).EndsWith(A(1),   StringComparison.Ordinal);
             case "tolower":    return A(0).ToLowerInvariant();
             case "toupper":    return A(0).ToUpperInvariant();
             case "len":
@@ -420,6 +438,7 @@ internal sealed class ScriptExpression
                 { n++; idx += sep.Length; }
                 return (double)n;
             }
+            case "defined":   // Genie4 alias of def
             case "def":
             {
                 // def(Name) — true if Name exists as a global or local var and
@@ -442,7 +461,12 @@ internal sealed class ScriptExpression
                 try { return Regex.Replace(A(0), A(1), A(2)); }
                 catch { return A(0); }
             case "match":
-                return A(0).IndexOf(A(1), StringComparison.OrdinalIgnoreCase) >= 0;
+                // Genie4 parity: exact equality (Eval.cs:941 string.Equals with
+                // the default Ordinal comparer), NOT substring. Case-sensitive to
+                // stay consistent with `==`/`=`, which Compare() already does
+                // Ordinal. Was a substring IndexOf — silently behaved like contains.
+                return string.Equals(A(0), A(1), StringComparison.Ordinal);
+            case "substring":   // Genie4 alias of substr
             case "substr":
             {
                 var s = A(0);
@@ -456,10 +480,14 @@ internal sealed class ScriptExpression
                 return s.Substring(st, ln);
             }
             case "trim":   return A(0).Trim();
+            // Genie4: case-sensitive AND 1-based (IndexOf + 1), so a miss is 0
+            // (falsy). Community scripts rely on `if !indexof(hay, needle)`
+            // meaning "needle absent" (e.g. GenieHunter/hunt.cmd). Was 0-based /
+            // OrdinalIgnoreCase, which made the not-found case (-1) truthy.
             case "indexof":
-                return (double)A(0).IndexOf(A(1), StringComparison.OrdinalIgnoreCase);
+                return (double)(A(0).IndexOf(A(1), StringComparison.Ordinal) + 1);
             case "lastindexof":
-                return (double)A(0).LastIndexOf(A(1), StringComparison.OrdinalIgnoreCase);
+                return (double)(A(0).LastIndexOf(A(1), StringComparison.Ordinal) + 1);
             case "element":
             {
                 // element(list, index [, sep])  — default separator is '|'

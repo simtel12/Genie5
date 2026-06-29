@@ -4,7 +4,19 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.7.5 — Text-to-Speech
+## Latest: v5.0.0-alpha.7.6 — Genie 4 Script-Language Parity
+
+A faithful-port pass over the scripting language so it behaves like Genie 4 — verified against ~130 community scripts.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.7.6** as a delta.
+
+- **Genie 4 parity behaviour changes** — `match(a, b)` is now exact equality (was substring); `contains` / `startswith` / `endswith` are case-sensitive; `indexof` / `lastindexof` are 1-based; `if_N` means "at least N arguments were passed".
+- **New operators & functions** — `eq` (≡ `=`), `<>` (≡ `!=`), and the `instr` / `substring` / `defined` aliases; `%argcount` / `$argcount` plus a faithful `shift`.
+- **Heads-up** — scripts written against the older Genie 5 behaviour may need a tweak; see the full notes.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.7.6)
+
+## v5.0.0-alpha.7.5 — Text-to-Speech
 
 Genie can now **read the game aloud** with natural neural voices that run entirely on your machine — offline, free, and private (no game text leaves your computer). A first step toward making DragonRealms playable for blind and low-vision players.
 
