@@ -1226,10 +1226,43 @@ public sealed class DrXmlParser : IDisposable
             var from  = Math.Clamp(span.Start + span.Length, start, raw.Length);
             var end   = raw.IndexOfAny(new[] { ',', '.' }, from);
             if (end < 0) end = raw.Length;
+
+            // Cap the phrase at the START of the next bold creature. DR separates
+            // list items with a comma EXCEPT the final pair, joined by " and "
+            // with no comma ("a viper and a viper.", and the only separator in a
+            // two-mob list). Without this cap the comma/period scan runs past
+            // " and " and swallows the following creature, so two same-type mobs
+            // show as one entry "a viper and a viper" and the count is off
+            // (#118). The trailing descriptor ("a kobold that appears dead")
+            // still survives — it sits before the next bold span, not after it.
+            foreach (var other in _componentBoldSpans)
+                if (other.Start > span.Start && other.Start < end) end = other.Start;
+
             var phrase = System.Net.WebUtility.HtmlDecode(raw[start..end]).Trim();
+            phrase = TrimTrailingConnector(phrase);
             if (phrase.Length > 0) phrases.Add(phrase);
         }
         return phrases.Count > 0 ? phrases : null;
+    }
+
+    /// <summary>
+    /// Strip a trailing list connector left behind when a bold phrase is capped
+    /// at the next creature mid-list — a dangling "and" and/or comma (e.g.
+    /// "a sleazy lout and" → "a sleazy lout"). Loops because the connector can be
+    /// ", and". Case-insensitive on the word "and".
+    /// </summary>
+    private static string TrimTrailingConnector(string s)
+    {
+        s = s.TrimEnd();
+        while (true)
+        {
+            if (s.EndsWith(",", System.StringComparison.Ordinal))
+                s = s[..^1].TrimEnd();
+            else if (s.EndsWith(" and", System.StringComparison.OrdinalIgnoreCase))
+                s = s[..^4].TrimEnd();
+            else
+                return s;
+        }
     }
 
     private static string StripBasicXml(string input)
