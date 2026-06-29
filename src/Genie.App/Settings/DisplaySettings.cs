@@ -201,6 +201,16 @@ public sealed class DisplaySettings : ReactiveObject
     /// </summary>
     [Reactive] public bool SkillsPromptDismissed { get; set; } = false;
 
+    /// <summary>
+    /// Whether a modal "Disconnected" popup is shown when a session ends and is
+    /// not auto-reconnecting (server <c>exit</c>/<c>quit</c>, manual disconnect,
+    /// or a dead link that won't recover) — Genie 4 parity for unmissable
+    /// leave-game feedback (#114). The timestamped <c>disconnected</c> line in
+    /// the Game window is always emitted regardless of this flag; this only
+    /// gates the extra popup. Default on; toggle via Window → Disconnect Popup.
+    /// </summary>
+    [Reactive] public bool ShowDisconnectPopup { get; set; } = true;
+
     // ── Wiring: push into Application.Resources whenever anything changes ────
 
     [JsonIgnore]

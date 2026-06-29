@@ -142,6 +142,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit>                    ShowAboutCommand         { get; }
     public Interaction<Unit, Unit>                        ShowAboutDialog          { get; } = new();
 
+    /// <summary>Fired on a session-ending disconnect (one that is NOT
+    /// auto-reconnecting) when <see cref="DisplaySettings.ShowDisconnectPopup"/>
+    /// is on — surfaces a modal "Disconnected" notice for unmissable leave-game
+    /// feedback (#114). The string payload is the notice body.</summary>
+    public Interaction<string, Unit>                      ShowDisconnectNotice     { get; } = new();
+
     /// <summary>Opens the community Discord invite in the user's default browser.
     /// Cross-platform via <c>UseShellExecute = true</c>; same pattern the parser
     /// uses for <c>&lt;a href&gt;</c> links from the game stream.</summary>
@@ -210,6 +216,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit>                    ToggleZoneRoomNumberCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleWindowedModeCommand{ get; }
     public ReactiveCommand<Unit, Unit>                    ToggleGuildInTitleCommand{ get; }
+    /// <summary>Window → Disconnect Popup. Toggles the modal "Disconnected" notice (#114).</summary>
+    public ReactiveCommand<Unit, Unit>                    ToggleDisconnectPopupCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleHandsBarCommand    { get; }
     /// <summary>Window → Hands Strip Position → Top. Snaps the strip to the top of the window.</summary>
     public ReactiveCommand<Unit, Unit>                    HandsBarToTopCommand     { get; }
@@ -535,15 +543,16 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// sharpest edge of the no-auto-resume policy). Cleared on the next non-quit command (a rejected quit
     /// means they're still playing) and on each fresh connect.</summary>
     private bool _intentionalGameExit;
-    /// <summary>This drop already printed a reason ("Connection lost: …"), so the paired Disconnected
-    /// event should not also print "Connection closed.".</summary>
-    private bool _dropAnnounced;
     /// <summary>This drop was an UNEXPECTED dead link — the transport raised an <see cref="ConnectionEventKind.Error"/>
     /// (read exception / keepalive failure / activity watchdog) before the paired Disconnected. Only such a drop
-    /// auto-reconnects. A clean server-initiated close (DR idle-kick, boot, "Connection closed.") arrives as a bare
+    /// auto-reconnects. A clean server-initiated close (DR idle-kick, boot, server exit/quit) arrives as a bare
     /// Disconnected with no Error and must NOT auto-reconnect — the server deliberately ended the session and the
     /// user is idle/away (no resume-while-away). Reset on each fresh connect.</summary>
     private bool _dropWasError;
+    /// <summary>The actionable reason for the most recent drop (bad password / PROBLEM / dead
+    /// link / timeout), captured from the <see cref="ConnectionEventKind.Error"/> message so the
+    /// session-ending "Disconnected" popup (#114) can show it. Null for a clean close.</summary>
+    private string? _lastDropReason;
 
     /// <summary>Base name of the recipe script whose completion should auto-stop
     /// the current capture (null for a manual capture, which the user stops).</summary>
@@ -1110,6 +1119,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleGuildInTitleCommand = ReactiveCommand.Create(() =>
         {
             Display.ShowGuildInTitle = !Display.ShowGuildInTitle;
+            Display.Save(_displayPath);
+        });
+
+        ToggleDisconnectPopupCommand = ReactiveCommand.Create(() =>
+        {
+            Display.ShowDisconnectPopup = !Display.ShowDisconnectPopup;
             Display.Save(_displayPath);
         });
 
@@ -2819,8 +2834,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                         GameText.AddSystemLine($"⚠ Connection lost: {e.Message}");
                     else
                         ReportConnectionFailure(e.Message);
-                    _dropAnnounced = true;
                     _dropWasError  = true;   // unexpected dead link → eligible to auto-reconnect
+                    _lastDropReason = e.Message;   // shown in the #114 disconnect popup if the session ends
                 }
 
                 // On connect, announce the login transport (TLS vs plaintext),
@@ -2837,24 +2852,39 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     ConnectionSecurityTip = "";
                 }
 
-                // Clean close (server FIN / manual disconnect) with no reason
-                // already printed → Genie 4's "Connection closed." (#87).
-                if (e.Kind == ConnectionEventKind.Disconnected)
-                {
-                    if (!_dropAnnounced)
-                        GameText.AddSystemLine("Connection closed.");
-                    _dropAnnounced = true;
-                }
-
                 // Only an UNEXPECTED dead link auto-reconnects. The transport raises
                 // Error (read failure / keepalive trip / activity watchdog) before
                 // the paired Disconnected; a clean server-initiated close — DR
-                // idle-kick, boot, or "Connection closed." — arrives as a bare
+                // idle-kick, boot, server `exit`/`quit` — arrives as a bare
                 // Disconnected with no Error. A deliberate server close must NOT
                 // auto-reconnect (the user is idle/away; no resume-while-away).
-                // Network drops still recover via the bounded ladder.
+                // Network drops still recover via the bounded ladder. Runs before
+                // the session-ended notice below so _reconnectAt reflects this drop.
                 if (_dropWasError && e.Kind is ConnectionEventKind.Disconnected or ConnectionEventKind.Error)
                     MaybeArmAutoReconnect();
+
+                // Session has truly ended — a Disconnected with no reconnect armed
+                // (clean close / manual disconnect / server exit / a dead link that
+                // won't recover or whose ladder gave up). Genie 4 parity (#114):
+                // always emit a timestamped "disconnected" marker in the Game
+                // window, and — unless the user turned it off — pop a modal notice
+                // so leaving the game is unmissable. Suppressed while reconnecting
+                // (a future Connected will resume the session).
+                if (e.Kind == ConnectionEventKind.Disconnected && _reconnectAt is null)
+                {
+                    GameText.AddSystemLine(WindowTimestamp.Prefix() + "disconnected");
+
+                    if (Display.ShowDisconnectPopup)
+                    {
+                        var body = string.IsNullOrWhiteSpace(_lastDropReason)
+                            ? "You have been disconnected from the game."
+                            : $"You have been disconnected from the game.\n\n{_lastDropReason}";
+                        // Fire-and-forget: a modal notice handled by MainWindow. The
+                        // empty error handler keeps a missing/closing handler (e.g.
+                        // app shutdown) from surfacing as an unobserved exception.
+                        ShowDisconnectNotice.Handle(body).Subscribe(_ => { }, _ => { });
+                    }
+                }
 
                 // Close any in-flight analyst capture when the session ends, so
                 // its meta sidecar is written rather than left dangling.
@@ -3296,8 +3326,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _intentionalGameExit   = false;
         _reconnectAttempts     = 0;
         _reconnectAt           = null;
-        _dropAnnounced         = false;
         _dropWasError          = false;
+        _lastDropReason        = null;
         EnsureReconnectTimer();
     }
 

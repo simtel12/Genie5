@@ -1,0 +1,34 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Genie.App.Views.NoticeDialog"
+        Title="Notice"
+        Width="420" Height="180"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False">
+
+  <Grid RowDefinitions="*,Auto" Margin="20,16,20,16">
+
+    <!-- Message: free-text, wraps to width so longer notices stay readable. -->
+    <TextBlock Grid.Row="0"
+               x:Name="MessageText"
+               TextWrapping="Wrap"
+               FontSize="13"
+               VerticalAlignment="Center"/>
+
+    <!-- Single OK button carries both the default (Enter) and the
+         Esc / close-box (Cancel) roles — a notice has nothing to refuse. -->
+    <StackPanel Grid.Row="1"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Margin="0,16,0,0">
+      <Button x:Name="OkButton"
+              Content="_OK"
+              MinWidth="88"
+              IsDefault="True"
+              IsCancel="True"
+              Click="OnOkClick"/>
+    </StackPanel>
+
+  </Grid>
+</Window>

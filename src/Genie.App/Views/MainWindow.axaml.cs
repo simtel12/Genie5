@@ -188,6 +188,22 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 ctx.SetOutput(System.Reactive.Unit.Default);
             }));
 
+            d(ViewModel!.ShowDisconnectNotice.RegisterHandler(async ctx =>
+            {
+                try
+                {
+                    await new NoticeDialog("Disconnected", ctx.Input).ShowDialog(this);
+                }
+                catch (Exception ex)
+                {
+                    // A modal needs a live owner; if the window is mid-close
+                    // (app shutting down) ShowDialog can throw — swallow so the
+                    // disconnect path doesn't surface a spurious error.
+                    Genie.App.Diagnostics.ErrorLog.Log("NoticeDialog.Show", ex);
+                }
+                ctx.SetOutput(System.Reactive.Unit.Default);
+            }));
+
             d(ViewModel!.ShowLayoutSavePrompt.RegisterHandler(async ctx =>
             {
                 try

@@ -158,6 +158,11 @@
                   IsChecked="{Binding Display.ShowGuildInTitle}"
                   Command="{Binding ToggleGuildInTitleCommand}"
                   ToolTip.Tip="Append the character's guild to the window title (after you've run 'info' this session). Off hides it."/>
+        <MenuItem Header="_Disconnect Popup"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Display.ShowDisconnectPopup}"
+                  Command="{Binding ToggleDisconnectPopupCommand}"
+                  ToolTip.Tip="Show a modal 'Disconnected' notice when a session ends and is not auto-reconnecting (server exit/quit, manual disconnect, or a dead link). The timestamped 'disconnected' line in the Game window always appears regardless. (#114)"/>
 
         <Separator/>
 
