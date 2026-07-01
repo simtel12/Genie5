@@ -292,6 +292,11 @@
                   IsChecked="{Binding ExperienceVisible, Mode=OneWay}"
                   Command="{Binding ToggleExperienceCommand}"
                   ToolTip.Tip="Skill ranks and learning rates, tracked by the Experience plugin. Train a skill or type 'exp' to populate it."/>
+        <MenuItem Header="_Active Spells"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding ActiveSpellsVisible, Mode=OneWay}"
+                  Command="{Binding ToggleActiveSpellsCommand}"
+                  ToolTip.Tip="Active spell durations, tracked by the Spell Timer. Populates when you have spells running."/>
         <MenuItem Header="Scr_ipts"
                   ToggleType="CheckBox"
                   IsChecked="{Binding ScriptsVisible, Mode=OneWay}"

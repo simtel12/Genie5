@@ -188,6 +188,7 @@ public class GenieDockFactory : Factory
         var log      = new StreamTool      (_vm.StreamTabs.Log,      ws.Get("log"));
         var itemlog  = new StreamTool      (_vm.StreamTabs.ItemLog,  ws.Get("itemlog"));
         var experience = new ExperienceTool(_vm.Experience,          ws.Get("experience"));
+        var activeSpells = new ActiveSpellsTool(_vm.ActiveSpells,    ws.Get("active-spells"));
         var scripts    = new ScriptsTool   (_vm.Scripts,            ws.Get("scripts"));
         var scene      = new SceneTool     (_vm.Scene,              ws.Get("scene"));
         var mobs       = new MobsTool      (_vm.Mobs,               ws.Get("mobs"));
@@ -341,6 +342,11 @@ public class GenieDockFactory : Factory
         // Experience: registered but hidden by default (like Vitals) — re-opens
         // beside the Backpack via Window → Experience. The plugin fills it.
         _tools[experience.Id] = (experience, backpackDock.Id);
+        // Active Spells: registered but hidden by default (like Experience) —
+        // re-opens beside the Backpack via Window → Active Spells. The Spell
+        // Timer fills it. First-class tool (not a plugin window) so it keeps MDI
+        // decorations and never re-opens itself on a server push (#112).
+        _tools[activeSpells.Id] = (activeSpells, backpackDock.Id);
         // Scripts: registered but hidden by default (like Vitals/Experience) —
         // re-opens beside the Backpack via Window → Scripts.
         _tools[scripts.Id]    = (scripts,    backpackDock.Id);
@@ -420,6 +426,7 @@ public class GenieDockFactory : Factory
         var log        = new StreamTool      (_vm.StreamTabs.Log,      ws.Get("log"));
         var itemlog    = new StreamTool      (_vm.StreamTabs.ItemLog,  ws.Get("itemlog"));
         var experience = new ExperienceTool  (_vm.Experience,          ws.Get("experience"));
+        var activeSpells = new ActiveSpellsTool(_vm.ActiveSpells,       ws.Get("active-spells"));
         var scene      = new SceneTool        (_vm.Scene,              ws.Get("scene"));
         var mobs       = new MobsTool         (_vm.Mobs,               ws.Get("mobs"));
         var players    = new PlayersTool      (_vm.Players,            ws.Get("players"));
@@ -432,7 +439,8 @@ public class GenieDockFactory : Factory
             ("logons", logons), ("talk", talk), ("whispers", whispers), ("thoughts", thoughts),
             ("combat", combat), ("familiar", familiar), ("death", death), ("assess", assess),
             ("atmospherics", atmospherics), ("log", log), ("itemlog", itemlog),
-            ("vitals", vitals), ("experience", experience), ("scene", scene),
+            ("vitals", vitals), ("experience", experience), ("active-spells", activeSpells),
+            ("scene", scene),
             ("mobs", mobs), ("players", players), ("raw-xml", rawXml),
         };
 

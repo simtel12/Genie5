@@ -37,6 +37,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public CommandViewModel    Command    { get; }
     public StreamTabsViewModel StreamTabs { get; } = new();
     public ExperienceViewModel Experience { get; } = new();
+    public ActiveSpellsViewModel ActiveSpells { get; } = new();
     public ScriptBarViewModel  ScriptBar  { get; } = new();
 
     /// <summary>Backs the dockable Scripts panel (running list with per-script
@@ -343,6 +344,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     [Reactive] public bool BackpackVisible { get; private set; } = true;
     [Reactive] public bool MapperVisible   { get; private set; } = true;
     [Reactive] public bool ExperienceVisible { get; private set; }   // hidden by default (opt-in)
+    [Reactive] public bool ActiveSpellsVisible { get; private set; } // hidden by default (opt-in)
     [Reactive] public bool LogonsVisible   { get; private set; } = true;
     [Reactive] public bool TalkVisible     { get; private set; } = true;
     [Reactive] public bool WhispersVisible { get; private set; } = true;
@@ -367,6 +369,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> ToggleBackpackCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleMapperCommand   { get; }
     public ReactiveCommand<Unit, Unit> ToggleExperienceCommand { get; }
+    public ReactiveCommand<Unit, Unit> ToggleActiveSpellsCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleLogonsCommand   { get; }
     public ReactiveCommand<Unit, Unit> ToggleTalkCommand     { get; }
     public ReactiveCommand<Unit, Unit> ToggleWhispersCommand { get; }
@@ -739,6 +742,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         WindowSettings.Register("itemlog",   "ItemLog");
         WindowSettings.Register("mapper",    "Mapper");
         WindowSettings.Register("experience", "Experience");
+        WindowSettings.Register("active-spells", "Active Spells");
         WindowSettings.Register("scripts",   "Scripts");
         WindowSettings.Register("scene",     "Scene");
         WindowSettings.Register("mobs",      "Mobs");
@@ -1279,6 +1283,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             MapperVisible = newVisible;
         });
         ToggleExperienceCommand = MakeToggleCommand("experience", v => ExperienceVisible = v);
+        ToggleActiveSpellsCommand = MakeToggleCommand("active-spells", v => ActiveSpellsVisible = v);
         ToggleLogonsCommand   = MakeToggleCommand("logons",    v => LogonsVisible   = v);
         ToggleTalkCommand     = MakeToggleCommand("talk",      v => TalkVisible     = v);
         ToggleWhispersCommand = MakeToggleCommand("whispers",  v => WhispersVisible = v);
@@ -2157,7 +2162,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     private static readonly HashSet<string> ReservedWindowNames =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            "experience", "main", "game", "game-text", "room", "vitals",
+            "experience", "active spells", "main", "game", "game-text", "room", "vitals",
             "backpack", "mapper", "scripts", "scene",
             "logons", "talk", "whispers", "thoughts", "combat",
             "log", "itemlog",
@@ -2467,6 +2472,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             case "backpack":  ForceSet(visible, v => BackpackVisible = v, () => BackpackVisible); break;
             case "mapper":    ForceSet(visible, v => MapperVisible   = v, () => MapperVisible);   break;
             case "experience": ForceSet(visible, v => ExperienceVisible = v, () => ExperienceVisible); break;
+            case "active-spells": ForceSet(visible, v => ActiveSpellsVisible = v, () => ActiveSpellsVisible); break;
             case "logons":    ForceSet(visible, v => LogonsVisible   = v, () => LogonsVisible);   break;
             case "talk":      ForceSet(visible, v => TalkVisible     = v, () => TalkVisible);     break;
             case "whispers":  ForceSet(visible, v => WhispersVisible = v, () => WhispersVisible); break;
@@ -3015,6 +3021,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Mapper.Attach(_core);
         StreamTabs.Attach(_core);
         Experience.Attach(_core);
+        ActiveSpells.Attach(_core);
         Scripts.Attach(_core);
         Scene.Attach(_core);
         Mobs.Attach(_core);

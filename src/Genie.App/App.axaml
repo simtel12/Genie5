@@ -866,6 +866,17 @@
       </DockPanel>
     </DataTemplate>
 
+    <DataTemplate DataType="docking:ActiveSpellsTool">
+      <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                    VerticalScrollBarVisibility="Auto">
+        <SelectableTextBlock Text="{Binding ViewModel.Content}"
+                             FontFamily="{Binding ToolFontFamily}"
+                             FontSize="{Binding ToolFontSize}"
+                             Margin="8"
+                             Foreground="{DynamicResource GameBrush}"/>
+      </ScrollViewer>
+    </DataTemplate>
+
     <!-- ── Plugin-created windows (generic) ───────────────────────────────── -->
     <!-- One template serves EVERY plugin window. A plugin calls               -->
     <!-- IPluginHost.SetWindow("My Panel", text) and the dock factory spins up -->
