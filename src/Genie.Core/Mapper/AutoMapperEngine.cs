@@ -813,14 +813,21 @@ public sealed class AutoMapperEngine
     /// A brutal one-hop swim that floods 15s of roundtime per stroke now costs
     /// as much as ~8 dry rooms, so a nearby bridge or gate wins the route.
     /// </summary>
-    private static int EdgeCost(MapExit exit)
+    private int EdgeCost(MapExit exit)
+        => IntraZoneEdgeCost(exit, Skills?.Rank("Athletics") ?? 0);
+
+    /// <summary>Cost (baseline-hop units) of traversing one intra-zone exit, given
+    /// the character's Athletics rank (for swim/climb scaling). Shared by the
+    /// single-zone <see cref="FindPath"/> and the multi-zone
+    /// <see cref="MultiZonePathfinder"/> so an edge costs the same either way.</summary>
+    internal static int IntraZoneEdgeCost(MapExit exit, int athleticsRank)
     {
         int cost = 1;
 
         if (exit.RtCost is int rt && rt > 0)
             cost += (rt + 1) / 2;                       // authored seconds → hops
         else
-            cost += MoveEffortPenalty(exit.MoveCommand); // infer from the move verb
+            cost += EffortPenalty(exit.MoveCommand, athleticsRank);  // infer from verb
 
         int waitLo  = exit.WaitMin ?? 0;
         int waitHi  = exit.WaitMax ?? waitLo;
@@ -830,42 +837,65 @@ public sealed class AutoMapperEngine
         return cost;
     }
 
+    /// <summary>Athletics rank at/above which swim &amp; climb effort decays to zero —
+    /// a well-trained character floods little to no roundtime on those moves.</summary>
+    internal const int AthleticsEffortFloorRank = 600;
+
     /// <summary>
     /// Heuristic extra cost (baseline-hop units) for a move verb that implies a
-    /// high roundtime or skill check. Used when the map arc carries no authored
+    /// high roundtime or skill check, used when the arc carries no authored
     /// <see cref="MapExit.RtCost"/> (the common case for community maps).
     /// <para>
-    /// Open-water swimming floods ~15s of "flounder" roundtime per stroke when
-    /// swimming skill is low, so it is penalised hardest. Natural-terrain climbs
-    /// (wall, cliff, steep slope, embrasure) carry real roundtime and skill
-    /// gates. Built structures — stairs, ladders, steps — climb in ~0 roundtime
-    /// and are NOT penalised, so ordinary indoor traversal is unaffected.
+    /// Swimming and natural-terrain climbing are <b>Athletics-gated</b>: at low
+    /// skill they flood ~15s / real roundtime, but a well-trained character does
+    /// them near-freely — so the swim/climb penalty <b>decays with Athletics rank</b>
+    /// (public #122 — a 957-Athletics character should swim the Faldesu rather than
+    /// wait on a ferry). Built structures (stairs, ladders, steps) climb in ~0 RT
+    /// and are never penalised. Ford/wade/crawl/squeeze/dive keep a flat moderate
+    /// cost (varied, non-Athletics requirements).
     /// </para>
     /// </summary>
-    private static int MoveEffortPenalty(string move)
+    internal static int EffortPenalty(string move, int athleticsRank)
     {
         if (string.IsNullOrWhiteSpace(move)) return 0;
         var m = move.ToLowerInvariant();
 
-        // Open-water swimming — the worst offender (floundering RT).
-        if (m.Contains("swim")) return 8;
-
-        if (m.Contains("climb"))
+        int basePenalty;
+        if (m.Contains("swim"))
+        {
+            basePenalty = 8;                            // open-water floundering
+        }
+        else if (m.Contains("climb"))
         {
             // Built structures climb in ~0 RT — leave normal traversal alone.
             if (m.Contains("stair") || m.Contains("ladder") ||
                 m.Contains("step")  || m.Contains("rung"))
                 return 0;
-            // Natural terrain / fortifications: real RT + skill gate.
-            return 6;
+            basePenalty = 6;                            // natural terrain / fortifications
+        }
+        else if (m.Contains("ford") || m.Contains("wade") || m.Contains("crawl") ||
+                 m.Contains("squeeze") || m.Contains("dive"))
+        {
+            return 4;                                   // moderate, not Athletics-scaled
+        }
+        else
+        {
+            return 0;
         }
 
-        // Fording, wading, crawling, squeezing, diving: moderate effort.
-        if (m.Contains("ford") || m.Contains("wade")  || m.Contains("crawl") ||
-            m.Contains("squeeze") || m.Contains("dive"))
-            return 4;
+        return ScaleByAthletics(basePenalty, athleticsRank);
+    }
 
-        return 0;
+    /// <summary>Scale a swim/climb effort penalty down as Athletics rank rises:
+    /// full at rank 0 / unknown (conservative — don't route an unskilled character
+    /// through a river), decaying linearly to 0 by
+    /// <see cref="AthleticsEffortFloorRank"/>.</summary>
+    private static int ScaleByAthletics(int basePenalty, int athleticsRank)
+    {
+        if (athleticsRank <= 0) return basePenalty;
+        if (athleticsRank >= AthleticsEffortFloorRank) return 0;
+        return (int)Math.Round(
+            basePenalty * (AthleticsEffortFloorRank - athleticsRank) / (double)AthleticsEffortFloorRank);
     }
 
     private int NextNodeId()

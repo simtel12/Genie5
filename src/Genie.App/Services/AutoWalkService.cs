@@ -267,7 +267,41 @@ public sealed class AutoWalkService : ReactiveObject
             return false;
         }
 
-        var session = new AutoWalkSession(origin, destination, moves);
+        return BeginPlan(origin, destination,
+                         moves.Select(v => new Genie.Core.Mapper.WalkStep { Verb = v }).ToList(),
+                         hasCrossZoneHop: false);
+    }
+
+    /// <summary>
+    /// Start a <b>cross-zone</b> attended walk from the current room, using a plan
+    /// the caller produced with <see cref="Genie.Core.Mapper.MultiZonePathfinder"/>
+    /// (the ViewModel owns the maps dir / connections needed to build it). The
+    /// walker already executes cross-zone <see cref="Genie.Core.Mapper.WalkStep"/>s —
+    /// wait countdown + destination-zone fingerprint arrival — so this just feeds
+    /// it the multi-zone plan. <paramref name="destinationLabel"/> is a display-only
+    /// node (the resolved target's title/id); arrival is confirmed by zone
+    /// fingerprint, not its id. Returns false if already walking or no route.
+    /// </summary>
+    public bool StartCrossZone(MapNode origin, MapNode destinationLabel,
+                               Genie.Core.Mapper.MultiZonePath? plan)
+    {
+        if (Current is { State: AutoWalkState.Active or AutoWalkState.Paused })
+            return false;
+        if (plan is null || plan.Steps.Count == 0)
+        {
+            FlashStatus($"No path to '{destinationLabel.Title}'.");
+            EmitAutomapperSignal("DESTINATION NOT FOUND");
+            return false;
+        }
+        return BeginPlan(origin, destinationLabel, plan.Steps, plan.HasCrossZoneHop);
+    }
+
+    /// <summary>Shared session setup + first-step kick-off for both the single-zone
+    /// (<see cref="Start"/>) and cross-zone (<see cref="StartCrossZone"/>) paths.</summary>
+    private bool BeginPlan(MapNode origin, MapNode destination,
+                           IReadOnlyList<Genie.Core.Mapper.WalkStep> steps, bool hasCrossZoneHop)
+    {
+        var session = new AutoWalkSession(origin, destination, steps, hasCrossZoneHop);
         session.StatusMessage = $"Walking to {destination.Title} — {session.ProgressText} · Esc to cancel";
         Current = session;
         _sessionChanges.OnNext(session);
@@ -608,15 +642,14 @@ public sealed class AutoWalkService : ReactiveObject
         _departureNodeId       = _mapEngine.CurrentNode?.Id;
         _departureServerRoomId = _mapEngine.CurrentServerRoomId;
 
-        // Map arcs may carry the Genie 4 automapper "rt" prefix
-        // (e.g. move="rt north") — a directive meaning "wait for roundtime,
-        // then move", NOT a literal command. Sending "rt north" to DR returns
-        // "Please rephrase that command." Strip it: movement is already paced
-        // one-move-per-room, and DR's typeahead queues a move issued during RT,
-        // so the real verb alone honours the intent.
-        var verb = step.Verb;
-        if (verb.StartsWith("rt ", StringComparison.OrdinalIgnoreCase))
-            verb = verb[3..].TrimStart();
+        // Map arcs may carry Genie 4 automapper pacing prefixes
+        // (e.g. move="rt north", move="slow south") — directives meaning
+        // "wait for roundtime / go carefully, then move", NOT literal commands.
+        // Sent verbatim they return "Please rephrase that command." (public #123).
+        // MoveVerb.Normalize strips the known prefix: movement is already paced
+        // one-move-per-room and gates on roundtime, so the real verb alone honours
+        // the intent. Real DR verbs (go/climb/swim/dive) are left untouched.
+        var verb = Genie.Core.Mapper.MoveVerb.Normalize(step.Verb);
 
         // Send through ProcessInput so the same alias / trigger / command
         // pipeline runs as if the user typed it. Movement is paced by the

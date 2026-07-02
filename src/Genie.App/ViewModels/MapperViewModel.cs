@@ -333,6 +333,8 @@ public class MapperViewModel : ReactiveObject
     private AutoMapperEngine?  _engine;
     private Genie.Core.Diagnostics.LiveAudit? _audit;
     private MapZoneRepository? _zoneRepo;
+    private ZoneRoomIndex?     _roomIndex;   // whole-Maps room index for cross-zone #goto (lazy)
+    private IReadOnlyList<ZoneConnection>? _derivedConnections;  // cross-zone links derived from map notes (lazy)
     private CommandEngine?     _commands;
     private DisplaySettings?   _display;
     private bool               _suppressAutoLoad;
@@ -1352,29 +1354,27 @@ public class MapperViewModel : ReactiveObject
     private void GotoNode(MapNode target)
     {
         if (_engine is null || AutoWalk is null) return;
-        if (_engine.CurrentNode is null)
+
+        // In-zone: the mapper has placed the player in the currently displayed
+        // zone, so origin + target share a graph — use the well-tested single-zone
+        // walk. The service sends each move on a CurrentNodeChanged tick (not all
+        // at once), respects RT via the command queue, and stops on Esc / typed
+        // command / disconnect / window-unfocus-over-60s.
+        if (_engine.CurrentNode is not null)
         {
-            LoadStatus = "No current room — can't path. Walk one step so the mapper can match you first.";
-            return;
-        }
-        if (_engine.CurrentNode.Id == target.Id)
-        {
-            LoadStatus = "Already here.";
+            if (_engine.CurrentNode.Id == target.Id) { LoadStatus = "Already here."; return; }
+            if (!AutoWalk.Start(_engine.CurrentNode, target))
+                LoadStatus = AutoWalk.LastStatusFlash ?? $"No path to '{target.Title}'.";
             return;
         }
 
-        // Delegate to AutoWalkService. The service sends each move on a
-        // CurrentNodeChanged tick (not all at once), respects RT via the
-        // command queue, and stops on Esc / typed command / disconnect /
-        // window-unfocus-over-60s. Earlier implementations sent the whole
-        // sequence as a burst which was non-compliant under DR policy.
-        var started = AutoWalk.Start(_engine.CurrentNode, target);
-        if (!started)
-        {
-            // Service refused — surface the reason (set via FlashStatus).
-            // If nothing's flashed, just say "no path" as a fallback.
-            LoadStatus = AutoWalk.LastStatusFlash ?? $"No path to '{target.Title}'.";
-        }
+        // The player isn't placed in the displayed zone — you've switched the map
+        // to look at another zone. Treat the click as a CROSS-ZONE goto from the
+        // player's real room (resolved via the whole-Maps index) to the clicked
+        // room in the shown zone.
+        if (!TryStartCrossZoneWalk(SelectedZoneFile ?? "", target.Id, target.Title))
+            LoadStatus = "Can't path yet — the mapper hasn't placed your character. " +
+                         "Connect and walk a step (or the current room isn't mapped), then try again.";
     }
 
     /// <summary>
@@ -1416,15 +1416,112 @@ public class MapperViewModel : ReactiveObject
         var target = ResolveNode(arg);
         if (target is null)
         {
+            // Not in the loaded zone — try a CROSS-ZONE walk: resolve the target
+            // through the whole-Maps index and route there with the multi-zone
+            // pathfinder. (Common when a travel script fires a room in another zone.)
+            if (TryStartCrossZoneGoto(arg)) return;
+
             LoadStatus = $"#goto: no room matching '{arg}' in zone '{_engine.ActiveZone.Name}'.";
             // Signal automapper-driven scripts (travel.cmd, …) that this #goto
             // can't be resolved — they matchwait on "DESTINATION NOT FOUND" and
-            // would otherwise hang. Common when a script fires a roomid for a
-            // zone that isn't the currently loaded one.
+            // would otherwise hang.
             AutoWalk?.EmitAutomapperSignal("DESTINATION NOT FOUND");
             return;
         }
         GotoNode(target);
+    }
+
+    /// <summary>Load every zone once and build BOTH the cross-zone room index and
+    /// the note-derived cross-zone connections (cached). A single scan of the Maps
+    /// folder feeds both, so we don't read 121 zone files twice.</summary>
+    private void EnsureMapsScan()
+    {
+        if (_roomIndex is not null && _derivedConnections is not null) return;
+        var loaded = new List<(string ZoneFile, MapZone Zone)>();
+        if (_zoneRepo is not null && !string.IsNullOrWhiteSpace(MapsDirectory))
+            foreach (var path in _zoneRepo.ListZoneFiles(MapsDirectory))
+            {
+                var z = _zoneRepo.Load(path);
+                if (z is not null) loaded.Add((Path.GetFileNameWithoutExtension(path), z));
+            }
+        _roomIndex          = ZoneRoomIndex.Build(loaded);
+        _derivedConnections = ZoneConnectionDeriver.Derive(loaded);
+    }
+
+    /// <summary>Whole-Maps room index for cross-zone resolution (server-room-id /
+    /// title → zone + node).</summary>
+    private ZoneRoomIndex RoomIndex() { EnsureMapsScan(); return _roomIndex!; }
+
+    /// <summary>Cross-zone connections. Prefers a hand-authored ZoneConnections.xml;
+    /// falls back to links derived from the maps' border-room notes (the community
+    /// maps ship no ZoneConnections.xml, so this is the normal path).</summary>
+    private IReadOnlyList<ZoneConnection> Connections()
+    {
+        var authored = new ZoneConnectionsRepository(
+            Path.Combine(MapsDirectory, "ZoneConnections.xml")).Load();
+        if (authored.Count > 0) return authored;
+        EnsureMapsScan();
+        return _derivedConnections!;
+    }
+
+    /// <summary>
+    /// Attempt a CROSS-ZONE <c>#goto</c>: the target isn't in the loaded zone, so
+    /// resolve it through the whole-Maps <see cref="ZoneRoomIndex"/> and, when it
+    /// lives in another zone, plan + walk there with <see cref="MultiZonePathfinder"/>.
+    /// The walker already executes cross-zone plans (wait countdown + destination-
+    /// zone fingerprint arrival). Returns true when it took over the goto (started,
+    /// or failed with a surfaced reason); false to let the caller report "not found".
+    /// </summary>
+    private bool TryStartCrossZoneGoto(string arg)
+    {
+        if (_zoneRepo is null || string.IsNullOrWhiteSpace(MapsDirectory)) return false;
+
+        var index = RoomIndex();
+        // Resolve the target: server-room-id first (exact, game-wide), else a title.
+        if (!index.TryResolveServerRoom(arg, out var dest))
+        {
+            var titleHits = index.ByTitle(arg);
+            if (titleHits.Count == 0) return false;   // not a known cross-zone room
+            dest = titleHits[0];
+        }
+        return TryStartCrossZoneWalk(dest.Zone, dest.NodeId, arg);
+    }
+
+    /// <summary>
+    /// Shared cross-zone walk: origin is the player's <b>actual</b> current room —
+    /// resolved from its server-room-id via the whole-Maps index, so it works even
+    /// when the displayed zone isn't the one they're standing in. Plans with
+    /// <see cref="MultiZonePathfinder"/> and hands the plan to the walker (which
+    /// executes cross-zone steps via wait-countdown + destination-zone fingerprint
+    /// arrival). Returns false when the origin can't be determined (offline / the
+    /// current room isn't mapped) or the destination is actually in the same zone.
+    /// </summary>
+    private bool TryStartCrossZoneWalk(string destZone, int destNodeId, string destTitle)
+    {
+        if (_engine is null || _zoneRepo is null || AutoWalk is null ||
+            string.IsNullOrWhiteSpace(MapsDirectory))
+            return false;
+
+        var srv = _engine.CurrentServerRoomId;
+        if (string.IsNullOrWhiteSpace(srv) || !RoomIndex().TryResolveServerRoom(srv, out var origin))
+            return false;   // don't know where the player physically is
+
+        if (string.Equals(origin.Zone, destZone, StringComparison.OrdinalIgnoreCase))
+            return false;   // same zone after all — let the in-zone path handle it
+
+        var pathfinder = new MultiZonePathfinder(
+            _zoneRepo, MapsDirectory, Connections(),
+            _skillStore, _engine.CharacterClass, _engine.CharacterLevel);
+
+        var plan = pathfinder.FindPath(
+            origin.Zone, origin.NodeId.ToString(), destZone, destNodeId.ToString());
+
+        // Display-only nodes (arrival is confirmed by zone fingerprint, not ids).
+        var originNode = new MapNode { Id = origin.NodeId, Title = "current location" };
+        var destNode   = new MapNode { Id = destNodeId,   Title = destTitle };
+        if (!AutoWalk.StartCrossZone(originNode, destNode, plan))
+            LoadStatus = AutoWalk.LastStatusFlash ?? $"No cross-zone path to '{destTitle}'.";
+        return true;
     }
 
     /// <summary>

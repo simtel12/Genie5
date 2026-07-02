@@ -53,6 +53,7 @@ public sealed class MultiZonePathfinder
     private readonly SkillStore?          _skills;
     private readonly string?              _characterClass;
     private readonly int                  _characterLevel;
+    private readonly int                  _athleticsRank;   // cached for swim/climb cost scaling
 
     public MultiZonePathfinder(
         MapZoneRepository zoneRepo,
@@ -68,6 +69,7 @@ public sealed class MultiZonePathfinder
         _skills         = skills;
         _characterClass = characterClass;
         _characterLevel = characterLevel;
+        _athleticsRank  = skills?.Rank("Athletics") ?? 0;
     }
 
     /// <summary>
@@ -126,7 +128,9 @@ public sealed class MultiZonePathfinder
                 var req = ExitRequirement.Parse(exit.Requires);
                 if (!req.IsMet(_skills, _characterClass, _characterLevel)) continue;
 
-                var weight = 1 + (exit.RtCost ?? 0) / 4;
+                // Same skill-scaled cost the single-zone pathfinder uses, so an
+                // edge weighs the same whether the route stays in-zone or crosses.
+                var weight = AutoMapperEngine.IntraZoneEdgeCost(exit, _athleticsRank);
                 var nextKey = (current.zone, nextNode.Id.ToString());
 
                 if (!distances.TryGetValue(nextKey, out var existingDist) ||
@@ -155,12 +159,15 @@ public sealed class MultiZonePathfinder
                     var req = ExitRequirement.Parse(conn.Requires);
                     if (!req.IsMet(_skills, _characterClass, _characterLevel)) continue;
 
-                    // Cross-zone weight = 1 baseline + RT/4 + averageWait/4.
-                    // Wait time dwarfs the room cost so boats with long
-                    // schedules are correctly preferred only when no
-                    // overland path exists.
+                    // Cross-zone weight = 1 baseline + RT/4 + averageWait/4, plus
+                    // skill-scaled effort when the transit verb is a swim/climb
+                    // (a "swim the Faldesu" link is near-free for a skilled
+                    // character, but a ferry's wait keeps it costly — #122).
+                    // Wait time dwarfs the room cost so boats with long schedules
+                    // are correctly preferred only when no overland path exists.
                     var avgWait = ((conn.WaitMin ?? 0) + (conn.WaitMax ?? conn.WaitMin ?? 0)) / 2;
-                    var weight  = 1 + (conn.RtCost ?? 0) / 4 + avgWait / 4;
+                    var weight  = 1 + (conn.RtCost ?? 0) / 4 + avgWait / 4
+                                    + AutoMapperEngine.EffortPenalty(conn.Verb, _athleticsRank);
 
                     var nextKey = (conn.ToZone, conn.ToRoom);
 
