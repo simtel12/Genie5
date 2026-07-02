@@ -1,3 +1,40 @@
+# Genie 5 — v5.0.0-alpha.7.8
+
+A travel-and-mapper polish release — smarter auto-walk routing, a movement
+pacing fix, and two Mapper window annoyances put to rest.
+
+> **Alpha software.** Builds are **unsigned** for most platforms — Windows
+> SmartScreen will warn on first launch (More info → Run anyway). Signing is
+> tracked in #33.
+
+## ✨ New
+
+- **Skill-aware travel routing (#122)** — auto-walk now weighs effort-heavy exits
+  like swimming and climbing against your **Athletics** rank. A strong swimmer
+  takes the water instead of waiting on a ferry; a weak one still routes around
+  it. The single-zone and multi-zone pathfinders now score an edge identically,
+  so routes stay consistent however far you travel.
+
+## 🐛 Fixes
+
+- **Travel pacing prefixes leaking to the game (#123)** — map movement could send
+  a `slow`/`rt` pacing prefix to DR verbatim, which the game rejected with "Please
+  rephrase that command." The prefix is now stripped before the move is sent.
+- **One Mapper right-click menu** — right-clicking a room opened two overlapping
+  menus (the room actions plus the window's Float / Close), and a second click
+  could stack another copy. It's now a single menu: room actions grey out when you
+  click empty space, Float / Close are folded in, and any previous menu closes
+  first.
+- **Duplicate Mapper window on layout change** — floating a tool (the default
+  layout floats the Mapper) and then **Reset to Default Layout** — or toggling
+  windowed mode — left the old floating window orphaned beside its rebuilt copy.
+  The outgoing floating windows are now torn down on rebuild.
+
+Under the hood this release also lays the groundwork for **cross-zone travel** (a
+whole-Maps room index and automatic zone-link derivation). It isn't active yet —
+single-zone travel is unchanged — but it's the foundation the next release builds
+on.
+
 # Genie 5 — v5.0.0-alpha.7.7
 
 A community bug-fix and polish release — clickable news listings, clearer

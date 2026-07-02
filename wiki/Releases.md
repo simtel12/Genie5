@@ -4,7 +4,20 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.7.7 — Community Fixes & Polish
+## Latest: v5.0.0-alpha.7.8 — Travel & Mapper Polish
+
+Smarter auto-walk routing that factors your Athletics skill, a movement pacing fix, and two Mapper window fixes — a single right-click menu and no more duplicate Mapper window on layout changes.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.7.8** as a delta.
+
+- **Skill-aware travel routing** — auto-walk weighs swim/climb exits against your Athletics rank, so a strong swimmer takes the water instead of waiting on a ferry ([#122](https://github.com/GenieClient/Genie5/issues/122)).
+- **Travel pacing fix** — map movement no longer sends `slow`/`rt` pacing prefixes to the game verbatim ([#123](https://github.com/GenieClient/Genie5/issues/123)).
+- **One Mapper right-click menu** — right-clicking a room now opens a single menu (Float / Close folded in, room actions greyed when you click empty space) instead of two overlapping ones.
+- **No duplicate Mapper window** — floating the Mapper then resetting the layout or toggling windowed mode no longer leaves an orphaned second window.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.7.8)
+
+## v5.0.0-alpha.7.7 — Community Fixes & Polish
 
 A bug-fix and polish release built mostly from issue reports — clickable news listings, clearer disconnect feedback, an accurate mob count, and a Room window that wraps again in windowed mode.
 
