@@ -1,3 +1,42 @@
+# Genie 5 — v5.0.0-alpha.7.9
+
+A scripting-parity and readability release — three Genie 4 script-language fixes
+from community reports, a `#goto` combat-retreat fix, and **MonsterBold**: DR's
+creature and NPC names now stand out in colour.
+
+> **Alpha software.** Builds are **unsigned** for most platforms — Windows
+> SmartScreen will warn on first launch (More info → Run anyway). Signing is
+> tracked in #33.
+
+## ✨ New
+
+- **MonsterBold (#131)** — the creature and NPC names (and combat messages) that
+  DR marks as "monster bold" now render in a distinct colour — default **gold**,
+  the traditional Wrayth / Genie 3-4 look — in the main window and every stream
+  window, so mobiles pop out of a busy scroll. **On by default.** Toggle it live
+  from **Config → Highlights → Presets** (the new *MonsterBold* checkbox) or with
+  `#config monsterbold on|off`, and recolour it via the `creatures` preset. Note
+  it bolds every mobile DR tags — friendly NPCs (guards, shopkeepers) as well as
+  hostile creatures — exactly as Wrayth does.
+
+## 🐛 Fixes
+
+- **`#goto` retreats when engaged (#130)** — auto-walk and travel scripts driving
+  movement with `#goto` would stall when a creature had you engaged at melee or
+  pole range. The walker now retreats and retries the step, matching Genie 3/4.
+- **Nested variables expand inside-out (#128)** — stacked references like
+  `$%output` and `%harness%counter` now resolve the inner variable first
+  (right-to-left), matching Genie 4, instead of leaving `$var1` / dropping the
+  prefix.
+- **`def()` sees `#var` variables (#129)** — `def(name)` / `defined(name)` now
+  checks the persistent `#var` store and reports **existence** (Genie 4
+  semantics), so a variable set with `#var` — even to an empty value — reads as
+  defined.
+- **`\;` escape in the command separator (#132)** — a backslash-escaped semicolon
+  (and a `;` inside `"quotes"` or `{braces}`) no longer splits a command
+  mid-value, so `#var t a\;b` stores the whole `a\;b` instead of truncating and
+  sending the tail to the game.
+
 # Genie 5 — v5.0.0-alpha.7.8
 
 A travel-and-mapper polish release — smarter auto-walk routing, a movement

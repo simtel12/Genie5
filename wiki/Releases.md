@@ -4,7 +4,21 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.7.8 — Travel & Mapper Polish
+## Latest: v5.0.0-alpha.7.9 — Scripting Parity & MonsterBold
+
+Three Genie 4 script-language fixes from community reports, a `#goto` combat-retreat fix, and **MonsterBold** — DR's creature and NPC names now stand out in colour.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.7.9** as a delta.
+
+- **MonsterBold** — creature and NPC names DR marks as monster-bold now render in a distinct colour (default gold) in the main window and every stream window; on by default, toggle it live under **Config → Highlights → Presets** or with `#config monsterbold on|off` ([#131](https://github.com/GenieClient/Genie5/issues/131)).
+- **`#goto` retreats when engaged** — travel/auto-walk no longer stalls when a creature has you engaged; it retreats and retries, like Genie 3/4 ([#130](https://github.com/GenieClient/Genie5/issues/130)).
+- **Nested variables** — stacked references like `$%output` and `%harness%counter` now resolve inside-out, matching Genie 4 ([#128](https://github.com/GenieClient/Genie5/issues/128)).
+- **`def()` sees `#var` variables** — `def(name)` now checks the `#var` store and reports existence, Genie 4-style ([#129](https://github.com/GenieClient/Genie5/issues/129)).
+- **`\;` escape in the separator** — an escaped semicolon (or one inside quotes/braces) no longer splits a command mid-value ([#132](https://github.com/GenieClient/Genie5/issues/132)).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.7.9)
+
+## v5.0.0-alpha.7.8 — Travel & Mapper Polish
 
 Smarter auto-walk routing that factors your Athletics skill, a movement pacing fix, and two Mapper window fixes — a single right-click menu and no more duplicate Mapper window on layout changes.
 
