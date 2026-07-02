@@ -1,7 +1,10 @@
 using System.Reactive;
+using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using System.Text.RegularExpressions;
 using Avalonia.Threading;
 using Genie.Core;
+using Genie.Core.Events;
 using Genie.Core.Mapper;
 using Genie.Core.Models;
 using ReactiveUI;
@@ -154,6 +157,35 @@ public sealed class AutoWalkService : ReactiveObject
     // re-arms whenever the movability gate next clears.
     private bool _autoStoodForBlock;
 
+    // Issue #130 auto-retreat: DR refuses a movement verb while the character
+    // is engaged in melee/pole combat, replying "You are engaged to a X in
+    // melee range!" (and variants). Genie 3/4 — and the community travel /
+    // climbcross / disarm scripts — retreat and retry the move; without it the
+    // walker just stalls until the 15s watchdog fires MOVEMENT FAILED. When a
+    // dispatched move is bounced by an engagement message the walker sends
+    // `retreat` itself via the core command path (not the typed path, so it
+    // doesn't trip SendCommand's "typed command cancels the walk" guard) and
+    // re-dispatches the SAME step. Retreat carries roundtime, which
+    // DispatchNextStep already paces around. Counted per step and capped so a
+    // persistent block can't spin an infinite retreat/move loop — mirrors the
+    // community scripts' `if moveRetreat > 4` bailout. Reset on a confirmed
+    // room change (the step landed) and at walk start / cancel.
+    private int _retreatCount;
+    private const int MaxRetreatsPerStep = 4;
+
+    /// <summary>
+    /// Server responses that mean "you can't move — you're engaged in combat".
+    /// DR exposes engagement ONLY through this move-blocked text — there is no
+    /// engagement &lt;indicator&gt; in the XML stream (verified against Lich's
+    /// ICONMAP and both non-combat + community sources). Lich's own walk_to
+    /// (dragonrealms/common-travel.rb) and the community scripts (climbcross.cmd,
+    /// disarm.cmd) all key off these same lines to drive retreat-then-move, so a
+    /// text match here is the parity-correct mechanism, not a fallback.
+    /// </summary>
+    private static readonly Regex EngagementBlock = new(
+        @"^(?:You are engaged to .+!|You try to move, but you're engaged\.|While in combat\?\s+You'll have better luck if you first retreat\.|You can't do that while engaged!)",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     /// <summary>
     /// Id of the room we were standing in when the most recent move was
     /// dispatched — i.e. the room we expect this step to take us OUT of. The
@@ -207,6 +239,14 @@ public sealed class AutoWalkService : ReactiveObject
         // thread because the engine event can fire from any thread the
         // parser observable is hopping through.
         _mapEngine.CurrentNodeChanged += () => Dispatcher.UIThread.Post(OnRoomChanged);
+
+        // Watch game text for "you're engaged, can't move" responses (#130) so a
+        // #goto/.travel step bounced by combat retreats and retries instead of
+        // stalling. Posted to the UI thread like the node-change pump; the handler
+        // only acts while a move is actually in flight (watchdog armed).
+        _core.GameEvents
+             .OfType<TextEvent>()
+             .Subscribe(te => Dispatcher.UIThread.Post(() => OnGameTextForRetreat(te.Text)));
 
         // Mirror the active session's StatusMessage into the reactive CurrentStatus
         // so the walk banner reflects mid-walk changes (waiting/paused/arrived);
@@ -309,6 +349,7 @@ public sealed class AutoWalkService : ReactiveObject
         // Seed the departure room so the first dispatched move is gated
         // against the origin, not against a stale id from a prior walk (#69).
         _autoStoodForBlock     = false;
+        _retreatCount          = 0;
         _departureNodeId       = origin.Id;
         _departureServerRoomId = _mapEngine.CurrentServerRoomId;
 
@@ -331,6 +372,7 @@ public sealed class AutoWalkService : ReactiveObject
         _sessionChanges.OnNext(Current);
         Current = null;
         _autoStoodForBlock = false;
+        _retreatCount = 0;
         _departureNodeId = null;
         _departureServerRoomId = null;
         IsCurrentPaused = false;
@@ -529,6 +571,10 @@ public sealed class AutoWalkService : ReactiveObject
                             && !string.Equals(srvUid, _departureServerRoomId, StringComparison.OrdinalIgnoreCase);
         if (nodeUnchanged && !uidChanged) return;
 
+        // Confirmed move landed — clear the per-step retreat counter (#130) so
+        // the next step gets its own fresh retreat budget.
+        _retreatCount = 0;
+
         // Any room-change implicitly clears a pending cross-zone wait —
         // either we arrived at the target zone, or we landed somewhere
         // intra-zone that progresses the plan. Either way the countdown
@@ -660,6 +706,45 @@ public sealed class AutoWalkService : ReactiveObject
         // Arm the watchdog — a confirmed room change (OnRoomChanged) restarts it
         // for the next step; no change in time means this move stuck.
         StartStepWatchdog();
+    }
+
+    /// <summary>
+    /// #130 auto-retreat: DR bounces a movement verb with "You are engaged to a
+    /// X in melee range!" (and variants) while the character is locked in combat.
+    /// Genie 3/4 and the community travel scripts retreat and retry; we do the
+    /// same so #goto/.travel recover instead of stalling to the watchdog. Only
+    /// acts while a step is in flight (<see cref="_stepTimer"/> armed) so a stray
+    /// combat line outside a dispatched move can't trigger a spurious retreat.
+    /// Sends <c>retreat</c> once per bounce (capped at <see cref="MaxRetreatsPerStep"/>
+    /// — pole→melee→free can need two), then re-dispatches the held step; the
+    /// retreat's roundtime is paced by <see cref="DispatchNextStep"/>.
+    /// </summary>
+    private void OnGameTextForRetreat(string line)
+    {
+        if (Current is null || Current.State != AutoWalkState.Active) return;
+        if (_stepTimer is null) return;                 // no move in flight — ignore
+        if (string.IsNullOrEmpty(line)) return;
+        if (!EngagementBlock.IsMatch(line)) return;
+
+        // Budget exhausted — something keeps us pinned (or it wasn't really an
+        // engagement block). Stop retreating and let the step watchdog own the
+        // eventual MOVEMENT FAILED / cancel.
+        if (_retreatCount >= MaxRetreatsPerStep) return;
+
+        StopStepWatchdog();     // we're handling this bounce; the retry re-arms it
+        StopPacingTimer();
+        _retreatCount++;
+        Current.StatusMessage =
+            $"Walking to {Current.Destination.Title} — retreating from combat to continue · Esc to cancel";
+        _sessionChanges.OnNext(Current);
+
+        // Retreat via the core command path (not the typed path) so it doesn't
+        // trip the "typed command cancels the walk" guard, exactly like auto-stand.
+        _core.Commands.ProcessInput("retreat");
+
+        // Let the retreat (and its roundtime) resolve, then re-send the held move.
+        // StepsCompleted was NOT advanced, so DispatchNextStep re-issues the same verb.
+        ScheduleMovabilityRetry(TimeSpan.FromMilliseconds(750));
     }
 
     /// <summary>
