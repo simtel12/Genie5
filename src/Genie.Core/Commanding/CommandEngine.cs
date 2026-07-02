@@ -127,13 +127,17 @@ public sealed class CommandEngine
             // command. Matches Genie 4's ParseGlobalVars-then-ParseCommand
             // ordering (Core/Command.cs:233).
             input = _host.ExpandVariables(input);
-            var commands = input.Split(_config.SeparatorChar);
+            // Escape-aware split (#132): a `\;` is a literal separator, and a `;`
+            // inside "quotes" or {braces} doesn't fragment the command — matches
+            // Genie 4's Utility.SafeSplit. A plain string.Split truncated values
+            // like `#var t a\;b` at the semicolon and leaked the tail to the game.
+            var commands = ArgumentParser.SafeSplit(input, _config.SeparatorChar);
 
             // Echo override only applies to single-command, plain-send pipeline
             // paths. If the input fan-outs into multiple commands via the
             // separator (e.g. an alias expanded mid-flight) we drop the override
             // — there's no meaningful 1:1 echo-text mapping at that point.
-            var applyOverride = echoOverride is not null && commands.Length == 1;
+            var applyOverride = echoOverride is not null && commands.Count == 1;
 
             foreach (var raw in commands)
             {

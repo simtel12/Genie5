@@ -69,4 +69,53 @@ public static class ArgumentParser
         if (current.Length > 0) results.Add(current.ToString());
         return results;
     }
+
+    /// <summary>
+    /// Split a command line on <paramref name="separator"/> (default <c>;</c>) the
+    /// way Genie 4's <c>Utility.SafeSplit</c> does (#132): a separator delimits a
+    /// command only when it is NOT escaped by a preceding backslash and NOT inside
+    /// a double-quoted run or a <c>{…}</c> brace group.
+    /// <para>
+    /// The escaping backslash is <b>preserved</b> in the output — Genie 4 does not
+    /// unescape here — so <c>#var t a\;b</c> yields the single segment <c>a\;b</c>
+    /// (and <c>$t</c> reads back with the backslash intact, matching Genie 4).
+    /// <c>\\</c> is a literal backslash and resets the escape state. Empty segments
+    /// are returned as-is; callers trim / skip them.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<string> SafeSplit(string input, char separator)
+    {
+        var results = new List<string>();
+        if (string.IsNullOrEmpty(input)) return results;
+
+        var current    = new System.Text.StringBuilder(input.Length);
+        var inQuotes   = false;
+        var braceDepth = 0;
+        var escaped    = false;   // previous char was an unconsumed backslash
+
+        foreach (var ch in input)
+        {
+            if (inQuotes)
+            {
+                current.Append(ch);
+                if (ch == '"') inQuotes = false;
+            }
+            else if (ch == '"' && !escaped) { current.Append(ch); inQuotes = true; }
+            else if (ch == '{' && !escaped) { braceDepth++; current.Append(ch); }
+            else if (ch == '}' && !escaped) { if (braceDepth > 0) braceDepth--; current.Append(ch); }
+            else if (ch == separator && !escaped && braceDepth == 0)
+            {
+                results.Add(current.ToString());
+                current.Clear();
+            }
+            else current.Append(ch);
+
+            // A backslash toggles escape (so `\\` cancels itself); anything else
+            // clears it. Matches Genie 4's bPreviousWasEscapeChar handling.
+            escaped = ch == '\\' && !escaped;
+        }
+
+        results.Add(current.ToString());
+        return results;
+    }
 }
