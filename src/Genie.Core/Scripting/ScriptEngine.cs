@@ -662,7 +662,7 @@ public sealed class ScriptEngine
                     // values; substitute each tick before passing to
                     // ScriptExpression, which doesn't itself parse $var refs.
                     bool done = false;
-                    try { done = ScriptExpression.EvalBool(SubstituteVars(inst.WaitEvalExpr, inst), inst, Globals); }
+                    try { done = ScriptExpression.EvalBool(SubstituteVars(inst.WaitEvalExpr, inst), inst, Globals, UserVarLookup); }
                     catch { /* treat parse error as still-waiting */ }
                     if (done || DateTime.UtcNow >= inst.WaitEvalDeadline)
                     { inst.WaitEvalExpr = null; inst.WaitEvalDeadline = DateTime.MaxValue; }
@@ -750,7 +750,7 @@ public sealed class ScriptEngine
             if (act.IsEval)
             {
                 bool cur;
-                try { cur = ScriptExpression.EvalBool(act.Pattern, inst, Globals); }
+                try { cur = ScriptExpression.EvalBool(act.Pattern, inst, Globals, UserVarLookup); }
                 catch { cur = false; }
                 fire = cur && !act.LastEvalResult;
                 act.LastEvalResult = cur;
@@ -1543,7 +1543,7 @@ public sealed class ScriptEngine
                 }
                 try
                 {
-                    var result = ScriptExpression.Eval(expr, inst, Globals);
+                    var result = ScriptExpression.Eval(expr, inst, Globals, UserVarLookup);
                     bool isMath = lower == "evalmath" || lower == "evaluatemath";
                     inst.Vars[vn.Trim()] = isMath
                         ? ScriptExpression.ToNum(result).ToString("0.################", CultureInfo.InvariantCulture)
@@ -1615,7 +1615,7 @@ public sealed class ScriptEngine
             if (inner.Length == 0) return false;
         }
 
-        try { return ScriptExpression.EvalBool(condText, inst, Globals); }
+        try { return ScriptExpression.EvalBool(condText, inst, Globals, UserVarLookup); }
         catch { return false; }
     }
 
@@ -2042,107 +2042,88 @@ public sealed class ScriptEngine
     private string SubstituteVars(string text, ScriptInstance inst)
     {
         if (text.IndexOf('%') < 0 && text.IndexOf('$') < 0) return text;
-        var sb = new StringBuilder(text.Length);
-        for (int i = 0; i < text.Length; i++)
-        {
-            char c = text[i];
-            if (c != '%' && c != '$') { sb.Append(c); continue; }
-            // `%%name` / `$$name` forces a second lookup: first fetch the
-            // named var's value, then use that value as a variable name for
-            // a second lookup. Matches Genie4's double-evaluation semantics.
-            bool doubleEval = false;
-            int nameStart = i + 1;
-            if (i + 1 < text.Length && text[i + 1] == c)
-            { doubleEval = true; nameStart = i + 2; }
-            int j = nameStart;
-            // Variable names allow letters, digits, _, . and -.  During the
-            // INNER pass of a double-eval, '.' and '-' terminate the name so
-            // that "%%a.b" / "%%a-b" resolve %a first, then append the suffix
-            // to form the outer name — matching Genie4's right-to-left
-            // expansion (e.g. %%spell.Prep).
-            while (j < text.Length &&
-                   (char.IsLetterOrDigit(text[j]) || text[j] == '_' ||
-                    (!doubleEval && (text[j] == '.' || text[j] == '-'))))
-                j++;
-            if (j == nameStart) { sb.Append(c); continue; }
 
-            // Genie4 parity: shrink the candidate from the right until we
-            // find a defined var. So `%caravan-there` resolves the full
-            // name when it exists, but `%count-1` still falls back to
-            // `%count` followed by literal "-1" when only `count` is defined.
-            // If nothing in the candidate resolves, the full candidate is
-            // consumed and substituted as empty (preserving prior behavior).
-            int nameEnd = j;
-            string name = string.Empty;
-            string value = string.Empty;
-            bool resolved = false;
-            while (nameEnd > nameStart)
-            {
-                name = text[nameStart..nameEnd];
-                if (TryResolveVar(name, c, inst, out value))
-                { resolved = true; break; }
-                nameEnd--;
-            }
-            if (!resolved)
-            {
-                // Undefined variable → empty string, for BOTH local %vars and
-                // global $vars. This matches Genie 4 (Lists/Globals.cs returns
-                // the line with the token resolved to nothing) and the
-                // Genie5.Kzin engine, which both treat an unset variable as
-                // empty rather than aborting. Scripts routinely compare against
-                // optional globals — e.g. travel.cmd's
-                // `if "$charactername" = "$char1"` where $char1 may never have
-                // been created — and rely on the empty result so the branch
-                // simply doesn't match. Scripts that need to distinguish
-                // "set to empty" from "never set" use the def() helper.
-                name = text[nameStart..j];
-                value = string.Empty;
-                nameEnd = j;
-            }
-            j = nameEnd;
-            if (doubleEval && !string.IsNullOrEmpty(value))
-            {
-                // The resolved value becomes the PREFIX of the outer name.
-                // If the text continues with identifier chars (e.g. ".Prep"),
-                // append them so "%%spell.Prep" → %<value-of-spell>.Prep.
-                int k = j;
-                while (k < text.Length &&
-                       (char.IsLetterOrDigit(text[k]) || text[k] == '_' ||
-                        text[k] == '.' || text[k] == '-'))
-                    k++;
-                var outerName = value + text[j..k];
-                value = c == '$'
-                    ? (Globals.TryGetValue(outerName, out var g2) ? g2 : string.Empty)
-                    : (inst.Vars.TryGetValue(outerName, out var l2) ? l2 : string.Empty);
-                j = k;
-            }
-            // Array indexing: %Bags(0) splits the pipe-delimited value and
-            // returns the element at that index (0-based). The index itself
-            // may already have been substituted (e.g. %Bags(%BagLoop)).
-            if (j < text.Length && text[j] == '(')
-            {
-                int close = text.IndexOf(')', j + 1);
-                if (close > j)
-                {
-                    var idxRaw = text[(j + 1)..close].Trim();
-                    // The index may itself contain %vars (e.g. %Bags(%BagLoop)),
-                    // so substitute before parsing as an integer.
-                    var idxStr = SubstituteVars(idxRaw, inst);
-                    if (int.TryParse(idxStr, NumberStyles.Integer,
-                                     CultureInfo.InvariantCulture, out var arrIdx))
-                    {
-                        var parts = value.Split('|');
-                        value = arrIdx >= 0 && arrIdx < parts.Length
-                            ? parts[arrIdx]
-                            : string.Empty;
-                    }
-                    j = close + 1;
-                }
-            }
-            sb.Append(value);
-            i = j - 1;
+        // Genie 4 parity (Script.cs ParseVariables): scan RIGHT-TO-LEFT so nested
+        // / stacked variables resolve inside-out (#128). A trailing var becomes
+        // part of the name to its left before that outer sigil is looked up:
+        //   • with counter=1 and harness1 set, "%harness%counter" resolves
+        //     %counter→"1" first, forming "%harness1", then resolves that;
+        //   • "$%output" (output="var1") resolves %output→"var1" first, forming
+        //     "$var1", then resolves it.
+        // This also yields the "%%name"/"$$name" double-eval for free — the inner
+        // %name resolves, then the outer % reads the produced name — matching
+        // Genie 4 without a special case. Values inserted by a resolution are
+        // never re-triggered as new sigils: the scan only moves LEFT into the
+        // untouched prefix, so positions ≥ p are read only as name content, and a
+        // resolved value that itself contains % or $ stays literal (also Genie 4).
+        var s = text;
+        for (int p = s.Length - 1; p >= 0; p--)
+        {
+            char c = s[p];
+            if (c != '%' && c != '$') continue;
+            var (value, end) = ResolveTokenAt(s, p, c, inst);
+            if (end != p + 1 || value != c.ToString())
+                s = s.Substring(0, p) + value + s.Substring(end);
         }
-        return sb.ToString();
+        return s;
+    }
+
+    /// <summary>
+    /// Resolve the single <c>%</c>/<c>$</c> variable token that begins at
+    /// <paramref name="p"/> in <paramref name="s"/>. Returns the substituted
+    /// value and the index just past the consumed token (name plus any array
+    /// index). An unresolved name yields an empty value (this engine's Genie 4
+    /// undefined-var policy) while still consuming the full name so it isn't
+    /// reconsidered. A bare sigil with no name returns the sigil unchanged.
+    /// Called by the right-to-left driver in <see cref="SubstituteVars"/>.
+    /// </summary>
+    private (string value, int end) ResolveTokenAt(string s, int p, char c, ScriptInstance inst)
+    {
+        int nameStart = p + 1;
+        int j = nameStart;
+        // Variable names allow letters, digits, _, . and - (the shrink-search
+        // below trims '.'/'-' suffixes that aren't part of a defined name).
+        while (j < s.Length &&
+               (char.IsLetterOrDigit(s[j]) || s[j] == '_' || s[j] == '.' || s[j] == '-'))
+            j++;
+        if (j == nameStart) return (c.ToString(), nameStart);   // bare sigil — leave literal
+
+        // Genie 4 parity: shrink the candidate from the right until a defined
+        // var is found. So `%caravan-there` resolves the full name when it
+        // exists, but `%count-1` falls back to `%count` followed by literal
+        // "-1" when only `count` is defined. If nothing resolves, the full
+        // candidate is consumed and substituted as empty.
+        int nameEnd = j;
+        string value = string.Empty;
+        bool resolved = false;
+        while (nameEnd > nameStart)
+        {
+            var name = s[nameStart..nameEnd];
+            if (TryResolveVar(name, c, inst, out value)) { resolved = true; break; }
+            nameEnd--;
+        }
+        if (!resolved) { value = string.Empty; nameEnd = j; }
+
+        // Array indexing: %Bags(0) splits the pipe-delimited value and returns
+        // the element at that index (0-based). The index may itself hold vars
+        // (e.g. %Bags(%BagLoop)) — already resolved by the right-to-left pass,
+        // but substitute again defensively.
+        if (nameEnd < s.Length && s[nameEnd] == '(')
+        {
+            int close = s.IndexOf(')', nameEnd + 1);
+            if (close > nameEnd)
+            {
+                var idxStr = SubstituteVars(s[(nameEnd + 1)..close].Trim(), inst);
+                if (int.TryParse(idxStr, NumberStyles.Integer,
+                                 CultureInfo.InvariantCulture, out var arrIdx))
+                {
+                    var parts = value.Split('|');
+                    value = arrIdx >= 0 && arrIdx < parts.Length ? parts[arrIdx] : string.Empty;
+                }
+                nameEnd = close + 1;
+            }
+        }
+        return (value, nameEnd);
     }
 
     /// <summary>

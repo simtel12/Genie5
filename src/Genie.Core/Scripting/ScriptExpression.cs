@@ -24,16 +24,19 @@ internal sealed class ScriptExpression
     private readonly string                       _src;
     private readonly ScriptInstance               _inst;
     private readonly IDictionary<string, string>? _globals;
+    private readonly Func<string, string?>?       _userVars;
     private int _pos;
 
     private ScriptExpression(string src, ScriptInstance inst,
-                              IDictionary<string, string>? globals)
-    { _src = src; _inst = inst; _globals = globals; }
+                              IDictionary<string, string>? globals,
+                              Func<string, string?>? userVars)
+    { _src = src; _inst = inst; _globals = globals; _userVars = userVars; }
 
     public static object Eval(string src, ScriptInstance inst,
-                               IDictionary<string, string>? globals = null)
+                               IDictionary<string, string>? globals = null,
+                               Func<string, string?>? userVars = null)
     {
-        var p = new ScriptExpression(src, inst, globals);
+        var p = new ScriptExpression(src, inst, globals, userVars);
         var v = p.ParseOr();
         p.SkipWs();
         if (p._pos < p._src.Length)
@@ -42,12 +45,14 @@ internal sealed class ScriptExpression
     }
 
     public static bool   EvalBool(string src, ScriptInstance inst,
-                                    IDictionary<string, string>? globals = null)
-        => ToBool(Eval(src, inst, globals));
+                                    IDictionary<string, string>? globals = null,
+                                    Func<string, string?>? userVars = null)
+        => ToBool(Eval(src, inst, globals, userVars));
 
     public static string EvalString(string src, ScriptInstance inst,
-                                      IDictionary<string, string>? globals = null)
-        => ToStr(Eval(src, inst, globals));
+                                      IDictionary<string, string>? globals = null,
+                                      Func<string, string?>? userVars = null)
+        => ToStr(Eval(src, inst, globals, userVars));
 
     // ── Coercion ────────────────────────────────────────────────────────────
 
@@ -441,15 +446,20 @@ internal sealed class ScriptExpression
             case "defined":   // Genie4 alias of def
             case "def":
             {
-                // def(Name) — true if Name exists as a global or local var and
-                // has a non-empty value. Genie4 scripts use this for guards
-                // like:  if !def(Athletics.Ranks) then ...
+                // def(Name) — true if Name EXISTS as a variable, regardless of
+                // value. Genie 4 (Eval.cs) checks m_oGlobals.VariableList
+                // .ContainsKey(name), so a var set to "" still counts — this is
+                // exactly how scripts tell "set empty" from "never set". Match
+                // that existence semantics across all three stores Genie 5 keeps
+                // a name in: script locals (%vars), live-state globals, and the
+                // persistent #var store (the one `#var testvar foo` writes to,
+                // reached via UserVarLookup — #129: it was omitted here, so
+                // def(testvar) returned false even though $testvar resolved).
                 var n = A(0);
                 if (string.IsNullOrEmpty(n)) return false;
-                if (_globals != null && _globals.TryGetValue(n, out var gv) && !string.IsNullOrEmpty(gv))
-                    return true;
-                if (_inst.Vars.TryGetValue(n, out var lv) && !string.IsNullOrEmpty(lv))
-                    return true;
+                if (_inst.Vars.ContainsKey(n)) return true;
+                if (_globals != null && _globals.ContainsKey(n)) return true;
+                if (_userVars?.Invoke(n) is not null) return true;
                 return false;
             }
             case "abs": return Math.Abs(N(0));

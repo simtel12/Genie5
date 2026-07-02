@@ -47,8 +47,8 @@ public class ScriptExpressionTests
     [InlineData("contains(\"hello\",\"ell\")",      true)]
     // defined alias of def
     [InlineData("defined(foo)",   true)]
-    [InlineData("defined(empty)", false)]   // empty value ⇒ not defined
-    [InlineData("defined(nope)",  false)]
+    [InlineData("defined(empty)", true)]    // #129: EXISTS (even set to "") ⇒ defined (Genie 4 ContainsKey)
+    [InlineData("defined(nope)",  false)]   // never set ⇒ not defined
     [InlineData("def(foo)",       true)]
     // Group B: string predicates are case-SENSITIVE (Genie 4 parity)
     [InlineData("contains(\"Hello\",\"hello\")", false)]   // case mismatch ⇒ no match
