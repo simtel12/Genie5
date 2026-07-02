@@ -19,7 +19,7 @@ public sealed class PresetEngine
         Set("speech",           "Lime");
         Set("whispers",         "Magenta");
         Set("thoughts",         "Cyan");
-        Set("creatures",        "Crimson");
+        Set("creatures",        "Gold");      // MonsterBold (#131) — bright gold, Wrayth/Genie 3-4 look
         Set("familiar",         "PaleGreen");
         Set("inputuser",        "Yellow");
         Set("inputother",       "GreenYellow");

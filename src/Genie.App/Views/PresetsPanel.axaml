@@ -2,11 +2,20 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Genie.App.Views.PresetsPanel">
 
-  <!-- Top: preset list. Bottom: editor pane. -->
-  <Grid RowDefinitions="*,Auto" Margin="6">
+  <!-- Top: MonsterBold toggle. Middle: preset list. Bottom: editor pane. -->
+  <Grid RowDefinitions="Auto,*,Auto" Margin="6">
+
+    <!-- #131 MonsterBold: one global on/off. When on, DR's <pushBold> creature
+         names + combat hits render bold in the 'creatures' preset colour, in
+         every window that shows them (main, stream windows, Room panel). Edit
+         the colour via the 'creatures' row below. -->
+    <CheckBox Name="MonsterBoldCheck" Grid.Row="0"
+              Content="MonsterBold — bold creatures (uses the 'creatures' colour) in every window"
+              Margin="0,0,0,6"
+              IsCheckedChanged="OnMonsterBoldToggled"/>
 
     <DataGrid Name="PresetList"
-              Grid.Row="0"
+              Grid.Row="1"
               Margin="0,0,0,6"
               IsReadOnly="True"
               SelectionMode="Single"
@@ -35,7 +44,7 @@
       </DataGrid.Columns>
     </DataGrid>
 
-    <Grid Grid.Row="1"
+    <Grid Grid.Row="2"
           ColumnDefinitions="Auto,*,Auto,Auto"
           RowDefinitions="Auto,Auto,Auto,Auto,Auto"
           Margin="0,4,0,0">

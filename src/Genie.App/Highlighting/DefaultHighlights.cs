@@ -70,6 +70,16 @@ public static class DefaultHighlights
     /// </summary>
     public static bool LinksEnabled = true;
 
+    /// <summary>
+    /// MonsterBold (#131). When true, DR's &lt;pushBold&gt; spans (creature names,
+    /// combat hits) render bold + the <c>creatures</c> preset colour; when false
+    /// they render as plain text. Mirrors <see cref="Genie.Core.Config.GenieConfig.MonsterBold"/>
+    /// — set at connect (like <see cref="LinksEnabled"/>) and live from the
+    /// Presets panel's MonsterBold checkbox. Gates the per-char bold mask below,
+    /// so the whole effect (weight + colour) toggles from this one flag.
+    /// </summary>
+    public static bool MonsterBoldEnabled = true;
+
     // ── Patterns (ordered: earlier rules win on overlap) ──────────────────────
 
     private static readonly (Regex Pattern, IBrush Brush)[] Rules =
@@ -169,7 +179,7 @@ public static class DefaultHighlights
         // partly-bold colored phrase emits two runs with the same brush
         // but different FontWeight.
         var bolds = new bool[text.Length];
-        if (boldSpans is { Count: > 0 })
+        if (MonsterBoldEnabled && boldSpans is { Count: > 0 })
         {
             foreach (var span in boldSpans)
             {
@@ -224,6 +234,24 @@ public static class DefaultHighlights
                 metrics.Time(PipelineStage.Highlights, ApplyUserHighlights);
             else
                 ApplyUserHighlights();
+        }
+
+        // ── MonsterBold (#131) ───────────────────────────────────────────
+        // DR emphasises creature/NPC names and incoming combat hits with
+        // <pushBold>…</pushBold>; Wrayth and Genie 3/4 render that "monster
+        // bold" in a distinct COLOUR, not just heavier weight. Colour every
+        // bold char with the `creatures` preset foreground so pushBold text
+        // pops out of a busy scroll. Applied BEFORE the preset-span base layer
+        // so a creature inside a room description still shows monster-bold, but
+        // AFTER user/built-in highlights so those win (??=). On by default
+        // (creatures = Crimson); set the `creatures` preset to Default in the
+        // Presets panel to fall back to weight-only bold — i.e. colour off.
+        if (boldSpans is { Count: > 0 } && PresetEngine is { } mbPresets)
+        {
+            var mbBrush = GetUserBrush(mbPresets.GetForeground("creatures"));
+            if (mbBrush is not null)
+                for (int i = 0; i < bolds.Length; i++)
+                    if (bolds[i]) brushes[i] ??= mbBrush;
         }
 
         // ── Preset colours (base layer) ──────────────────────────────────

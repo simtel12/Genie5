@@ -2604,6 +2604,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // Honour ShowLinks + conndebug for this connect (both can change between
         // sessions via #config).
         Highlighting.DefaultHighlights.LinksEnabled = _core.Config.ShowLinks;
+        Highlighting.DefaultHighlights.MonsterBoldEnabled = _core.Config.MonsterBold;   // #131
         _core.ConnectionVerboseDiag = _core.Config.ConnDebug;
 
         await _core.ConnectAsync(coreCfg, reloadRules: reloadRules, clearPerCharacter: charSwitch);

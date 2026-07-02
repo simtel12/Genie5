@@ -3,6 +3,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Genie.App.Controls;
 using Genie.App.Highlighting;
+using Genie.Core.Config;
 using Genie.Core.Presets;
 
 namespace Genie.App.Views;
@@ -22,17 +23,45 @@ public partial class PresetsPanel : UserControl
 
     private PresetEngine? _engine;
     private Action?       _onChanged;
+    private GenieConfig?  _config;
+    private Action?       _onConfigChanged;
+    private bool          _suppressMonsterBold;   // guard the initial IsChecked set
 
     public PresetsPanel()
     {
         InitializeComponent();
     }
 
-    public void Initialize(PresetEngine engine, Action? onChanged = null)
+    public void Initialize(PresetEngine engine, Action? onChanged = null,
+                           GenieConfig? config = null, Action? onConfigChanged = null)
     {
-        _engine    = engine;
-        _onChanged = onChanged;
+        _engine          = engine;
+        _onChanged       = onChanged;
+        _config          = config;
+        _onConfigChanged = onConfigChanged;
+
+        // #131 MonsterBold on/off. Reflect the persisted setting without firing
+        // the change handler (which would re-persist + re-render on load). The
+        // control disables itself pre-connect, when there's no config to bind.
+        _suppressMonsterBold = true;
+        MonsterBoldCheck.IsChecked   = config?.MonsterBold ?? true;
+        MonsterBoldCheck.IsEnabled   = config is not null;
+        _suppressMonsterBold = false;
+
         Refresh();
+    }
+
+    /// <summary>#131: flip MonsterBold live. Updates the persisted config, the
+    /// renderer's live flag, saves settings.cfg, and repaints visible lines so
+    /// the change is immediate in every window (not just on next connect).</summary>
+    private void OnMonsterBoldToggled(object? sender, RoutedEventArgs e)
+    {
+        if (_suppressMonsterBold || _config is null) return;
+        var on = MonsterBoldCheck.IsChecked == true;
+        _config.MonsterBold                 = on;
+        DefaultHighlights.MonsterBoldEnabled = on;
+        _onConfigChanged?.Invoke();          // persist settings.cfg
+        UserHighlights.NotifyRulesChanged(); // repaint currently-visible lines
     }
 
     private void Refresh()

@@ -43,7 +43,9 @@ public partial class ConfigurationDialog : ReactiveWindow<ConfigurationViewModel
                 highlights, names, presets,
                 onHighlightsChanged: vm.OnHighlightsChanged,
                 onNamesChanged:      vm.OnHighlightsChanged,
-                onPresetsChanged:    vm.OnPresetsChanged);
+                onPresetsChanged:    vm.OnPresetsChanged,
+                config:              vm.ScriptConfig,          // #131 MonsterBold toggle
+                onConfigChanged:     vm.OnScriptSettingsChanged);
         }
 
         if (vm.TriggerEngine    is { } triggers)    TriggersPanelCtrl   .Initialize(triggers,    vm.OnTriggersChanged);

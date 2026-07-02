@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Genie.Core.Config;
 using Genie.Core.Highlights;
 using Genie.Core.Presets;
 
@@ -19,10 +20,12 @@ public partial class HighlightsPanel : UserControl
         PresetEngine        presets,
         Action?             onHighlightsChanged = null,
         Action?             onNamesChanged      = null,
-        Action?             onPresetsChanged    = null)
+        Action?             onPresetsChanged    = null,
+        GenieConfig?        config              = null,
+        Action?             onConfigChanged     = null)
     {
         StringsPanelCtrl.Initialize(highlights, onHighlightsChanged);
         NamesPanelCtrl  .Initialize(names,      onNamesChanged);
-        PresetsPanelCtrl.Initialize(presets,    onPresetsChanged);
+        PresetsPanelCtrl.Initialize(presets,    onPresetsChanged, config, onConfigChanged);
     }
 }

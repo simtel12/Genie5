@@ -76,6 +76,10 @@ public sealed class GenieConfig
     public int AutoWalkUnfocusSeconds { get; set; } = 60;
     public double RoundTimeOffset { get; set; }
     public bool ShowLinks { get; set; } = true;
+    /// <summary>MonsterBold (#131): render DR's &lt;pushBold&gt; creature names /
+    /// combat hits in bold + the <c>creatures</c> preset colour, in every window
+    /// that shows them. On by default (Wrayth / Genie 3-4 parity).</summary>
+    public bool MonsterBold { get; set; } = true;
     public bool ShowImages { get; set; } = true;
     public bool WebLinkSafety { get; set; } = true;
     public bool SizeInputToGame { get; set; }
@@ -297,6 +301,7 @@ public sealed class GenieConfig
         ("autowalkpauseonunfocus", AutoWalkPauseOnUnfocus.ToString()),
         ("autowalkunfocusseconds", AutoWalkUnfocusSeconds.ToString()),
         ("showlinks", ShowLinks.ToString()),
+        ("monsterbold", MonsterBold.ToString()),
         ("showimages", ShowImages.ToString()),
         ("weblinksafety", WebLinkSafety.ToString()),
         ("connectscript", ConnectScript),
@@ -393,6 +398,7 @@ public sealed class GenieConfig
                 case "automapperalpha": AutoMapperAlpha = ClampAlpha(value); Notify(ConfigFieldUpdated.AutoMapper); break;
                 case "conndebug": ConnDebug = ToBool(value); break;
                 case "showlinks": ShowLinks = ToBool(value); break;
+                case "monsterbold": MonsterBold = ToBool(value); break;
                 case "showimages": ShowImages = ToBool(value); Notify(ConfigFieldUpdated.ImagesEnabled); break;
                 case "sizeinputtogame": SizeInputToGame = ToBool(value); Notify(ConfigFieldUpdated.SizeInputToGame); break;
                 case "updatemapperscripts": UpdateMapperScripts = ToBool(value); Notify(ConfigFieldUpdated.UpdateMapperScripts); break;
