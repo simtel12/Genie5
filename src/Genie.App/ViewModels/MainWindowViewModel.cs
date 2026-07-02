@@ -1102,6 +1102,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             if (Display.WindowedMode)
                 _mdiBoundsCache = factory.CaptureMdiBounds();
             Display.WindowedMode = !Display.WindowedMode;
+            // Close any floating windows on the outgoing root so a floated tool
+            // (e.g. the Mapper) doesn't survive the tree swap as an orphan next
+            // to its rebuilt copy — same duplicate-window guard as ApplyLayout.
+            factory.CloseFloatingWindows();
             DockLayout = Display.WindowedMode
                 ? factory.BuildMdiLayout(_mdiBoundsCache)
                 : factory.BuildDefaultLayout();
@@ -3551,6 +3555,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
         if (DockFactory is Docking.GenieDockFactory factory)
         {
+            // Tear down any floating HostWindows on the OUTGOING root first.
+            // Swapping in a rebuilt tree below doesn't close them (Dock only
+            // owns windows via the live root), so a floated tool — e.g. the
+            // Mapper, which the default layout floats — would otherwise linger
+            // as an orphaned window beside the freshly-floated copy (duplicate
+            // travel window on Reset to Default Layout).
+            factory.CloseFloatingWindows();
+
             if (layout.WindowedMode)
             {
                 // Windowed (MDI): the dock-tree snapshot doesn't capture MDI

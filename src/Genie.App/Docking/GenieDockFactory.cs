@@ -1253,6 +1253,25 @@ public class GenieDockFactory : Factory
     }
 
     /// <summary>
+    /// Close every floating <see cref="IDockWindow"/> currently attached to the
+    /// root. Swapping a freshly-built tree onto the DockControl does NOT tear
+    /// down the old root's HostWindows — Dock.Avalonia only owns windows via the
+    /// live root's <see cref="IRootDock.Windows"/> collection, so any tool that
+    /// was floated (the out-of-box default floats the Mapper) survives the swap
+    /// as an orphaned OS window while the rebuilt tree floats its own copy —
+    /// the duplicate-Mapper bug on Reset to Default Layout. Callers invoke this
+    /// against the CURRENT root immediately before building the replacement.
+    /// </summary>
+    public void CloseFloatingWindows()
+    {
+        if (_root?.Windows is not { } windows) return;
+        // Exit() removes the window from the collection as it closes, so iterate
+        // a snapshot to avoid mutating-while-enumerating.
+        foreach (var w in windows.ToList())
+            w.Exit();
+    }
+
+    /// <summary>
     /// True if the tool is currently in one of the root's floating
     /// <see cref="IRootDock.Windows"/> (as opposed to docked in the main
     /// layout). Drives the Window menu's "Float" ⇄ "Re-dock" verb and routes

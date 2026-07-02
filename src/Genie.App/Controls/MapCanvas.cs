@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.VisualTree;
+using Genie.App.Docking;
 using Genie.Core.Mapper;
 
 namespace Genie.App.Controls;
@@ -243,11 +244,24 @@ public class MapCanvas : Control
     private Point         _panLast;    // last pointer pos in ScrollViewer coords
     private ScrollViewer? _scroller;   // cached parent scroll viewer
 
+    // The context menu we opened last, so a fresh right-click can dismiss it
+    // before opening a new one. We build a new ContextMenu per click and open it
+    // imperatively; because the right-click is Handled, Avalonia's light-dismiss
+    // doesn't always close the previous menu, leaving two stacked. Track + close.
+    private ContextMenu? _openMenu;
+
     public MapCanvas()
     {
         // Focusable so the Delete key reaches OnKeyDown when the canvas has
         // focus (we Focus() on pointer-press in edit mode).
         Focusable = true;
+
+        // The map surface owns a single unified right-click menu (built in
+        // OnPointerPressed, folding in the window-level Float/Close actions).
+        // Swallow ContextRequested so the dock chrome's separate per-window menu
+        // never opens alongside ours. ContextRequested is a routed event, not a
+        // virtual override, so we subscribe rather than override.
+        ContextRequested += OnContextRequested;
     }
 
     static MapCanvas()
@@ -514,11 +528,12 @@ public class MapCanvas : Control
         // menu needs the MapNode reference captured at click time.
         if (props.IsRightButtonPressed)
         {
-            var pt   = e.GetPosition(this);
-            var node = HitTest(pt);
-            if (node is null) return;
-
-            ShowNodeContextMenu(node);
+            // Always open the unified menu. Node actions (Go Here / Copy Room ID
+            // / Edit Exit) grey out when the click missed a room; the window
+            // actions (Float / Close) are always live. The dock chrome's own
+            // menu is suppressed in OnContextRequested so only this one shows.
+            var node = HitTest(e.GetPosition(this));
+            ShowContextMenu(node);
             e.Handled = true;
             return;
         }
@@ -586,6 +601,27 @@ public class MapCanvas : Control
             BeginPan(e);
             e.Handled = true;
         }
+    }
+
+    /// <summary>
+    /// Suppress the dock chrome's per-window context menu (Float / Close Window)
+    /// when a right-click lands on a room node — otherwise BOTH menus open on the
+    /// same click. Our node menu is built imperatively in
+    /// <see cref="OnPointerPressed"/> and opened with <c>menu.Open(this)</c>;
+    /// that path does NOT consume Avalonia's separate <c>ContextRequested</c>
+    /// routed event, so without this override the event bubbles to the wrapping
+    /// ContentControl (ToolControlCachedSkin.axaml) and its ContextMenu opens too.
+    /// Marking the event handled here stops that second menu. When the click
+    /// misses every node we leave it unhandled, so right-clicking empty map space
+    /// still surfaces the chrome's Float / Close Window menu.
+    /// </summary>
+    private void OnContextRequested(object? sender, ContextRequestedEventArgs e)
+    {
+        // The map builds one combined menu in OnPointerPressed (room actions +
+        // the window Float/Close actions). Unconditionally swallow this event so
+        // the dock chrome's separate per-window menu never opens over the map —
+        // one menu, not two.
+        e.Handled = true;
     }
 
     /// <summary>Start a grab-scroll pan: cache the parent ScrollViewer and the
@@ -681,90 +717,138 @@ public class MapCanvas : Control
     }
 
     /// <summary>
-    /// Builds and opens a fresh <see cref="ContextMenu"/> for the given
-    /// node. Items: Go Here (walks the path; the same command used by the
-    /// pre-context-menu right-click), Copy Room ID (writes
-    /// <c>#&lt;serverId&gt;</c> to the clipboard so the user can paste it
-    /// into scripts or aliases), and a non-clickable header that confirms
-    /// which room the menu is acting on.
+    /// Builds and opens the map's single unified right-click <see cref="ContextMenu"/>.
+    /// The menu shape is constant so it's predictable: a header, the room actions
+    /// (Go Here / Copy Room ID / Edit Exit ▶), and the window actions
+    /// (Float&#8239;/&#8239;Re-dock and Close Window, folded in from the hosting
+    /// dockable's <see cref="WindowMenuModel"/> — the same model the dock chrome
+    /// uses). Room actions <b>grey out</b> when <paramref name="node"/> is null
+    /// (the click missed a room) rather than disappearing, so there's never a
+    /// second menu and the user always sees every option.
     /// </summary>
-    private void ShowNodeContextMenu(MapNode node)
+    private void ShowContextMenu(MapNode? node)
     {
-        // Header: shows the room title + ID so the user can sanity-check
-        // which node they hit. IsHitTestVisible=false prevents it being
-        // selectable; FontWeight=Bold visually marks it as a header.
-        var title = string.IsNullOrWhiteSpace(node.Title) ? "(unnamed room)" : node.Title;
-        var serverId = !string.IsNullOrEmpty(node.ServerRoomId) ? $"  #{node.ServerRoomId}" : "";
-        var header = new MenuItem
-        {
-            Header           = title + serverId,
-            IsHitTestVisible = false,
-            FontWeight       = FontWeight.Bold
-        };
+        var items = new List<Control>();
 
-        var goHere = new MenuItem { Header = "Go Here" };
-        goHere.Click += (_, _) =>
-        {
-            if (NodeClickedCommand?.CanExecute(node) == true)
-                NodeClickedCommand.Execute(node);
-        };
+        // Header: the room this menu acts on, or a placeholder when the click
+        // missed every room. IsHitTestVisible=false makes it a non-selectable
+        // label; FontWeight=Bold marks it as a header.
+        var headerText = node is null
+            ? "(no room here)"
+            : (string.IsNullOrWhiteSpace(node.Title) ? "(unnamed room)" : node.Title)
+              + (!string.IsNullOrEmpty(node.ServerRoomId) ? $"  #{node.ServerRoomId}" : "");
+        items.Add(new MenuItem { Header = headerText, IsHitTestVisible = false, FontWeight = FontWeight.Bold });
+        items.Add(new Separator());
 
-        var copyId = new MenuItem { Header = "Copy Room ID" };
-        copyId.Click += async (_, _) =>
+        // --- Room actions — enabled only when a room was actually hit. ---
+        var goHere = new MenuItem
         {
-            var idText = !string.IsNullOrEmpty(node.ServerRoomId)
-                ? $"#{node.ServerRoomId}"
-                : node.Id.ToString();
-            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-            if (clipboard is not null)
-                await clipboard.SetTextAsync(idText);
+            Header    = "Go Here",
+            IsEnabled = node is not null && NodeClickedCommand?.CanExecute(node) == true
         };
+        if (node is not null)
+            goHere.Click += (_, _) =>
+            {
+                if (NodeClickedCommand?.CanExecute(node) == true)
+                    NodeClickedCommand.Execute(node);
+            };
+        items.Add(goHere);
+
+        var copyId = new MenuItem { Header = "Copy Room ID", IsEnabled = node is not null };
+        if (node is not null)
+            copyId.Click += async (_, _) =>
+            {
+                var idText = !string.IsNullOrEmpty(node.ServerRoomId)
+                    ? $"#{node.ServerRoomId}"
+                    : node.Id.ToString();
+                var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+                if (clipboard is not null)
+                    await clipboard.SetTextAsync(idText);
+            };
+        items.Add(copyId);
 
         // "Set Waypoint" / "Show Path" are deferred — they need pathfinding
-        // surface area on MapperViewModel that isn't shipped yet. Leaving
-        // them here as commented-out scaffolds so it's obvious where the
-        // next iteration extends the menu.
+        // surface area on MapperViewModel that isn't shipped yet.
         // var setWaypoint = new MenuItem { Header = "Set as Waypoint" };
         // var showPath    = new MenuItem { Header = "Show Path"      };
 
-        // Edit Exit ▶ {verb} submenu — one item per exit on this node.
-        // The exit verb is shown so the user can pick which arc to edit
-        // (rooms with multiple exits like a junction get distinct items).
-        // Disabled when no EditExitCommand is wired (e.g. designer preview).
-        var editExitMenu = BuildEditExitSubmenu(node);
+        // Edit Exit ▶ {verb} submenu — one item per exit on the node. Off-node
+        // (or no exits / no command wired) it shows as a greyed stub so the menu
+        // shape stays constant.
+        items.Add((node is not null ? BuildEditExitSubmenu(node) : null)
+                  ?? new MenuItem { Header = "Edit Exit", IsEnabled = false });
 
-        var items = new List<Control>
-        {
-            header,
-            new Separator(),
-            goHere,
-            copyId,
-        };
-        if (editExitMenu is not null) items.Add(editExitMenu);
-
-        // Edit-mode-only: Remove Room. Mirrors the Delete key + the toolbar
-        // Remove button; the menu item makes it discoverable on right-click.
+        // Edit-mode-only: Remove Room. Greyed off-node. Mirrors the Delete key +
+        // the toolbar Remove button; the menu item makes it discoverable.
         if (EditMode && RemoveNodeCommand is not null)
         {
-            items.Add(new Separator());
-            var remove = new MenuItem { Header = "Remove Room", Foreground = new SolidColorBrush(Color.FromRgb(0xff, 0x99, 0x99)) };
-            remove.Click += (_, _) =>
+            var remove = new MenuItem
             {
-                if (RemoveNodeCommand?.CanExecute(node) == true)
-                {
-                    RemoveNodeCommand.Execute(node);
-                    if (SelectedNode?.Id == node.Id) SelectedNode = null;
-                }
+                Header     = "Remove Room",
+                IsEnabled  = node is not null,
+                Foreground = new SolidColorBrush(Color.FromRgb(0xff, 0x99, 0x99))
             };
+            if (node is not null)
+                remove.Click += (_, _) =>
+                {
+                    if (RemoveNodeCommand?.CanExecute(node) == true)
+                    {
+                        RemoveNodeCommand.Execute(node);
+                        if (SelectedNode?.Id == node.Id) SelectedNode = null;
+                    }
+                };
             items.Add(remove);
         }
 
+        // --- Window actions — Float/Re-dock + Close Window, pulled from the same
+        // WindowMenuModel the dock chrome binds to, so behaviour is identical;
+        // they just live in this one menu now instead of a second one. ---
+        var wm = FindWindowMenu();
+        if (wm is not null)
+        {
+            var windowItems = new List<Control>();
+            if (wm.ShowFloat && wm.ToggleFloatCommand is not null)
+            {
+                wm.RefreshFloatState();   // pick the correct "Float" vs "Re-dock" verb
+                windowItems.Add(new MenuItem { Header = wm.FloatHeader, Command = wm.ToggleFloatCommand });
+            }
+            if (wm.ShowClose && wm.CloseCommand is not null)
+                windowItems.Add(new MenuItem { Header = "Close Window", Command = wm.CloseCommand });
+
+            if (windowItems.Count > 0)
+            {
+                items.Add(new Separator());
+                items.AddRange(windowItems);
+            }
+        }
+
+        // Dismiss any menu still open from a previous right-click before showing
+        // the new one — otherwise two (or more) stack up, since our Handled
+        // right-click suppresses the light-dismiss that would normally close it.
+        _openMenu?.Close();
+
         var menu = new ContextMenu { ItemsSource = items };
+        _openMenu = menu;
+        menu.Closed += (_, _) => { if (ReferenceEquals(_openMenu, menu)) _openMenu = null; };
 
         // Show the menu programmatically. Avalonia's ContextMenu.Open()
         // opens it next to the placement target's cursor position by
         // default; passing `this` anchors it to the canvas.
         menu.Open(this);
+    }
+
+    /// <summary>
+    /// Walk the visual tree to the hosting dockable's <see cref="WindowMenuModel"/>
+    /// — the same model the dock chrome binds Float / Close to. Lets the map fold
+    /// those window-level actions into its own single context menu. Returns null
+    /// when the canvas isn't hosted in a dockable (e.g. designer preview).
+    /// </summary>
+    private WindowMenuModel? FindWindowMenu()
+    {
+        foreach (var ancestor in this.GetVisualAncestors())
+            if (ancestor is Control { DataContext: IWindowMenuHost { WindowMenu: { } wm } })
+                return wm;
+        return null;
     }
 
     /// <summary>
