@@ -1,3 +1,29 @@
+# Genie 5 — v5.0.0-alpha.7.10
+
+An Experience-window density control, Active Spells promoted to a proper window,
+and a tidier `#config list`.
+
+> **Alpha software.** Builds are **unsigned** for most platforms — Windows
+> SmartScreen will warn on first launch (More info → Run anyway). Signing is
+> tracked in #33.
+
+## ✨ New
+
+- **Experience density slider (#125)** — the Experience panel now has a **Density**
+  slider that condenses each skill line to taste: **Full → No count → Numbers
+  only → Short names → Brief**. The slider, the `#config experiencedensity`
+  command, and `settings.cfg` all drive the one setting, and dragging re-renders
+  the panel live without spamming the Game window.
+- **Active Spells window (#112)** — Active Spells is now a first-class dock tool:
+  it no longer springs back open after you close it, and it carries the standard
+  window decorations in windowed / MDI mode.
+
+## 🔧 Improved
+
+- **`#config list` grouped by category** — the settings dump is now organised into
+  labelled sections instead of one flat wall of keys, so related options sit
+  together.
+
 # Genie 5 — v5.0.0-alpha.7.9
 
 A scripting-parity and readability release — three Genie 4 script-language fixes

@@ -4,7 +4,19 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.7.9 — Scripting Parity & MonsterBold
+## Latest: v5.0.0-alpha.7.10 — Experience Density & Active Spells
+
+An Experience-window **Density** slider, Active Spells promoted to a proper window, and a `#config list` grouped by category.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.7.10** as a delta.
+
+- **Experience density slider** — condense each skill line from **Full** down to **Brief** (Full / No count / Numbers only / Short names / Brief); the slider, `#config experiencedensity`, and `settings.cfg` all drive one setting ([#125](https://github.com/GenieClient/Genie5/issues/125)).
+- **Active Spells window** — now a first-class dock tool: it stays closed when you close it and carries the standard window decorations in windowed mode ([#112](https://github.com/GenieClient/Genie5/issues/112)).
+- **`#config list` grouped by category** — the settings dump is organised into labelled sections instead of one flat list.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.7.10)
+
+## v5.0.0-alpha.7.9 — Scripting Parity & MonsterBold
 
 Three Genie 4 script-language fixes from community reports, a `#goto` combat-retreat fix, and **MonsterBold** — DR's creature and NPC names now stand out in colour.
 
