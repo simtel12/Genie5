@@ -1,3 +1,48 @@
+# Genie 5 — v5.0.0-alpha.7.11
+
+Menu-script windows arrive — the Genie 4 named-window command family (`#log`,
+`#link`, `#clear`, `#window`) — plus directed-echo routing fixes from a
+community report, MonsterBold in the Room panel, and filter boxes on the
+Configuration panels.
+
+> **Alpha software.** Builds are **unsigned** for most platforms — Windows
+> SmartScreen will warn on first launch (More info → Run anyway). Signing is
+> tracked in #33.
+
+## ✨ New
+
+- **Named-window commands** — the Genie 4 menu-script toolkit now works:
+  `#window add|open|show|close|hide|remove|clear "Name"` manages script-created
+  dock windows, `#link [>window] {text} {command}` renders a clickable line that
+  runs its command when clicked, `#clear [>window]` wipes a window in place, and
+  `#log [>file] text` appends to a log file under your Logs directory (the bare
+  form targets the per-character daily log, banner and all). Classic Genie 4
+  menu scripts like `mm_train` run as-is.
+- **MonsterBold in the Room panel** — the room objects line now golds creature
+  and NPC names the same way the game and stream windows do, honouring the
+  MonsterBold toggle and the `creatures` preset colour.
+- **Configuration panel filters** — Aliases, Triggers, Highlight Strings,
+  Substitutes and Gags each get a type-to-filter box, so a several-hundred-line
+  trigger list is navigable again.
+- **Per-stream "Also show in Main"** — each stream window (Combat, Talk,
+  Whispers, …) has a Layout-tab toggle to additionally echo its lines into the
+  main game window, Genie 4-style.
+- **Script Bar debug readout** — each running-script chip shows the script's
+  live `#debug` trace level (`dbg:N`).
+
+## 🐛 Fixed
+
+- **`#echo >Main` no longer vanishes** — echoing to `Main`/`Game` or to a
+  built-in stream window (`>Combat`, `>Talk`, `>Thoughts`, …) now reaches that
+  window; previously only `>Log`/`>ItemLog` worked and everything else was
+  silently dropped. Colours are honoured, and non-text panels (`>Mapper`,
+  `>Vitals`, …) fall back to Main instead of eating the text.
+- **Junk `>Log` window** — an `#echo` target variable whose value already
+  carried a chevron (`var w >Log` + `#echo >$w …`) manufactured a window
+  literally named `>Log`; extra chevrons are now trimmed so it lands in Log.
+- **Raw XML window font** — the Raw XML panel now honours the Layout-tab font
+  instead of a hardcoded one.
+
 # Genie 5 — v5.0.0-alpha.7.10
 
 An Experience-window density control, Active Spells promoted to a proper window,

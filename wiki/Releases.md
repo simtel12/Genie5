@@ -4,7 +4,21 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.7.10 — Experience Density & Active Spells
+## Latest: v5.0.0-alpha.7.11 — Named Windows & Panel Filters
+
+The Genie 4 named-window command family (`#log`, `#link`, `#clear`, `#window`) so classic menu scripts run as-is, directed-echo routing fixes from a community report, MonsterBold in the Room panel, and type-to-filter boxes on the Configuration panels.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.7.11** as a delta.
+
+- **Named-window commands** — `#window add|open|close|remove "Name"`, clickable `#link` menu lines, `#clear >window`, and `#log` file logging: the Genie 4 menu-script toolkit (mm_train-style) now works.
+- **`#echo >Main` fixed** — directed echoes reach Main/Game and every built-in stream window instead of being silently dropped; only `>Log`/`>ItemLog` worked before. Stray chevrons in a target variable no longer manufacture a junk `>Log` window.
+- **MonsterBold in the Room panel** — the room objects line golds creatures like the game window does.
+- **Configuration panel filters** — type-to-filter boxes on Aliases, Triggers, Highlight Strings, Substitutes and Gags.
+- **Per-stream "Also show in Main"** — a Layout-tab toggle echoes a stream's lines into the main window too.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.7.11)
+
+## v5.0.0-alpha.7.10 — Experience Density & Active Spells
 
 An Experience-window **Density** slider, Active Spells promoted to a proper window, and a `#config list` grouped by category.
 
