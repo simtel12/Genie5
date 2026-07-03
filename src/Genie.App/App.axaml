@@ -229,7 +229,10 @@
                                IsVisible="{Binding ViewModel.Exits,   Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
           <SelectableTextBlock Text="{Binding ViewModel.Players}" Foreground="#8d8" FontSize="11" TextWrapping="Wrap"
                                IsVisible="{Binding ViewModel.Players, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-          <SelectableTextBlock Text="{Binding ViewModel.Objects}" Foreground="#aaa" FontSize="11" TextWrapping="Wrap"
+          <!-- #131: render room objects as inlines so <pushBold> creatures gold
+               via the MonsterBold path; Foreground is the default for the rest. -->
+          <SelectableTextBlock controls:InlinesBehavior.Source="{Binding ViewModel.ObjectsInlines}"
+                               Foreground="#aaa" FontSize="11" TextWrapping="Wrap"
                                IsVisible="{Binding ViewModel.Objects, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         </StackPanel>
         </ScrollViewer>

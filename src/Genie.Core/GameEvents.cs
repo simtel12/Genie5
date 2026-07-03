@@ -138,7 +138,8 @@ public sealed record CastTimeEvent(DateTimeOffset ExpiresAt) : GameEvent;
 public sealed record ComponentEvent(
     string ComponentId,
     string Content,
-    IReadOnlyList<string>? BoldNames = null) : GameEvent;
+    IReadOnlyList<string>? BoldNames = null,
+    IReadOnlyList<BoldSpan>? BoldSpans = null) : GameEvent;
 
 // ── Status indicators ────────────────────────────────────────────────────────
 

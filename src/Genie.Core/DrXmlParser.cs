@@ -1001,7 +1001,8 @@ public sealed class DrXmlParser : IDisposable
                 // the ignore list can match it). Decoded; positions index the
                 // same raw buffer the spans were recorded against.
                 IReadOnlyList<string>? boldNames = ExtractBoldPhrases(raw);
-                _events.OnNext(new ComponentEvent(id, content, boldNames));
+                IReadOnlyList<BoldSpan>? boldSpans = ExtractComponentBoldSpans(raw, content);
+                _events.OnNext(new ComponentEvent(id, content, boldNames, boldSpans));
                 _pendingComponentId = null;
                 _componentBuffer.Clear();
                 _componentBoldSpans.Clear();
@@ -1243,6 +1244,44 @@ public sealed class DrXmlParser : IDisposable
             if (phrase.Length > 0) phrases.Add(phrase);
         }
         return phrases.Count > 0 ? phrases : null;
+    }
+
+    /// <summary>
+    /// Bold ranges for a component's DISPLAY text (#131 Room-panel MonsterBold),
+    /// as character offsets into <paramref name="content"/> (the decoded/stripped
+    /// text the ComponentEvent carries). Unlike <see cref="ExtractBoldPhrases"/>
+    /// — which extends each phrase to the next comma/period for creature-counting
+    /// and so over-reaches ("a ship's rat and a poster") — this returns the EXACT
+    /// &lt;pushBold&gt; span. Each recorded bold range is a range in the raw
+    /// buffer; we decode that slice to the text as it appears in Content and find
+    /// it there (scanning forward so duplicate creatures map in order and any
+    /// tag/entity/trim shifts are absorbed). Consumed by RoomViewModel to render
+    /// creatures gold in the Room panel via the same Tokenize path as the streams.
+    /// </summary>
+    private IReadOnlyList<BoldSpan>? ExtractComponentBoldSpans(string raw, string content)
+    {
+        if (_componentBoldSpans.Count == 0 || content.Length == 0) return null;
+
+        // Buffer order (ascending start) so the forward scan below can't rematch
+        // an earlier duplicate; the recorded spans are flat for room objs but
+        // sorting keeps this correct if a component ever nests bold.
+        var ordered = _componentBoldSpans.OrderBy(s => s.Start);
+        var spans = new List<BoldSpan>(_componentBoldSpans.Count);
+        int searchFrom = 0;
+        foreach (var span in ordered)
+        {
+            var start = Math.Clamp(span.Start, 0, raw.Length);
+            var end   = Math.Clamp(span.Start + span.Length, start, raw.Length);
+            if (end <= start) continue;
+            var boldText = System.Net.WebUtility.HtmlDecode(raw[start..end]);
+            if (boldText.Length == 0) continue;
+            int at = content.IndexOf(boldText, Math.Min(searchFrom, content.Length),
+                                     System.StringComparison.Ordinal);
+            if (at < 0) continue;   // shouldn't happen — the bold text is a slice of the same source
+            spans.Add(new BoldSpan(at, boldText.Length));
+            searchFrom = at + boldText.Length;
+        }
+        return spans.Count > 0 ? spans : null;
     }
 
     /// <summary>
