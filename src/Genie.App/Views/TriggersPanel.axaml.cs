@@ -19,6 +19,7 @@ public partial class TriggersPanel : UserControl
 
     private TriggerEngineFinal? _engine;
     private Action?             _onChanged;
+    private string              _filter = string.Empty;
 
     public TriggersPanel() => InitializeComponent();
 
@@ -35,6 +36,7 @@ public partial class TriggersPanel : UserControl
         var keep = (ItemsList.SelectedItem as TriggerRow)?.Pattern;
         ItemsList.ItemsSource = _engine.Triggers
             .Select(t => new TriggerRow(t.IsEnabled ? "✓" : "✗", t.Pattern, t.Action, t.ClassName))
+            .Where(r => PanelFilterHelpers.Matches(_filter, r.Pattern, r.Action, r.ClassName))
             .ToList();
         if (keep is not null)
             ItemsList.SelectedItem = ((IEnumerable<TriggerRow>)ItemsList.ItemsSource)
@@ -100,6 +102,12 @@ public partial class TriggersPanel : UserControl
 
     private void OnAdd  (object? sender, RoutedEventArgs e) => ClearForm();
     private void OnClear(object? sender, RoutedEventArgs e) => ClearForm();
+
+    private void OnFilterChanged(object? sender, TextChangedEventArgs e)
+    {
+        _filter = FilterBox.Text ?? string.Empty;
+        Refresh();
+    }
 
     private async void OnImport(object? sender, RoutedEventArgs e)
     {

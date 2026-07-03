@@ -18,6 +18,7 @@ public partial class GagsPanel : UserControl
 
     private GagEngine? _engine;
     private Action?    _onChanged;
+    private string     _filter = string.Empty;
 
     public GagsPanel() => InitializeComponent();
 
@@ -34,6 +35,7 @@ public partial class GagsPanel : UserControl
         var keep = (ItemsList.SelectedItem as GagRow)?.Pattern;
         ItemsList.ItemsSource = _engine.Rules
             .Select(r => new GagRow(r.IsEnabled ? "✓" : "✗", r.Pattern, r.ClassName))
+            .Where(r => PanelFilterHelpers.Matches(_filter, r.Pattern, r.ClassName))
             .ToList();
         if (keep is not null)
             ItemsList.SelectedItem = ((IEnumerable<GagRow>)ItemsList.ItemsSource)
@@ -97,6 +99,12 @@ public partial class GagsPanel : UserControl
 
     private void OnAdd  (object? sender, RoutedEventArgs e) => ClearForm();
     private void OnClear(object? sender, RoutedEventArgs e) => ClearForm();
+
+    private void OnFilterChanged(object? sender, TextChangedEventArgs e)
+    {
+        _filter = FilterBox.Text ?? string.Empty;
+        Refresh();
+    }
 
     private async void OnImport(object? sender, RoutedEventArgs e)
     {

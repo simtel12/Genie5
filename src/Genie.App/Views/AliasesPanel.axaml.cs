@@ -18,6 +18,7 @@ public partial class AliasesPanel : UserControl
 
     private AliasEngine? _engine;
     private Action?      _onChanged;
+    private string       _filter = string.Empty;
 
     public AliasesPanel() => InitializeComponent();
 
@@ -34,6 +35,7 @@ public partial class AliasesPanel : UserControl
         var keep = (ItemsList.SelectedItem as AliasRow)?.Name;
         ItemsList.ItemsSource = _engine.Aliases
             .Select(a => new AliasRow(a.IsEnabled ? "✓" : "✗", a.Name, a.Expansion, a.IsEnabled))
+            .Where(r => PanelFilterHelpers.Matches(_filter, r.Name, r.Expansion))
             .ToList();
         if (keep is not null)
             ItemsList.SelectedItem = ((IEnumerable<AliasRow>)ItemsList.ItemsSource)
@@ -92,6 +94,12 @@ public partial class AliasesPanel : UserControl
 
     private void OnAdd  (object? sender, RoutedEventArgs e) => ClearForm();
     private void OnClear(object? sender, RoutedEventArgs e) => ClearForm();
+
+    private void OnFilterChanged(object? sender, TextChangedEventArgs e)
+    {
+        _filter = FilterBox.Text ?? string.Empty;
+        Refresh();
+    }
 
     private void ClearForm()
     {

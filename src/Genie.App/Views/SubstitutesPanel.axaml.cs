@@ -19,6 +19,7 @@ public partial class SubstitutesPanel : UserControl
 
     private SubstituteEngine? _engine;
     private Action?           _onChanged;
+    private string            _filter = string.Empty;
 
     public SubstitutesPanel() => InitializeComponent();
 
@@ -35,6 +36,7 @@ public partial class SubstitutesPanel : UserControl
         var keep = (ItemsList.SelectedItem as SubstituteRow)?.Pattern;
         ItemsList.ItemsSource = _engine.Rules
             .Select(r => new SubstituteRow(r.IsEnabled ? "✓" : "✗", r.Pattern, r.Replacement, r.ClassName))
+            .Where(r => PanelFilterHelpers.Matches(_filter, r.Pattern, r.Replacement, r.ClassName))
             .ToList();
         if (keep is not null)
             ItemsList.SelectedItem = ((IEnumerable<SubstituteRow>)ItemsList.ItemsSource)
@@ -100,6 +102,12 @@ public partial class SubstitutesPanel : UserControl
 
     private void OnAdd  (object? sender, RoutedEventArgs e) => ClearForm();
     private void OnClear(object? sender, RoutedEventArgs e) => ClearForm();
+
+    private void OnFilterChanged(object? sender, TextChangedEventArgs e)
+    {
+        _filter = FilterBox.Text ?? string.Empty;
+        Refresh();
+    }
 
     private async void OnImport(object? sender, RoutedEventArgs e)
     {

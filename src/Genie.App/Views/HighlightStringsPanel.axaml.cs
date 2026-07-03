@@ -39,6 +39,7 @@ public partial class HighlightStringsPanel : UserControl
 
     private HighlightEngine? _engine;
     private Action?          _onRulesChanged;
+    private string           _filter = string.Empty;
 
     public HighlightStringsPanel()
     {
@@ -73,6 +74,8 @@ public partial class HighlightStringsPanel : UserControl
                 r.BackgroundColor,
                 r.Pattern,
                 r.ClassName))
+            .Where(r => PanelFilterHelpers.Matches(
+                _filter, r.Pattern, r.ForegroundColor, r.BackgroundColor, r.MatchType, r.ClassName))
             .ToList();
         if (keep is not null)
             ItemsList.SelectedItem = ((IEnumerable<HighlightRow>)ItemsList.ItemsSource)
@@ -150,6 +153,12 @@ public partial class HighlightStringsPanel : UserControl
     private void OnAdd(object? sender, RoutedEventArgs e) => ClearForm();
 
     private void OnClear(object? sender, RoutedEventArgs e) => ClearForm();
+
+    private void OnFilterChanged(object? sender, TextChangedEventArgs e)
+    {
+        _filter = FilterBox.Text ?? string.Empty;
+        Refresh();
+    }
 
     private async void OnImport(object? sender, RoutedEventArgs e)
     {
