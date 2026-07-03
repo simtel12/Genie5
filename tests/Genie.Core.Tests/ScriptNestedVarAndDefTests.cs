@@ -65,6 +65,22 @@ public class ScriptNestedVarAndDefTests
     }
 
     [Fact]
+    public void Double_eval_with_dot_suffix_matches_genie4_docs()   // #128 regression guard
+    {
+        // The community-documented Genie 4 example (right-to-left evaluation):
+        //   var spell Fireball
+        //   var Fireball.Prep 10
+        //   echo %%spell.Prep   → inner %spell.Prep shrink-resolves to %spell
+        //                         ("Fireball"), forming %Fireball.Prep ⇒ 10.
+        const string body =
+            "var spell Fireball\n" +
+            "var Fireball.Prep 10\n" +
+            "echo P=%%spell.Prep\n";
+
+        Assert.Contains("P=10", RunFixture(body));
+    }
+
+    [Fact]
     public void Array_index_still_works()   // #128 regression guard
     {
         const string body =
