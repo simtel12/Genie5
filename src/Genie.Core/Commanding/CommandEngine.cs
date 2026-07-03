@@ -45,6 +45,9 @@ public sealed class CommandEngine
     private bool _interactive = true;
     private const int MaxProcessInputDepth = 100;
 
+    // Serializes #log file writes (multiple scripts can #log concurrently).
+    private readonly object _logLock = new();
+
     // ── Engines wired after construction ─────────────────────────────────────
     // GenieCore creates the command engine first (so other engines can route
     // through it) and then back-fills these references. Each one is nullable
@@ -187,6 +190,99 @@ public sealed class CommandEngine
                     else                        _host.Echo(msg);
                 }
                 break;
+            case "log":
+            {
+                // Genie 4 #log — append text to a file under <LogDir> (Core/Command.cs:366,
+                // Utility/Log.cs). Two forms:
+                //   #log >filename text   — append "text" + newline to <LogDir>/filename
+                //                           (a filename containing a path separator is used
+                //                           verbatim). No banner (Log.LogLine).
+                //   #log text             — append "text" + newline to the default
+                //                           per-character log <LogDir>/<char><game>_<yyyy-MM-dd>.log,
+                //                           prepending a "LOG CREATED" banner on first write
+                //                           (Log.LogText). No-op when no character is known.
+                // Variables in the body are already expanded upstream (the script engine's
+                // substitution / ProcessInput.ExpandVariables), so `parts` hold resolved text.
+                if (parts.Count < 2) break;
+                if (parts[1].StartsWith(">", StringComparison.Ordinal))
+                {
+                    var fileName = parts[1][1..];
+                    if (fileName.Length == 0 || parts.Count < 3) break;   // ">file" with no text
+                    var path = fileName.IndexOf('\\') >= 0 || fileName.IndexOf('/') >= 0
+                        ? fileName
+                        : Path.Combine(_config.LogDir, fileName);
+                    WriteLogFile(path, string.Join(" ", parts.Skip(2)), banner: false);
+                }
+                else
+                {
+                    var globals = _host.GetGlobalVariables();
+                    globals.TryGetValue("charactername", out var charName);
+                    globals.TryGetValue("game", out var gameName);
+                    if (string.IsNullOrEmpty(charName)) break;   // Genie 4: no character → no-op
+                    var name = $"{charName}{gameName}_{DateTime.Now:yyyy-MM-dd}.log";
+                    WriteLogFile(Path.Combine(_config.LogDir, name),
+                                 string.Join(" ", parts.Skip(1)), banner: true);
+                }
+                break;
+            }
+            case "link":
+            {
+                // Genie 4 #link [>window] {text} {command} — a clickable menu
+                // link. {text} renders as a link; clicking runs {command}
+                // through the normal pipeline (ProcessInput), so a ';'-chained
+                // body like "#clear >w;#echo done;#var x 1;#parse cont" fires on
+                // CLICK, not at #link time. That is the whole point: the command
+                // is stored, not executed now — which is why routing it straight
+                // through the processor (the old behaviour) self-referenced and
+                // tripped the re-entrancy guard. Quote/brace grouping in
+                // ParseArgs keeps {text} and {command} intact even with spaces or
+                // ';' inside them. Arg shape mirrors Genie 4 (Core/Command.cs):
+                // parts[0] == "link", optional ">window", then text, then command.
+                string? linkWindow = null;
+                string  linkText, linkCommand;
+                if (parts.Count > 3 && parts[1].StartsWith(">", StringComparison.Ordinal))
+                {
+                    linkWindow  = parts[1][1..];
+                    linkText    = parts[2];
+                    linkCommand = string.Join(" ", parts.Skip(3));
+                }
+                else if (parts.Count > 2)
+                {
+                    linkText    = parts[1];
+                    linkCommand = string.Join(" ", parts.Skip(2));
+                }
+                else break;   // need at least {text} and {command}
+
+                if (linkText.Length > 0)
+                    _host.EchoLink(linkText, linkCommand, linkWindow);
+                break;
+            }
+            case "clear":
+            {
+                // #clear [>window] — wipe a window's contents (Genie 4). No
+                // target clears the main game window; ">name" clears that
+                // side / plugin / menu window. Menu scripts (mm_train) use
+                // "#clear >Menu" to redraw their menu in place before rebuilding
+                // it with #echo / #link.
+                string? clearWindow = null;
+                if (parts.Count > 1 && parts[1].StartsWith(">", StringComparison.Ordinal))
+                    clearWindow = parts[1][1..];
+                _host.EchoClear(clearWindow);
+                break;
+            }
+            case "window":
+            {
+                // #window <add|open|show|close|hide|remove|clear> "name" —
+                // Genie 4 named-window lifecycle. Menu scripts (mm_train) add +
+                // open a window, write to it with #echo / #link, then remove it.
+                // ParseArgs already grouped a quoted multi-word name into one
+                // token, so parts[2] is the whole "Moonmage Training Menu". The
+                // dock lives in the App, so forward the sub-command + name.
+                var sub   = parts.Count > 1 ? parts[1] : string.Empty;
+                var wname = parts.Count > 2 ? parts[2] : string.Empty;
+                _host.WindowCommand(sub, wname);
+                break;
+            }
             case "status":
             case "statusbar":
                 // Genie 4 #statusbar [N] {text} — write text to one of ten status
@@ -543,6 +639,40 @@ public sealed class CommandEngine
             default:
                 _host.Echo($"Unknown command: {parts[0]}");
                 break;
+        }
+    }
+
+    // ── #log ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Append a line to a log file for <c>#log</c> (Genie 4 <c>Utility/Log.cs</c>).
+    /// Creates the target directory if needed. When <paramref name="banner"/> is
+    /// true and the file does not yet exist, a "LOG CREATED" header is written
+    /// first (matches Genie 4 <c>Log.LogText</c>; the named-file <c>LogLine</c>
+    /// form passes false). Serialized on <see cref="_logLock"/> since multiple
+    /// scripts can log concurrently. Write failures are reported, not thrown —
+    /// a bad log path must never abort the command that issued the <c>#log</c>.
+    /// </summary>
+    private void WriteLogFile(string path, string text, bool banner)
+    {
+        try
+        {
+            lock (_logLock)
+            {
+                var dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+                var sb = new System.Text.StringBuilder();
+                if (banner && !File.Exists(path))
+                    sb.Append("*** LOG CREATED AT ").Append(DateTime.Now).Append(" ***")
+                      .Append(Environment.NewLine).Append(Environment.NewLine);
+                sb.Append(text).Append(Environment.NewLine);
+                File.AppendAllText(path, sb.ToString());
+            }
+        }
+        catch (Exception ex)
+        {
+            _host.Echo($"[#log] could not write '{path}': {ex.Message}");
         }
     }
 

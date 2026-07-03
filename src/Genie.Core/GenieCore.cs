@@ -290,6 +290,27 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// </summary>
     public event Action<string, string?, bool>? EchoStyledLine;
 
+    /// <summary>
+    /// Raised by <c>#link</c> (Genie 4 clickable menu link). Args: (text,
+    /// command, window?). The App renders <c>text</c> as a clickable link in the
+    /// target window (null = main); clicking runs <c>command</c> through
+    /// <see cref="ProcessInput"/>.
+    /// </summary>
+    public event Action<string, string, string?>? EchoLinkLine;
+
+    /// <summary>
+    /// Raised by <c>#clear [&gt;window]</c>. Arg is the target window name, or
+    /// null for the main game window. The App empties the matching panel.
+    /// </summary>
+    public event Action<string?>? ClearWindow;
+
+    /// <summary>
+    /// Raised by <c>#window &lt;sub&gt; "name"</c> (Genie 4 named-window
+    /// lifecycle). Args: (sub-command, window name). The App creates / shows /
+    /// hides / clears the matching dock panel.
+    /// </summary>
+    public event Action<string, string>? WindowCommandRequested;
+
     // ── Constructor ────────────────────────────────────────────────────────────
 
     public GenieCore(
@@ -750,6 +771,15 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
     void ICommandHost.EchoMain(string text, string? color, bool mono)
         => EchoStyledLine?.Invoke(text, color, mono);
+
+    void ICommandHost.EchoLink(string text, string command, string? window)
+        => EchoLinkLine?.Invoke(text, command, window);
+
+    void ICommandHost.EchoClear(string? window)
+        => ClearWindow?.Invoke(window);
+
+    void ICommandHost.WindowCommand(string sub, string window)
+        => WindowCommandRequested?.Invoke(sub, window);
 
     void ICommandHost.SetStatusBar(string text, int index)
         => StatusBarRequested?.Invoke(text, index);

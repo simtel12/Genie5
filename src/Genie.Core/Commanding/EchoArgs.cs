@@ -23,7 +23,10 @@ public static class EchoArgs
         while (idx < tokens.Count)
         {
             var tok = tokens[idx];
-            if (tok.Length > 0 && tok[0] == '>') { window = tok[1..]; idx++; continue; }
+            // TrimStart, not [1..]: a ">>Log" token (target variable whose value
+            // already carried the chevron) degrades to "Log" instead of naming
+            // a junk window ">Log".
+            if (tok.Length > 0 && tok[0] == '>') { window = tok.TrimStart('>'); idx++; continue; }
             if (string.Equals(tok, "mono", StringComparison.OrdinalIgnoreCase)) { mono = true; idx++; continue; }
             if (IsEchoColor(tok)) { color = tok; idx++; continue; }
             break;

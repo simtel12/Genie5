@@ -62,6 +62,32 @@ public class ScriptEngineArgTests
     }
 
     [Fact]
+    public void Gosub_args_are_quote_aware_not_space_split()
+    {
+        // Genie 4 parity: a quoted multi-word gosub arg ("Moonmage Training Menu")
+        // must arrive as a SINGLE $-arg with its outer quotes stripped. A plain
+        // Split(' ') shattered it across $4/$5/$6 and leaked stray quotes into the
+        // neighbouring args — which is what made menu scripts (mm_train) spray a
+        // fresh window per option and mangle the click commands.
+        const string body =
+            "gosub sub \"alpha beta\" plain \"gamma\"\n" +
+            "exit\n" +
+            "sub:\n" +
+            "echo D1=[$1]\n" +
+            "echo D2=[$2]\n" +
+            "echo D3=[$3]\n" +
+            "echo D4=[$4]\n" +
+            "return\n";
+
+        var o = RunFixture(body, new List<string>());
+
+        Assert.Contains("D1=[alpha beta]", o);  // quoted multi-word ⇒ one arg, quotes stripped
+        Assert.Contains("D2=[plain]",      o);  // bare arg unaffected
+        Assert.Contains("D3=[gamma]",      o);  // quoted single word ⇒ quotes stripped
+        Assert.Contains("D4=[]",           o);  // unpassed arg ⇒ empty
+    }
+
+    [Fact]
     public void Do_command_is_guarded_and_not_sent_to_game()
     {
         // Group D is deferred (zero corpus usage); the no-op guard must consume a

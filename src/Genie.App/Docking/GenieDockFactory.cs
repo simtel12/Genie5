@@ -821,6 +821,7 @@ public class GenieDockFactory : Factory
             GameTextDocument gd => ReactiveCommand.Create(() => gd.ViewModel.Lines.Clear()),
             BackpackTool bp     => ReactiveCommand.Create(() => bp.ViewModel.Items.Clear()),
             RawXmlTool rx       => ReactiveCommand.Create(() => rx.ViewModel.Lines.Clear()),
+            PluginWindowTool pw => ReactiveCommand.Create(() => pw.ViewModel.Lines.Clear()),
             _                   => null
         };
 
@@ -841,6 +842,8 @@ public class GenieDockFactory : Factory
                 () => WindowClipboard.CopyLinesAsync(st.Buffer.Lines.Select(l => l.Text))),
             RawXmlTool rx       => ReactiveCommand.CreateFromTask(
                 () => WindowClipboard.CopyLinesAsync(rx.ViewModel.Lines)),
+            PluginWindowTool pw => ReactiveCommand.CreateFromTask(
+                () => WindowClipboard.CopyLinesAsync(pw.ViewModel.Lines.Select(l => l.Text))),
             _                   => null
         };
 

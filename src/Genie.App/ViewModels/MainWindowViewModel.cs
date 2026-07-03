@@ -2192,24 +2192,124 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // covers script `#echo >name …`, which previously had no subscriber.
         // show:false — appended lines create the panel on first sight but must
         // not re-open it on every line if the user closed it.
-        core.EchoToWindow += (text, window, _) =>
+        // A reserved name never spawns a duplicate plugin panel, but the text
+        // must still land somewhere (Genie 4 never ate a directed echo):
+        // stream names append to their buffers, everything else — main/game
+        // plus the non-text panels (mapper, vitals, experience, …) — falls
+        // back to the main game window, keeping the echo colour.
+        core.EchoToWindow += (text, window, color) =>
         {
-            // First-class log windows: route #echo >log / >itemlog to the
-            // built-in stream panels instead of auto-creating a plugin window.
-            var w = window?.Trim().ToLowerInvariant();
-            if (w is "log" or "itemlog")
+            var buf = window?.Trim().ToLowerInvariant() switch
             {
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    (w == "log" ? StreamTabs.Log : StreamTabs.ItemLog).Add(text));
+                "logons"       => StreamTabs.Logons,
+                "talk"         => StreamTabs.Talk,
+                "whispers"     => StreamTabs.Whispers,
+                "thoughts"     => StreamTabs.Thoughts,
+                "combat"       => StreamTabs.Combat,
+                "familiar"     => StreamTabs.Familiar,
+                "death"        => StreamTabs.Death,
+                "assess"       => StreamTabs.Assess,
+                "atmospherics" => StreamTabs.Atmospherics,
+                "log"          => StreamTabs.Log,
+                "itemlog"      => StreamTabs.ItemLog,
+                _              => null,
+            };
+            if (buf is not null)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => buf.Add(text));
                 return;
             }
-            if (IsReservedWindow(window)) return;
+            if (IsReservedWindow(window))
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (GameText.DisplaySettings?.ShowEchoText == false) return;
+                    GameText.AddEcho(text, color, mono: false);
+                });
+                return;
+            }
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 if (DockFactory is GenieDockFactory f)
                     f.GetOrCreatePluginWindow(window!, show: false).AppendLine(text);
             });
         };
+
+        // #link [>window] {text} {command} → a clickable menu line. Clicking
+        // runs {command} through the same OnLinkClicked → ProcessInput path the
+        // game's own <d cmd> links use. A custom >window renders the link INTO
+        // that window (next to its #echo text) so a mm_train-style menu is
+        // self-contained; no/reserved/log target falls back to Main. (Stream
+        // buffers — log/itemlog — can't render links, so those go to Main too.)
+        core.EchoLinkLine += (text, command, window) =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                var w = window?.Trim();
+                if (!string.IsNullOrEmpty(w) &&
+                    !w.Equals("main", StringComparison.OrdinalIgnoreCase) &&
+                    !w.Equals("game", StringComparison.OrdinalIgnoreCase) &&
+                    w.ToLowerInvariant() is not ("log" or "itemlog") &&
+                    !IsReservedWindow(w) &&
+                    DockFactory is GenieDockFactory f)
+                {
+                    f.GetOrCreatePluginWindow(w, show: false).AppendLink(text, command);
+                    return;
+                }
+                GameText.AddLink(text, command);
+            });
+
+        // #clear [>window] → empty a window. No target clears Main; a custom
+        // >window clears that plugin/menu window (mm_train redraws its menu with
+        // "#clear >Menu" before rebuilding). Reserved built-in panels are left
+        // alone; log/itemlog clear their line buffers.
+        core.ClearWindow += window =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                var w = window?.Trim();
+                if (string.IsNullOrEmpty(w) ||
+                    w.Equals("main", StringComparison.OrdinalIgnoreCase) ||
+                    w.Equals("game", StringComparison.OrdinalIgnoreCase))
+                { GameText.Clear(); return; }
+
+                switch (w.ToLowerInvariant())
+                {
+                    case "log":     StreamTabs.Log.Lines.Clear();     return;
+                    case "itemlog": StreamTabs.ItemLog.Lines.Clear(); return;
+                }
+                if (IsReservedWindow(w)) return;
+                if (DockFactory is GenieDockFactory f)
+                    f.GetOrCreatePluginWindow(w, show: false).Clear();
+            });
+
+        // #window <add|open|show|close|hide|remove|clear> "name" → named-window
+        // lifecycle for menu scripts (mm_train adds+opens a window, writes to it,
+        // then removes it). add/open/show create + reveal the panel; close/hide/
+        // remove hide it; clear empties it. Reserved built-in windows are left
+        // alone so a stray #window can't disturb Game/Room/Combat/etc.
+        core.WindowCommandRequested += (sub, window) =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                var w = window?.Trim();
+                if (string.IsNullOrEmpty(w) || IsReservedWindow(w) ||
+                    DockFactory is not GenieDockFactory f)
+                    return;
+                switch (sub.Trim().ToLowerInvariant())
+                {
+                    case "add":
+                    case "open":
+                    case "show":
+                        f.GetOrCreatePluginWindow(w, show: true);
+                        break;
+                    case "clear":
+                        f.GetOrCreatePluginWindow(w, show: false).Clear();
+                        break;
+                    case "close":
+                    case "hide":
+                    case "remove":
+                        f.SetToolVisibility(GenieDockFactory.PluginWindowId(w), false);
+                        break;
+                }
+            });
     }
 
     /// <summary>Rebuild the Window → Plugin Windows submenu from the factory's
@@ -3019,7 +3119,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Room.Attach(_core);
         Inventory.Attach(_core);
         Mapper.Attach(_core);
-        StreamTabs.Attach(_core);
+        StreamTabs.Attach(_core, GameText);
         Experience.Attach(_core);
         ActiveSpells.Attach(_core);
         Scripts.Attach(_core);

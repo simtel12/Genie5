@@ -84,6 +84,7 @@ public sealed class WindowSettingsStore
         s.Background = m.Background;
         s.Timestamp  = m.Timestamp;
         s.NameListOnly = m.NameListOnly;
+        s.EchoToMain = m.EchoToMain;
         if (m.HasIfClosed) s.IfClosed = m.IfClosed;
     }
 }

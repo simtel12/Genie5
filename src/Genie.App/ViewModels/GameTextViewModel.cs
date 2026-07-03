@@ -348,6 +348,17 @@ public class GameTextViewModel : ReactiveObject
         => AddLine($"[{stream}] {text}", StreamColor.Main);
 
     /// <summary>
+    /// Echo a side-stream line into the main window because that stream's
+    /// "Also show in Main window" (<c>WindowSettings.EchoToMain</c>) toggle is
+    /// on. Unlike <see cref="AddStreamLine"/> (the panel-<i>closed</i> path)
+    /// this adds no bracket prefix, so the line reads inline as ordinary main
+    /// text — matching Genie 4's per-stream "show in main". The stream's own
+    /// panel still receives the line separately.
+    /// </summary>
+    public void EchoStreamToMain(string text)
+        => AddLine(text, StreamColor.Main);
+
+    /// <summary>
     /// Add a client-side system / diagnostic line — recorder status, internal
     /// notices, etc. Uses the System colour so it visually distinguishes from
     /// game text.
@@ -361,6 +372,20 @@ public class GameTextViewModel : ReactiveObject
     /// colour / <c>mono</c> options). Renders as a single plain run carrying the
     /// requested style; unparseable colours fall back to the default echo colour.
     /// </summary>
+    /// <summary>
+    /// Add a Genie 4 <c>#link</c> clickable menu line to the main window — the
+    /// whole line is a link (a single <see cref="LinkSpan"/> covering it) that
+    /// runs <paramref name="command"/> via the normal link-click path when
+    /// clicked. Goes through <see cref="AddLine"/> so timestamping shifts the
+    /// span correctly and the scrollback cap applies.
+    /// </summary>
+    public void AddLink(string text, string command)
+        => AddLine(text, StreamColor.Main,
+                   links: new[] { new LinkSpan(0, text.Length, command) });
+
+    /// <summary>Empty the main game window (Genie 4 <c>#clear</c>).</summary>
+    public void Clear() => Lines.Clear();
+
     public void AddEcho(string text, string? color, bool mono)
     {
         if (Settings?.Timestamp == true)              // #90: stamp echoes too

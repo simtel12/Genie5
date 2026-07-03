@@ -47,8 +47,14 @@ public class StreamTabsViewModel : ReactiveObject
     public IReadOnlyList<StreamBuffer> All =>
         [Logons, Talk, Whispers, Thoughts, Combat, Familiar, Death, Assess, Atmospherics, Log, ItemLog];
 
-    public void Attach(GenieCore core)
+    /// <summary>Main game-window sink, handed in by <see cref="Attach"/> so a
+    /// stream with its <c>EchoToMain</c> toggle on can also post into Main.</summary>
+    private GameTextViewModel? _main;
+
+    public void Attach(GenieCore core, GameTextViewModel? main = null)
     {
+        _main = main;
+
         // Hand each buffer the live Names engine so the per-window "Name List
         // Only" right-click toggle can filter to lines mentioning a tracked
         // name. NameHighlights survives reconnect (persistent core), so this is
@@ -76,6 +82,14 @@ public class StreamTabsViewModel : ReactiveObject
                     _                      => null
                 };
                 buf?.Add(e.Text);
+
+                // Per-stream "Also show in Main" (Layout tab). When on, echo the
+                // line into the main game window in addition to its own panel.
+                // buf.Settings is the same WindowSettings instance the Layout tab
+                // mutates, so the toggle takes effect live with no re-subscribe —
+                // exactly like the Timestamp / NameListOnly toggles above.
+                if (buf?.Settings?.EchoToMain == true)
+                    _main?.EchoStreamToMain(e.Text);
 
                 // The Log window is a consolidated conversation feed: mirror
                 // the speech streams into it (matches the Genie 4 / dylb0t

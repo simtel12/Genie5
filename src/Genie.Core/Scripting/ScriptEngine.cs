@@ -130,6 +130,30 @@ public sealed class ScriptEngine
     private bool   AbortDupeScript  => Config?.AbortDupeScript ?? true;
     private string DefaultScriptExt => Config?.ScriptExtension ?? "cmd";
 
+    /// <summary>Rate-limit for the runaway-loop timeout notice, keyed by script
+    /// name. A script that self-restarts (e.g. a menu that re-<c>#parse</c>s
+    /// itself) re-trips the script-timeout guard every turn; without this it
+    /// prints the same three-line warning dozens of times and buries the game
+    /// window. We warn once per script per <see cref="RunawayWarnCooldown"/>.</summary>
+    private readonly Dictionary<string, DateTime> _runawayWarnedAt = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly TimeSpan RunawayWarnCooldown = TimeSpan.FromSeconds(30);
+
+    /// <summary>Max wall-clock a single <see cref="Tick"/> spends running script
+    /// lines before it yields the UI thread. A busy or runaway script is broken
+    /// off here and resumed via <see cref="ScheduleTick"/>; returning from Tick
+    /// lets the dispatcher service pending input first, so a Stop/pause/debug
+    /// click always lands even while a heavy loop is churning. Without this, a
+    /// non-yielding loop could hold the thread for the whole ScriptTimeout window
+    /// (up to 5 s) and freeze the app.</summary>
+    private const double MaxTickBudgetMs = 60;
+
+    /// <summary>Continuous busy time (ms) across consecutive budget-limited ticks
+    /// that never yielded naturally. Feeds the ScriptTimeout runaway detector so
+    /// it still fires now that a single tick stops early at
+    /// <see cref="MaxTickBudgetMs"/>. Reset to 0 whenever a tick ends because
+    /// every script is idle / paused / waiting.</summary>
+    private double _busyRunMs;
+
     public ScriptEngine(string scriptsDir, TypeAheadSession typeAhead,
                         Action<string> sendCommand, Action<string> echo,
                         Action<string>? handleHashCmd = null,
@@ -233,6 +257,17 @@ public sealed class ScriptEngine
     public bool IsJavaScript(string name) =>
         _js.RunningNames().Any(n => n.Equals(name, StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>Current per-line debug/trace level of a running <c>.cmd</c> script
+    /// (0 if the name isn't a running .cmd script). Lets the Script Bar chip seed
+    /// itself from the engine's real level instead of assuming 0.</summary>
+    public int GetTrace(string name)
+    {
+        foreach (var inst in _instances)
+            if (inst.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+                return inst.DebugLevel;
+        return 0;
+    }
+
     /// <summary>Wire (or clear) the JS line-dispatch timing sink — used by the
     /// performance overlay to time the JavaScript stage. Stays null (no-op) on a
     /// build with no overlay.</summary>
@@ -252,6 +287,15 @@ public sealed class ScriptEngine
     /// <see cref="INotifyCollectionChanged"/> isn't an option.
     /// </summary>
     public event Action<string>? ScriptStarted;
+
+    /// <summary>
+    /// Fired whenever a script's per-line debug/trace level changes — from the
+    /// Script Bar chip (<see cref="SetTrace"/>) OR the script's own
+    /// <c>#debug N</c> line. Args: (script name, new level). Lets the Script Bar
+    /// chip track the script's live level instead of only reflecting the user's
+    /// own chip clicks.
+    /// </summary>
+    public event Action<string, int>? DebugLevelChanged;
 
     public bool TryStart(string name, IReadOnlyList<string> args)
     {
@@ -431,7 +475,11 @@ public sealed class ScriptEngine
         if (level > 10) level = 10;
         foreach (var inst in _instances)
             if (inst.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
-            { inst.DebugLevel = level; _echo($"[script] {name} debug level set to {level}"); }
+            {
+                inst.DebugLevel = level;
+                _echo($"[script] {name} debug level set to {level}");
+                DebugLevelChanged?.Invoke(inst.Name, level);
+            }
     }
 
     public void PauseAll()
@@ -577,28 +625,54 @@ public sealed class ScriptEngine
         // next Tick call instead of monopolizing this one.
         var  tickStart = DateTime.UtcNow;
         bool progress  = true;
+        bool yielded   = false;   // broke to free the UI thread, with work still pending
         int  guard     = 0;
         ScriptInstance? hot = null;   // last instance to execute a line this turn
         while (progress && guard++ < 1_000)
         {
-            // ScriptTimeout (Genie 4 parity): a single processing turn that runs
-            // longer than the configured timeout without yielding is treated as a
-            // possible infinite loop — warn, stop the offending script, and bail.
-            // The guard++ < 1_000 cap below still shields the UI thread from fast
-            // spins; this catches the genuinely runaway / heavy non-yielding loop
-            // Genie 4 warned about, and never affects WAITFOR/MATCH blocking.
-            if (ScriptTimeoutMs > 0 &&
-                (DateTime.UtcNow - tickStart).TotalMilliseconds > ScriptTimeoutMs)
+            var elapsedMs = (DateTime.UtcNow - tickStart).TotalMilliseconds;
+
+            // ScriptTimeout (Genie 4 parity): a run that churns longer than the
+            // configured timeout without yielding is treated as a possible
+            // infinite loop — warn, stop the offending script, and bail. Measured
+            // as CUMULATIVE busy time (this tick + prior budget-limited ticks that
+            // never yielded naturally), so it still fires now that a single tick
+            // stops early at MaxTickBudgetMs. Never affects WAITFOR/MATCH blocking
+            // (those make the tick end via progress==false, which resets the
+            // accumulator below).
+            if (ScriptTimeoutMs > 0 && _busyRunMs + elapsedMs > ScriptTimeoutMs)
             {
                 var who = hot?.Name ?? "(script)";
-                _echo($"[script] {who}: possible infinite loop — exceeded script timeout " +
-                      $"({ScriptTimeoutMs}ms) without a pause/wait. Stopped. Add a pause/wait, " +
-                      $"or raise it with #config scripttimeout.");
+                // Warn once per script per cooldown — a self-restarting runaway
+                // re-trips this guard every turn and would otherwise flood the
+                // window with identical notices (see _runawayWarnedAt).
+                var nowUtc = DateTime.UtcNow;
+                if (!_runawayWarnedAt.TryGetValue(who, out var lastWarn) ||
+                    nowUtc - lastWarn > RunawayWarnCooldown)
+                {
+                    _runawayWarnedAt[who] = nowUtc;
+                    _echo($"[script] {who}: possible infinite loop — exceeded script timeout " +
+                          $"({ScriptTimeoutMs}ms) without a pause/wait. Stopped. Add a pause/wait, " +
+                          $"raise it with #config scripttimeout, or #stop {who} if it keeps looping.");
+                }
                 if (hot is not null)
                 {
                     hot.Running = false;
                     try { ScriptFinished?.Invoke(hot.Name); } catch { /* never rethrow from cleanup */ }
                 }
+                _busyRunMs = 0;
+                break;
+            }
+
+            // UI-yield budget: never hold the UI thread more than MaxTickBudgetMs
+            // in one turn. Break and resume via ScheduleTick so a busy/runaway
+            // loop can't freeze input — a click on the Stop / pause / debug chip
+            // (or a typed command) must always be serviceable. Carry the elapsed
+            // time forward so the runaway detector above still converges.
+            if (elapsedMs > MaxTickBudgetMs)
+            {
+                _busyRunMs += elapsedMs;
+                yielded = true;
                 break;
             }
 
@@ -712,6 +786,17 @@ public sealed class ScriptEngine
                 }
             }
         }
+
+        if (yielded)
+            // Work still pending, but we returned to free the UI thread. Resume
+            // almost immediately — the reschedule runs after the dispatcher has
+            // drained any queued input, so a Stop/pause click gets in first.
+            ScheduleTick?.Invoke(TimeSpan.FromMilliseconds(1));
+        else
+            // Turn ended naturally (every script idle / paused / waiting, or the
+            // 1_000-statement safety cap) — the engine yielded on its own, so the
+            // continuous-busy accumulator resets.
+            _busyRunMs = 0;
     }
 
     /// <summary>
@@ -1275,9 +1360,17 @@ public sealed class ScriptEngine
                 frame[0] = gosubArgs ?? string.Empty;
                 if (!string.IsNullOrEmpty(gosubArgs))
                 {
-                    var parts = gosubArgs.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    // Quote/brace-aware split (Genie 4 parity), NOT a plain
+                    // Split(' '): a quoted multi-word arg like
+                    // "Moonmage Training Menu" must stay a single $-arg with its
+                    // outer quotes stripped. The old space-split shattered it into
+                    // $4="Moonmage / $5=Training / $6=Menu" and leaked stray quotes
+                    // into the other args — which is what made menu scripts
+                    // (mm_train) spray a fresh window per option and mangle the
+                    // click commands.
+                    var parts = Genie.Core.Parsing.ArgumentParser.ParseArgs(gosubArgs);
                     for (int a = 0; a < 9; a++)
-                        frame[a + 1] = a < parts.Length ? parts[a] : string.Empty;
+                        frame[a + 1] = a < parts.Count ? parts[a] : string.Empty;
                 }
                 inst.DollarStack.Push(frame);
                 return true;
@@ -1362,6 +1455,7 @@ public sealed class ScriptEngine
                 else
                     inst.DebugLevel = 0;
                 _echo($"[script] {inst.Name} debug level set to {inst.DebugLevel}");
+                DebugLevelChanged?.Invoke(inst.Name, inst.DebugLevel);
                 return true;
             }
 
@@ -1675,8 +1769,12 @@ public sealed class ScriptEngine
                 while (msg.Length > 0)
                 {
                     var (tok, after) = SplitCmd(msg);
+                    // TrimStart, not [1..]: a target variable whose value
+                    // already carries the chevron ("var w >Log" + "#echo >$w")
+                    // expands to ">>Log" — degrade to "Log" rather than
+                    // manufacturing a junk window literally named ">Log".
                     if (tok.Length > 0 && tok[0] == '>')
-                    { window = tok[1..]; msg = after; continue; }
+                    { window = tok.TrimStart('>'); msg = after; continue; }
                     if (string.Equals(tok, "mono", StringComparison.OrdinalIgnoreCase))
                     { mono = true; msg = after; continue; }
                     if (IsEchoColor(tok))

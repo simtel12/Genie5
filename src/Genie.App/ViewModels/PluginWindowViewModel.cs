@@ -1,22 +1,28 @@
+using System.Collections.ObjectModel;
+using Genie.Core.Events;
 using ReactiveUI;
 using ReactiveUI.Fody.Helpers;
 
 namespace Genie.App.ViewModels;
 
 /// <summary>
-/// Backs a <b>plugin-created</b> dock panel. Unlike <see cref="ExperienceViewModel"/>
-/// (which is hard-wired to the "Experience" window), this VM is generic: one
-/// instance per distinct window name a plugin writes to via
-/// <c>IPluginHost.SetWindow(name, …)</c> / <c>EchoToWindow(name, …)</c>. The
-/// host's dock factory creates a panel on demand and binds it here, so any
-/// plugin can surface its own window without the App knowing about it in advance.
+/// Backs a <b>plugin- or script-created</b> dock panel. Unlike
+/// <see cref="ExperienceViewModel"/> (hard-wired to the "Experience" window),
+/// this VM is generic: one instance per distinct window name written to via
+/// <c>IPluginHost.SetWindow(name, …)</c>, <c>#echo &gt;Name</c>, or
+/// <c>#link &gt;Name</c>. The dock factory creates a panel on demand and binds
+/// it here, so any plugin or menu script can surface its own window without the
+/// App knowing about it in advance.
 ///
-/// <para>This is the generalisation of the named-window seam: the App no longer
-/// needs a bespoke ViewModel + Tool + DataTemplate per plugin window — one
-/// generic trio serves them all, keyed by name.</para>
+/// <para>Line-based (an <see cref="ObservableCollection{T}"/> of
+/// <see cref="TextLine"/>) so the panel renders through the same
+/// link-capable pipeline the game/stream windows use — that's what lets a
+/// Genie 4 <c>#link</c> menu line be clickable here, not just in Main.</para>
 /// </summary>
 public class PluginWindowViewModel : ReactiveObject
 {
+    private const int Max = 2000;
+
     public PluginWindowViewModel(string title)
     {
         Title = string.IsNullOrWhiteSpace(title) ? "Plugin" : title;
@@ -27,23 +33,47 @@ public class PluginWindowViewModel : ReactiveObject
     /// updating this when it reuses the VM.</summary>
     [Reactive] public string Title { get; set; }
 
-    /// <summary>The full rendered contents of the panel. Snapshot-style: a
-    /// <see cref="SetContent"/> replaces it wholesale (matching how the
-    /// Experience plugin re-renders), while <see cref="AppendLine"/> supports the
-    /// append/log style used by <c>EchoToWindow</c> / <c>#echo &gt;Name</c>.</summary>
-    [Reactive] public string Content { get; private set; } = "";
+    /// <summary>The panel's lines. Rendered via <see cref="TextLine.Inlines"/>, so
+    /// clickable <c>#link</c> lines, user highlights, and <c>&lt;d cmd&gt;</c>
+    /// links all work here exactly as in the stream panels.</summary>
+    public ObservableCollection<TextLine> Lines { get; } = new();
 
-    /// <summary>Replace the whole panel (plugin SetWindow semantics).</summary>
-    public void SetContent(string content) => Content = content ?? "";
-
-    /// <summary>Append a line (EchoToWindow semantics). Keeps the panel growing
-    /// like a log.</summary>
-    public void AppendLine(string text)
+    /// <summary>Replace the whole panel (plugin <c>SetWindow</c> semantics).
+    /// Splits on newlines so multi-line plugin output (inventory trees, tables)
+    /// keeps one line per row.</summary>
+    public void SetContent(string content)
     {
-        text ??= "";
-        Content = Content.Length == 0 ? text : Content + "\n" + text;
+        Lines.Clear();
+        if (string.IsNullOrEmpty(content)) return;
+        foreach (var line in content.Replace("\r\n", "\n").Split('\n'))
+            Lines.Add(new TextLine(line, StreamColor.Main));
+        Trim();
     }
 
-    /// <summary>Empty the panel (used when the owning plugin is disabled).</summary>
-    public void Clear() => Content = "";
+    /// <summary>Append a plain line (<c>EchoToWindow</c> / <c>#echo &gt;Name</c>).
+    /// Keeps the panel growing like a log.</summary>
+    public void AppendLine(string text)
+    {
+        Lines.Add(new TextLine(text ?? "", StreamColor.Main));
+        Trim();
+    }
+
+    /// <summary>Append a clickable Genie 4 <c>#link</c> line — the whole line is a
+    /// link that runs <paramref name="command"/> (via the normal link-click →
+    /// ProcessInput path) when clicked.</summary>
+    public void AppendLink(string text, string command)
+    {
+        Lines.Add(new TextLine(text, StreamColor.Main,
+                               Links: new[] { new LinkSpan(0, text.Length, command) }));
+        Trim();
+    }
+
+    /// <summary>Empty the panel (<c>#clear &gt;Name</c>, or the owning plugin
+    /// being disabled).</summary>
+    public void Clear() => Lines.Clear();
+
+    private void Trim()
+    {
+        while (Lines.Count > Max) Lines.RemoveAt(0);
+    }
 }

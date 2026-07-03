@@ -16,6 +16,33 @@ public interface ICommandHost
     void EchoMain(string text, string? color, bool mono);
 
     /// <summary>
+    /// Render a Genie 4 clickable menu link — <c>#link [&gt;window] {text}
+    /// {command}</c>. <paramref name="text"/> shows as a clickable link;
+    /// clicking runs <paramref name="command"/> through the command pipeline
+    /// (so a <c>;</c>-chained body of <c>#</c>-commands fires on click, not when
+    /// the link is created). <paramref name="window"/> is the optional
+    /// <c>&gt;window</c> target (null = the main game window). Console / headless
+    /// builds with no UI drop it silently.
+    /// </summary>
+    void EchoLink(string text, string command, string? window);
+
+    /// <summary>
+    /// Clear a window's contents (Genie 4 <c>#clear [&gt;window]</c>).
+    /// <paramref name="window"/> null = the main game window; a name clears that
+    /// side / plugin / menu window. Console / headless builds with no UI drop it.
+    /// </summary>
+    void EchoClear(string? window);
+
+    /// <summary>
+    /// Genie 4 <c>#window &lt;sub&gt; "name"</c> lifecycle for a named side
+    /// window: <c>add</c> / <c>open</c> / <c>show</c> (create + reveal),
+    /// <c>close</c> / <c>hide</c> / <c>remove</c> (hide the panel), and
+    /// <c>clear</c> (empty it). The dock lives in the App layer, so Core forwards
+    /// the parsed sub-command + window name; Console / headless builds drop it.
+    /// </summary>
+    void WindowCommand(string sub, string window);
+
+    /// <summary>
     /// Set the script status-bar text (Genie 4 <c>#statusbar</c> / <c>#status</c>).
     /// <paramref name="index"/> selects one of Genie 4's ten status slots
     /// (1-10; the command-bar layer defaults a missing/invalid index to 1); the

@@ -887,12 +887,23 @@
     <!-- output (inventory trees, tables).                                      -->
     <DataTemplate DataType="docking:PluginWindowTool">
       <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                    VerticalScrollBarVisibility="Auto">
-        <SelectableTextBlock Text="{Binding ViewModel.Content}"
-                             FontFamily="{Binding ToolFontFamily}"
-                             FontSize="{Binding ToolFontSize}"
-                             Margin="8"
-                             Foreground="{DynamicResource GameBrush}"/>
+                    VerticalScrollBarVisibility="Auto"
+                    controls:AutoScrollBehavior.ItemsSource="{Binding ViewModel.Lines}">
+        <ItemsControl ItemsSource="{Binding ViewModel.Lines}"
+                      FontFamily="{Binding ToolFontFamily}"
+                      FontSize="{Binding ToolFontSize}"
+                      Margin="8"
+                      Foreground="{DynamicResource GameBrush}">
+          <ItemsControl.ItemTemplate>
+            <!-- Same link-capable line rendering as the stream panels: TextLine
+                 .Inlines carries clickable #link / <d cmd> links + highlights. -->
+            <DataTemplate DataType="vm:TextLine">
+              <SelectableTextBlock TextWrapping="Wrap"
+                                   ContextFlyout="{x:Null}"
+                                   controls:InlinesBehavior.Source="{Binding Inlines}"/>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
       </ScrollViewer>
     </DataTemplate>
 
@@ -986,8 +997,9 @@
                         HorizontalScrollBarVisibility="Auto"
                         controls:AutoScrollBehavior.ItemsSource="{Binding ViewModel.Lines}">
             <ItemsControl ItemsSource="{Binding ViewModel.Lines}"
-                          FontFamily="Cascadia Mono,Consolas,Courier New,monospace"
-                          FontSize="11" Foreground="#7fc4a0" Margin="4">
+                          FontFamily="{Binding ToolFontFamily}"
+                          FontSize="{Binding ToolFontSize}"
+                          Foreground="#7fc4a0" Margin="4">
               <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="x:String">
                   <SelectableTextBlock Text="{Binding}"/>

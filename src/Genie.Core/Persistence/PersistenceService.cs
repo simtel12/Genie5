@@ -234,6 +234,7 @@ public sealed class PersistenceService
             Background   = s.Background,
             Timestamp    = s.Timestamp,
             NameListOnly = s.NameListOnly,
+            EchoToMain   = s.EchoToMain,
             IfClosed     = s.IfClosed,
             HasIfClosed  = true,    // value above is authoritative
         });

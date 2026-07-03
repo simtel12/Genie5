@@ -1,4 +1,6 @@
+using Avalonia.Media;
 using Dock.Model.Mvvm.Controls;
+using Genie.App.Controls;
 using Genie.App.ViewModels;
 using Genie.Core.Layout;
 
@@ -18,6 +20,16 @@ public class RawXmlTool : Tool, IWindowMenuHost
     /// <see cref="GenieDockFactory"/>.</summary>
     public WindowMenuModel? WindowMenu { get; set; }
 
+    // Per-window font, resolved from this panel's WindowSettings the same way
+    // StreamTool does, so the Layout-tab font change reaches the Raw XML dump
+    // instead of being ignored (it used to be hardcoded in the template).
+    // Foreground stays the panel's distinctive green — only the font is tunable.
+    private FontFamily _toolFontFamily = new("Cascadia Mono,Consolas,Courier New,monospace");
+    public  FontFamily ToolFontFamily { get => _toolFontFamily; private set => SetProperty(ref _toolFontFamily, value); }
+
+    private double     _toolFontSize = 11;
+    public  double     ToolFontSize { get => _toolFontSize; private set => SetProperty(ref _toolFontSize, value); }
+
     public RawXmlTool(RawXmlViewModel vm, WindowSettings? settings = null)
     {
         ViewModel = vm;
@@ -26,11 +38,15 @@ public class RawXmlTool : Tool, IWindowMenuHost
 
         if (settings is not null)
         {
-            ApplyTitle(settings);
-            settings.Changed += () => ApplyTitle(settings);
+            ApplySettings(settings);
+            settings.Changed += () => ApplySettings(settings);
         }
     }
 
-    private void ApplyTitle(WindowSettings s) =>
-        Title = string.IsNullOrEmpty(s.DisplayTitle) ? s.DefaultTitle : s.DisplayTitle;
+    private void ApplySettings(WindowSettings s)
+    {
+        Title          = string.IsNullOrEmpty(s.DisplayTitle) ? s.DefaultTitle : s.DisplayTitle;
+        ToolFontFamily = WindowSettingsResolver.ResolveFontFamily(s.FontFamily);
+        ToolFontSize   = WindowSettingsResolver.ResolveFontSize(s.FontSize);
+    }
 }

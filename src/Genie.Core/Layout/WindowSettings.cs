@@ -54,6 +54,18 @@ public sealed class WindowSettings
     /// </summary>
     public bool    NameListOnly { get; set; } = false;
 
+    /// <summary>
+    /// Genie 4 "also show in Main" — when true, lines routed to this stream
+    /// window are <b>additionally</b> echoed into the main game window (the
+    /// stream's own panel keeps showing them too). Off by default so nothing
+    /// changes until the user opts a stream in. Only consulted for the text
+    /// stream windows (Combat, Talk, Whispers, Thoughts, Familiar, Deaths,
+    /// Logons, Assess, Atmospherics, ItemLog); a no-op for other dockables.
+    /// Distinct from <see cref="IfClosed"/>, which only fires when the panel
+    /// is <i>closed</i>.
+    /// </summary>
+    public bool    EchoToMain   { get; set; } = false;
+
     public string? IfClosed     { get; set; }
     public event Action? Changed;
     public void NotifyChanged() => Changed?.Invoke();

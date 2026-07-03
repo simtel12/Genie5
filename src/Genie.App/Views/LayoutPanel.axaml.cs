@@ -98,6 +98,7 @@ public partial class LayoutPanel : UserControl
         ColorPickerHelpers.LoadColor(FgColorPicker, FgDefaultCheck, s.Foreground, "Default");
         ColorPickerHelpers.LoadColor(BgColorPicker, BgNoneCheck,    s.Background, "");
         TimestampCheck.IsChecked = s.Timestamp;
+        EchoToMainCheck.IsChecked = s.EchoToMain;
         IfClosedBox.SelectedItem = IfClosedToLabel(s.IfClosed);
     }
 
@@ -129,6 +130,7 @@ public partial class LayoutPanel : UserControl
         _current.Foreground   = ColorPickerHelpers.ReadColor(FgColorPicker, FgDefaultCheck, "Default");
         _current.Background   = ColorPickerHelpers.ReadColor(BgColorPicker, BgNoneCheck,    "");
         _current.Timestamp    = TimestampCheck.IsChecked == true;
+        _current.EchoToMain   = EchoToMainCheck.IsChecked == true;
         _current.IfClosed     = LabelToIfClosed(IfClosedBox.SelectedItem as string);
         _current.NotifyChanged();
 
@@ -151,6 +153,7 @@ public partial class LayoutPanel : UserControl
         _current.Foreground   = fresh.Foreground;
         _current.Background   = fresh.Background;
         _current.Timestamp    = fresh.Timestamp;
+        _current.EchoToMain   = fresh.EchoToMain;
         _current.IfClosed     = fresh.IfClosed;
         _current.NotifyChanged();
 
