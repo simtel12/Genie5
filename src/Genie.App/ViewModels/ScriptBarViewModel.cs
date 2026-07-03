@@ -156,19 +156,34 @@ public sealed class ScriptBarViewModel : ReactiveObject
 
         core.Scripts.ScriptStarted += name =>
         {
-            // Resolve the language now, on the engine thread — an ultra-short
-            // .js script could finish before the marshalled add runs.
+            // Resolve the language + current trace level now, on the engine
+            // thread — an ultra-short .js script could finish before the
+            // marshalled add runs. Seeding the level (vs assuming 0) makes the
+            // chip correct for a script that was already tracing before its
+            // chip existed (e.g. a restart); runtime #debug changes arrive via
+            // DebugLevelChanged below.
             var isJs = core.Scripts.IsJavaScript(name);
+            var lvl  = core.Scripts.GetTrace(name);
             Dispatcher.UIThread.Post(() =>
             {
                 // Reload semantics: replace an existing same-named row.
                 for (int i = RunningScripts.Count - 1; i >= 0; i--)
                     if (RunningScripts[i].Name.Equals(name, StringComparison.OrdinalIgnoreCase))
                         RunningScripts.RemoveAt(i);
-                RunningScripts.Add(new ScriptBarItem(name, isJs));
+                RunningScripts.Add(new ScriptBarItem(name, isJs) { DebugLevel = lvl });
                 HasScripts = RunningScripts.Count > 0;
             });
         };
+
+        // Keep each chip's dbg:N readout in sync with the engine: fired when a
+        // script changes its own level (#debug N) or when SetTrace is called.
+        core.Scripts.DebugLevelChanged += (name, level) =>
+            Dispatcher.UIThread.Post(() =>
+            {
+                foreach (var item in RunningScripts)
+                    if (item.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+                        item.DebugLevel = level;
+            });
 
         core.Scripts.ScriptFinished += name =>
             Dispatcher.UIThread.Post(() =>
