@@ -57,6 +57,14 @@ public sealed class ScriptInstance
     public int  LastDebugLine = -1;
 
     /// <summary>
+    /// Sources ("line N" / "waiteval") that already produced a bad-condition
+    /// warning this run — a condition that failed to PARSE warns once, not on
+    /// every loop iteration or waiteval tick. Fresh per instance, so re-running
+    /// the script warns again.
+    /// </summary>
+    public HashSet<string> WarnedBadConditions = new(StringComparer.Ordinal);
+
+    /// <summary>
     /// Set by <c>SubstituteVars</c> when it encounters an undefined <c>$var</c>
     /// during line execution. The runner checks this after substituting the
     /// current line and aborts the script with a clear "stopped at line N:

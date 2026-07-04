@@ -737,8 +737,14 @@ public sealed class ScriptEngine
                     // values; substitute each tick before passing to
                     // ScriptExpression, which doesn't itself parse $var refs.
                     bool done = false;
-                    try { done = ScriptExpression.EvalBool(SubstituteVars(inst.WaitEvalExpr, inst), inst, Globals, UserVarLookup); }
-                    catch { /* treat parse error as still-waiting */ }
+                    var waitCond = SubstituteVars(inst.WaitEvalExpr, inst);
+                    try { done = ScriptExpression.EvalBool(waitCond, inst, Globals, UserVarLookup); }
+                    catch (Exception ex)
+                    {
+                        // Still-waiting, but say so ONCE — a malformed waiteval
+                        // otherwise reads as a silent hang until the deadline.
+                        WarnBadCondition(inst, "waiteval", waitCond, ex);
+                    }
                     if (done || DateTime.UtcNow >= inst.WaitEvalDeadline)
                     { inst.WaitEvalExpr = null; inst.WaitEvalDeadline = DateTime.MaxValue; }
                     else continue;
@@ -1094,7 +1100,7 @@ public sealed class ScriptEngine
                 }
                 var condText  = rest[..thenIdx].Trim();
                 var afterThen = rest[(thenIdx + 4)..].Trim();
-                bool cond = EvalConditionSafe(condText, inst);
+                bool cond = EvalConditionSafe(condText, inst, lineNo);
                 DbgEcho(inst, 3, $"{lower} ({condText}) = {cond}");
                 return HandleConditional(cond, afterThen, inst, lineNo, currentIdx);
             }
@@ -1696,9 +1702,13 @@ public sealed class ScriptEngine
     /// Evaluate a condition, treating empty input and parse errors as false.
     /// Genie scripts routinely test variables that are not yet set; an undefined
     /// <c>$hidden</c> substitutes to <c>""</c> and we want <c>if ($hidden)</c>
-    /// to silently mean false rather than crashing.
+    /// to silently mean false rather than crashing. A PARSE error, though, is
+    /// almost always a script typo (a community report spent days on
+    /// <c>if (("%a" = "%b") then</c> — unbalanced parens — reading its silent
+    /// false as "the variables don't match"), so it is surfaced as a one-time
+    /// warning per line per run rather than swallowed.
     /// </summary>
-    private bool EvalConditionSafe(string condText, ScriptInstance inst)
+    private bool EvalConditionSafe(string condText, ScriptInstance inst, int lineNo)
     {
         if (string.IsNullOrWhiteSpace(condText)) return false;
 
@@ -1711,7 +1721,24 @@ public sealed class ScriptEngine
         }
 
         try { return ScriptExpression.EvalBool(condText, inst, Globals, UserVarLookup); }
-        catch { return false; }
+        catch (Exception ex)
+        {
+            WarnBadCondition(inst, $"line {lineNo}", condText, ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// One-time (per script run, per source) warning for a condition that failed
+    /// to PARSE — as opposed to one that legitimately evaluated false. Deduped
+    /// so a malformed condition inside a loop (or a waiteval re-checked every
+    /// tick) warns once, not per iteration.
+    /// </summary>
+    private void WarnBadCondition(ScriptInstance inst, string where, string condText, Exception ex)
+    {
+        if (!inst.WarnedBadConditions.Add(where)) return;
+        _echo($"[script] {inst.Name} {where}: bad condition '{condText}' — " +
+              $"{ex.Message}; treated as false");
     }
 
     private bool HandleConditional(bool cond, string afterThen,
