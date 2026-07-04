@@ -37,7 +37,8 @@ The Genie 4 codebase is WinForms + Windows-only and hasn't kept pace with modern
 | Genie 4 `.cmd` script engine (labels, `MATCH`, `GOSUB`, `$variables`, `WAITFOR`, etc.) | ✅ Working |
 | Rules engines (`#alias`, `#trigger`, `#highlight`, `#substitute`, `#gag`, `#macro`, `#class`, `#var`) | ✅ Working with `.cfg` persistence |
 | Per-character profile storage with AES-GCM password encryption | ✅ Working |
-| Dockable UI panels (vitals, room, inventory, mapper, stream tabs) | ✅ Working |
+| Dockable UI panels (vitals, room, mobs/players, inventory, mapper, experience, active spells, stream tabs) — named save/load layouts + MDI windowed mode | ✅ Working |
+| Named script windows (`#window`, `#link`, `#log`, `#clear`, directed `#echo >window`) — Genie 4 menu scripts (`mm_train` et al.) run as-is | ✅ Working |
 | Mapper — click-to-goto, `#goto`/`#go2`, room/zone tags + `#goto @tag`, `$roomid`/`$zoneid`/`$zonename` script vars, zone fingerprinting, Less Obvious Paths | ✅ Working (auto-walk is a roadmap item) |
 | Session Recorder for raw-XML capture | ✅ Working |
 | Lich 5 proxy mode (`ConnectionMode.LichProxy`) | ✅ Working |
@@ -51,7 +52,7 @@ The Genie 4 codebase is WinForms + Windows-only and hasn't kept pace with modern
 | Performance overlay — live per-stage pipeline timing + running-`.js` list, behind the Performance menu | ✅ Working |
 | Game prompt in the window — `prompt` string + `promptbreak` (own-line) / `promptforce` (reconstructed status letters) | ✅ Working |
 | Scene panel — DR room/scene artwork (`#config showimages`), fetched from the play.net art CDN | ✅ Working |
-| Preset colouring — room descriptions / whispers / speech render in their palette colours (Configuration → Presets) | ✅ Working |
+| Preset colouring — room descriptions / whispers / speech render in their palette colours (Configuration → Presets), plus MonsterBold creature highlighting | ✅ Working |
 | Sound — SFX on triggers/highlights + `#play` command (cross-platform: winmm / afplay / paplay) | ✅ Working |
 | `#config` settings system (`settings.cfg`, ~20 Genie 4 settings + Scripts tab); reserved/live `$variables` exposed and listed by `#var` | ✅ Working |
 | Visual trigger / flow designer | 🚧 Roadmap |

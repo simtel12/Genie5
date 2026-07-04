@@ -16,12 +16,22 @@ Out of the box you get a three-column arrangement:
 | Panel | Shows |
 | --- | --- |
 | **Game** | The main scrolling game text. Supports clickable links and per-tag visibility (below). |
-| **Room** | Current room title, description, and obvious paths — split out from the game text so it's always glanceable. |
+| **Room** | Current room title, description, and obvious paths — split out from the game text so it's always glanceable. Creature names honor MonsterBold coloring. |
+| **Mobs / Players** | The creatures and the other players in the room, as their own glanceable lists. |
 | **Inventory / Backpack** | What you're carrying. |
 | **Mapper** | The zone map with your current room highlighted; click a room to walk there. See [The Mapper](Mapper). |
-| **Stream tabs** | DragonRealms routes certain text to named streams. Genie surfaces **Talk**, **Whispers**, **Thoughts**, **Combat**, and **Logons** as their own tabs so they each keep a clean scrollback. (Speech and whispers also appear in the main window — DragonRealms sends them to both by design.) |
+| **Experience** | Live skill learning states. A **Density** slider on the panel condenses each skill line to taste (**Full → No count → Numbers only → Short names → Brief**); the same setting is scriptable as `#config experiencedensity`. |
+| **Active Spells** | Your running spell effects with time remaining. |
+| **Scripts** | A separate scrollback for script output (`[script]` lines, `#echo`, debug traces), so a busy hunt script doesn't clutter the main window. |
+| **Scene** | DragonRealms room/scene artwork for the current area (`#config showimages`). |
+| **Raw XML** | The unparsed server stream, for debugging and parser spelunking. |
+| **Stream tabs** | DragonRealms routes certain text to named streams. Genie surfaces **Talk**, **Whispers**, **Thoughts**, **Combat**, **Logons**, **Familiar**, **Deaths**, **Assess**, **Atmospherics**, **Log**, and **Item Log** as their own windows so they each keep a clean scrollback. (Speech and whispers also appear in the main window — DragonRealms sends them to both by design.) |
 
 Toggle any panel from the **Window** menu. Drag a panel's tab to re-dock it; drag it out to **float** it in its own window, and drag it back to re-dock.
+
+Every stream window also has an **"Also show this stream in the Main window"** toggle (Configuration → **Layout** tab, per window) that additionally echoes its lines into the main game window, Genie 4-style. The Layout tab is also where each window's font is set.
+
+Scripts can create their **own named windows** too — the Genie 4 menu-script commands (`#window`, `#link`, `#echo >window`) build clickable menu panels that dock like any other. See the [Scripting Reference](Scripting-Reference#named-windows-links-and-logging).
 
 ## The bottom strips
 
@@ -58,12 +68,14 @@ Turn off script lines, for example, to keep a busy hunt script from cluttering t
 
 ## Layouts
 
-Rearrange the panels however you like, then keep the arrangement:
+Rearrange the panels however you like, then keep the arrangement — the **Layout** menu manages it all:
 
-- **Window → Reset Layout** restores the default three-column layout.
+- **Layout → Save Layout As… / Load Layout / Manage Layouts…** — keep several named layouts (a "Combat" layout vs. an "In-Character" layout) and switch between them; **Manage Layouts…** also picks the default.
+- **Layout → Reset to Default Layout** restores the three-column arrangement.
+- **Layout → Windowed Mode (MDI)** switches from docked panels to free-floating child windows, Genie 4-style.
 - Floating the Mapper, hiding panels you don't use, and moving the hands strip are all remembered.
 
-> 🚧 **Roadmap:** named, switchable workspace presets (a "Combat" layout vs. an "In-Character" layout) and light/dark themes are planned but not in the alpha yet.
+> 🚧 **Roadmap:** light/dark themes are planned but not in the alpha yet.
 
 ## Display settings
 

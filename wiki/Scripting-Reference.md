@@ -99,6 +99,20 @@ Regex captures from `matchre` / `waitforre` / actions land in the current `$0..$
 | `js <expr>` / `jscall <var> <expr>` | Call a JS library function; `jscall` stores the result in `%var`. |
 | `plugin …` | Parsed for Genie 4 parity; .NET plugin execution is not supported. |
 
+### Named windows, links, and logging
+
+The Genie 4 **menu-script toolkit** — the commands classic scripts like `mm_train` use to build clickable menu windows. They work typed at the command bar or from a script via `put #…`:
+
+| Command | Notes |
+| --- | --- |
+| `#window add\|open\|show\|close\|hide\|remove\|clear "Name"` | Create, show, hide, or destroy a named dock window. `add`/`open`/`show` bring it up (creating it if needed); `clear` wipes its text in place. |
+| `#link [>window] {text} {command}` | Print a clickable line — clicking it runs `command` through the normal input pipeline (it does **not** run at `#link` time). |
+| `#echo [>window] [color] text` | Directed echo. Targets **Main**/**Game**, any built-in stream window (`>Combat`, `>Talk`, `>Thoughts`, …), or a named window; colours are honoured. Non-text panels (`>Mapper`, `>Vitals`, …) fall back to Main. |
+| `#clear [>window]` | Wipe a window's scrollback in place. |
+| `#log [>file] text` | Append to a log file under your Logs folder. The `>filename` form writes verbatim; the bare form appends to the per-character daily log (with the Genie 4 `LOG CREATED` banner). Writes are serialized across scripts. |
+
+Windows created this way render full text lines — clickable links and your highlight rules both apply.
+
 ## Variables and scope
 
 Two namespaces, distinguished by prefix:
@@ -138,7 +152,7 @@ Commands you `put` to the game contribute to an in-flight counter that's decreme
 
 ## Diagnostics
 
-- **Per-script tracing** — `debug 5` traces a script's reactions; `debug 10` traces every line. Output goes to the echo channel.
+- **Per-script tracing** — `debug 5` traces a script's reactions; `debug 10` traces every line. Output goes to the echo channel, and each running-script chip on the Script Bar shows the script's live trace level (`dbg:N`).
 - **Scripts panel** — script output (`[script]`, `[dbg:N]`, in-script `#echo`) is forked to its own panel with separate scrollback.
 
 ## Differences from Genie 4

@@ -2,7 +2,7 @@
 
 Genie 5 ships all of Genie 4's **rule engines** — the pattern-driven helpers that color text, expand shortcuts, react to the game, and bind keys. You manage them two ways:
 
-- **The Configuration dialog** — **Edit → Configuration…** opens a tabbed, form-based editor for every rule type. Easiest for browsing and editing.
+- **The Configuration dialog** — **Edit → Configuration…** opens a tabbed, form-based editor for every rule type. Easiest for browsing and editing. The list-based tabs (Aliases, Triggers, Highlight Strings, Substitutes, Gags) each have a **type-to-filter box**, so a several-hundred-line trigger list stays navigable.
 - **The command bar** — `#`-prefixed commands add and remove rules on the fly, exactly as in Genie 4.
 
 Either way, rules are saved to plain-text `.cfg` files and reloaded automatically next launch. Command syntax follows the **Genie 4 dialect**; when in doubt about a specific option, the Configuration dialog is the reliable surface.
@@ -52,6 +52,11 @@ Make important lines jump out:
 ```
 
 Highlights support foreground and background colors, whole-line vs. substring matching, and case sensitivity — all editable in the Highlights tab.
+
+Two built-in colorings live alongside your own rules:
+
+- **Presets** — the game's own text categories (room descriptions, whispers, speech, …) render in palette colors you can change under **Config → Highlights → Presets**.
+- **MonsterBold** — creature and NPC names DragonRealms marks as monster-bold render in a distinct color (default gold) in the main window, the stream windows, and the Room panel. On by default; toggle it under **Config → Highlights → Presets** or with `#config monsterbold on|off`.
 
 ### Substitutes — rewriting text
 
