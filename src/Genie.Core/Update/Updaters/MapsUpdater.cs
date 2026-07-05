@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Genie.Core.Mapper;
 using Genie.Core.Update.Sources;
 
@@ -57,6 +58,7 @@ public sealed class MapsUpdater : IUpdater
         int newCount     = 0;
         int changedCount = 0;
         var notesLines   = new List<string>();
+        var recorded     = LoadShaManifest();
 
         foreach (var source in _sources)
         {
@@ -81,12 +83,19 @@ public sealed class MapsUpdater : IUpdater
                     continue;
                 }
 
-                // Cheap diff: compare git-blob-sha1 of the local file with
-                // what the source reports. Skip the comparison entirely if
-                // the source doesn't expose a hash — we'd have to download
-                // to know, which defeats the point of a cheap CheckAsync.
+                // Cheap diff: compare the upstream sha against the one we
+                // recorded when we last applied that file. Hashing the LOCAL
+                // file is useless here — ApplyAsync re-serializes through
+                // Genie4MapExporter (own formatting + merged server_ids), so
+                // the local bytes never match the upstream blob and every
+                // zone would count as "changed" forever. Skip the comparison
+                // when the source exposes no hash — we'd have to download to
+                // know, which defeats the point of a cheap CheckAsync. A file
+                // with no recorded sha (pre-manifest install) counts as
+                // changed once; the next apply records it and it goes quiet.
                 if (!string.IsNullOrEmpty(entry.Sha) &&
-                    GithubContentsSource.GitBlobSha1(localPath) != entry.Sha)
+                    (!recorded.TryGetValue(entry.Name, out var appliedSha) ||
+                     appliedSha != entry.Sha))
                 {
                     changedCount++;
                 }
@@ -142,11 +151,29 @@ public sealed class MapsUpdater : IUpdater
         int total      = workItems.Count;
         int mergedRows = 0;
         int newRows    = 0;
+        int currentRows = 0;
+        var recorded   = LoadShaManifest();
 
         for (int i = 0; i < workItems.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
             var (source, entry) = workItems[i];
+
+            // Skip the download when the upstream blob is the one we already
+            // applied — mirrors CheckAsync, so auto-apply on startup doesn't
+            // re-pull every zone on every launch. Keyed on the RECORDED sha,
+            // not a hash of the local file, because the local file is our own
+            // re-serialization (see CheckAsync).
+            if (!string.IsNullOrEmpty(entry.Sha) &&
+                File.Exists(Path.Combine(_mapsDir, entry.Name)) &&
+                recorded.TryGetValue(entry.Name, out var appliedSha) &&
+                appliedSha == entry.Sha)
+            {
+                currentRows++;
+                progress?.Report(new UpdateProgress(i + 1, total, entry.Name, "already current"));
+                continue;
+            }
+
             progress?.Report(new UpdateProgress(i + 1, total, entry.Name, "downloading"));
 
             try
@@ -182,6 +209,8 @@ public sealed class MapsUpdater : IUpdater
                 }
 
                 _repo.Save(localPath, fresh);
+                if (!string.IsNullOrEmpty(entry.Sha))
+                    recorded[entry.Name] = entry.Sha;
                 progress?.Report(new UpdateProgress(i + 1, total, entry.Name, isNew ? "new" : "merged"));
             }
             catch (Exception ex)
@@ -191,9 +220,11 @@ public sealed class MapsUpdater : IUpdater
             }
         }
 
+        SaveShaManifest(recorded);
+
         var summary = errors.Count == 0
-            ? $"Updated {total} zones ({newRows} new, {mergedRows} merged)."
-            : $"Updated {total} zones ({newRows} new, {mergedRows} merged, {errors.Count} failed).";
+            ? $"Updated {newRows + mergedRows} zone(s) ({newRows} new, {mergedRows} merged, {currentRows} already current)."
+            : $"Updated {newRows + mergedRows} zone(s) ({newRows} new, {mergedRows} merged, {currentRows} already current, {errors.Count} failed).";
 
         return new UpdateApplyResult(
             Succeeded: errors.Count == 0,
@@ -220,6 +251,42 @@ public sealed class MapsUpdater : IUpdater
                 freshNode.ServerRoomId = existingNode.ServerRoomId;
             }
         }
+    }
+
+    // ── Applied-sha manifest ─────────────────────────────────────────────
+    //
+    // Maps whose local file is a re-serialization of upstream (import →
+    // merge server_ids → export) can't be diffed by hashing the local file.
+    // Instead we record the UPSTREAM blob sha of each file at apply time and
+    // diff future listings against that. Dot-named so MapZoneRepository's
+    // *.xml enumeration and DescribeInstalled never see it as a zone.
+
+    private string ShaManifestPath => Path.Combine(_mapsDir, ".map-shas.json");
+
+    private Dictionary<string, string> LoadShaManifest()
+    {
+        try
+        {
+            if (File.Exists(ShaManifestPath))
+            {
+                var loaded = JsonSerializer.Deserialize<Dictionary<string, string>>(
+                    File.ReadAllText(ShaManifestPath));
+                if (loaded != null)
+                    return new Dictionary<string, string>(loaded, StringComparer.OrdinalIgnoreCase);
+            }
+        }
+        catch { /* corrupt manifest → treat all as unrecorded; next apply rebuilds it */ }
+        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void SaveShaManifest(Dictionary<string, string> shas)
+    {
+        try
+        {
+            File.WriteAllText(ShaManifestPath,
+                JsonSerializer.Serialize(shas, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch { /* best-effort — a failed write just means a re-check re-flags files */ }
     }
 
     /// <summary>
