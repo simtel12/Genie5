@@ -85,6 +85,16 @@ public sealed class RoomState
     public string   ImageId     { get; set; } = "";
 }
 
+// ── Injuries ─────────────────────────────────────────────────────────────────
+
+/// <summary>
+/// Latest injuries-dialog reading for one body region. <see cref="Kind"/> /
+/// <see cref="Severity"/> mirror the last <c>&lt;image&gt;</c> update the server
+/// sent for the region under the player's current injury display mode
+/// (E/I Wound/Scar/Both — see <see cref="Events.InjuryEvent"/>).
+/// </summary>
+public readonly record struct InjuryReading(Events.InjuryKind Kind, int Severity);
+
 // ── Combat state ─────────────────────────────────────────────────────────────
 
 public sealed class CombatState
@@ -159,6 +169,14 @@ public sealed class GameState
     // Status flags (from indicators)
     public HashSet<CharacterStatus> ActiveStatuses { get; } = [];
 
+    /// <summary>
+    /// Current injuries by body region (raw dialog region id — "head",
+    /// "rightArm", "nsys", …). A region reads healthy when absent OR when its
+    /// entry is <see cref="Events.InjuryKind.None"/> — the engine keeps None
+    /// entries so consumers can tell "healed" from "never reported".
+    /// </summary>
+    public ConcurrentDictionary<string, InjuryReading> Injuries { get; } = new();
+
     // Misc UI state
     public string ActiveStream   { get; set; } = "main";
     public DateTimeOffset LastPrompt { get; set; }
@@ -222,6 +240,7 @@ public sealed class GameState
 
         // Status / misc
         ActiveStatuses.Clear();
+        Injuries.Clear();
         Components.Clear();
         ActiveStream = "main";
         LastPrompt   = default;

@@ -152,6 +152,52 @@ public sealed record ComponentEvent(
 /// </summary>
 public sealed record IndicatorEvent(string IndicatorId, bool Visible) : GameEvent;
 
+// ── Injuries ─────────────────────────────────────────────────────────────────
+
+/// <summary>What the injuries dialog reports for a body region. Severity runs
+/// 1–3 for every kind (verified against Lich 5's parser, which packs each
+/// region into 2 GSL bits and maps nerve text to at most 3).</summary>
+public enum InjuryKind
+{
+    /// <summary>Region is healthy (the image name equals the region id, or a
+    /// kind prefix with digit 0 — e.g. <c>Nsys0</c>).</summary>
+    None,
+    /// <summary>Fresh wound — image name <c>Injury1</c>…<c>Injury3</c>.</summary>
+    Wound,
+    /// <summary>Healed scar — image name <c>Scar1</c>…<c>Scar3</c>.</summary>
+    Scar,
+    /// <summary>Nerve damage — image name <c>Nsys1</c>…<c>Nsys3</c>. The nsys
+    /// region NEVER uses the Injury/Scar names, and the dialog image alone
+    /// cannot say whether the damage is a wound or a scar. It surfaces as this
+    /// indeterminate kind until a <c>health</c> response resolves it: the
+    /// parser always scans main-stream text for the six nerve lines (so a
+    /// user-typed <c>health</c> refines it for free), and the user can opt in
+    /// to a silent poll cadence (<c>#config injuriespoll N</c> / the Injuries
+    /// panel's Auto-refresh picker; off by default) that re-emits a
+    /// Wound/Scar-kinded event for the nsys region.</summary>
+    Damage,
+}
+
+/// <summary>
+/// One body-region update from the server's injuries dialog:
+/// <c>&lt;dialogData id="injuries"&gt;&lt;image id="rightLeg" name="Injury1"/&gt;…</c>.
+///
+/// <para>
+/// <see cref="Area"/> is the raw region id — one of DR's 16 hit-test regions:
+/// head, neck, chest, abdomen, back, nsys (nervous system), plus left/right
+/// eye, arm, hand, leg, foot. A healthy region arrives with
+/// <c>name == id</c> and emits <see cref="InjuryKind.None"/> with severity 0.
+/// </para>
+///
+/// <para>
+/// The dialog reflects the player's selected display mode (the E/I
+/// Wound/Scar/Both radios, <c>_injury N</c>), so a region that carries both a
+/// wound and a scar reports whichever the current mode shows — the event is a
+/// display snapshot, not a full medical chart.
+/// </para>
+/// </summary>
+public sealed record InjuryEvent(string Area, InjuryKind Kind, int Severity) : GameEvent;
+
 // ── Inventory ────────────────────────────────────────────────────────────────
 
 public enum Hand { Left, Right }
@@ -228,6 +274,16 @@ public sealed record NavEvent(string RoomId) : GameEvent;
 /// is the raw display name (e.g. "Barbarian", "Moon Mage", "Commoner").
 /// </summary>
 public sealed record GuildEvent(string Guild) : GameEvent;
+
+/// <summary>
+/// Bare character name learned mid-session. DirectSGE knows the name from the
+/// login handshake, but a Lich-proxy attach doesn't — Lich performed the login,
+/// so the client never sees <c>&lt;app char=…/&gt;</c>. Fired by the parser when
+/// the Lich ident reply arrives (public issue #127). The <c>info</c> Name field
+/// can't be used instead: it embeds optional pre-titles and surname
+/// ("Legendary Moon Mage Renucci Wepatocmaite") with no way to isolate the name.
+/// </summary>
+public sealed record CharacterNameEvent(string Name) : GameEvent;
 
 /// <summary>
 /// &lt;settingsInfo .../&gt; — server init block done and ready for commands.

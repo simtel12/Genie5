@@ -122,6 +122,90 @@ public sealed class DrXmlParser : IDisposable
     private readonly List<BoldSpan> _componentBoldSpans = new();
     private readonly Stack<int>     _componentBoldStack = new();
 
+    // ── Injuries dialog context (public issue #18) ───────────────────────────
+    // Set while inside <dialogData id="injuries"> … </dialogData>. The <image>
+    // children carry one body-region reading each (name "Injury2"/"Scar1", or
+    // name == region id when healthy); outside this context <image> is layout
+    // noise and stays dropped.
+    private bool _inInjuriesDialog;
+
+    // ── Silent `health` window (injuries auto-refresh) ───────────────────────
+    // The dialog's Nsys image can't say wound vs scar; only the `health` verb's
+    // text can. When the core issues an auto-refresh poll it arms this window
+    // first: the response — bracketed by <output class="mono"/> … <output
+    // class=""/> exactly like Lich's nerve tracker observes — is consumed for
+    // its nerve line but never emitted as TextEvents, so the poll stays
+    // invisible. The window disarms on the closing bracket, on the deadline
+    // (mono never arrived / response never closed), or on a runaway line count
+    // — the three valves guarantee suppression can't outlive one response.
+    // User-TYPED health output is untouched (window is only armed by the poll);
+    // its nerve line still refines nsys via the always-on scan in EmitLine.
+    private DateTimeOffset _silentHealthDeadline = DateTimeOffset.MinValue;
+    private bool _silentHealthActive;
+    private int  _silentHealthLines;
+    private const int SilentHealthMaxLines = 60;
+
+    /// <summary>Arm suppression for the next <c>health</c> response (injuries
+    /// auto-refresh poll). Call immediately before sending the command.</summary>
+    public void BeginSilentHealthWindow(TimeSpan? timeout = null) =>
+        _silentHealthDeadline = DateTimeOffset.UtcNow + (timeout ?? TimeSpan.FromSeconds(5));
+
+    // ── Lich-attach room seed (public issue #126) ─────────────────────────────
+    // A Lich detachable attach happens AFTER Lich performed the login, so the
+    // login block — the only unprompted source of <component id='room …'>
+    // updates — is gone, and DR never re-sends components on `look` (verified
+    // against all recorded sessions: room-component count == <nav/> count).
+    // When armed, the next `look` response's display lines are additionally
+    // folded into synthetic ComponentEvents so the Room panel / GameState /
+    // mapper seed exactly as a direct-connect login block would have seeded
+    // them. Lines still display normally — this is a tee, not a suppressor.
+    // Valves: deadline, runaway line count, completion ("Obvious paths"), and
+    // any REAL room component / <nav/> (movement beat us to it — the genuine
+    // data must win).
+    private DateTimeOffset _roomSeedDeadline = DateTimeOffset.MinValue;
+    private bool _roomSeedArmed;
+    private int  _roomSeedLines;
+    private const int RoomSeedMaxLines = 200;
+
+    /// <summary>Arm the one-shot room-component seed for the next <c>look</c>
+    /// response (Lich attach). Call immediately before sending the command.</summary>
+    public void BeginRoomSeedCapture(TimeSpan? timeout = null)
+    {
+        _roomSeedDeadline = DateTimeOffset.UtcNow + (timeout ?? TimeSpan.FromSeconds(20));
+        _roomSeedArmed    = true;
+        _roomSeedLines    = 0;
+    }
+
+    // ── Lich ident reply (public issue #127) ─────────────────────────────────
+    // GenieCore asks Lich for the bare character name via `,eq respond
+    // "GENIE5-IDENT " + XMLData.name` on attach. The reply is a mono-bracketed
+    // marker line; while the window is armed we consume it (never displayed)
+    // and emit CharacterNameEvent. One-shot: disarms on match or deadline.
+    private DateTimeOffset _identDeadline = DateTimeOffset.MinValue;
+    private static readonly System.Text.RegularExpressions.Regex _lichIdentRe =
+        new(@"^GENIE5-IDENT\s+(\S+)\s*$",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>Arm capture of the Lich ident reply (Lich attach). Call
+    /// immediately before sending the ident query.</summary>
+    public void BeginLichIdentWindow(TimeSpan? timeout = null) =>
+        _identDeadline = DateTimeOffset.UtcNow + (timeout ?? TimeSpan.FromSeconds(20));
+
+    // Nerve lines from the `health` verb, verbatim from Lich 5's tracker
+    // (lib/common/xmlparser.rb:652-669) — the only source that can split the
+    // dialog's indeterminate Nsys reading into wound vs scar. Scanned on every
+    // main-stream line starting with "You", so a user-typed `health` refines
+    // the panel exactly like a poll does.
+    private static readonly (string Phrase, InjuryKind Kind, int Severity)[] _nervePhrases =
+    {
+        ("a case of uncontrollable convulsions",      InjuryKind.Wound, 3),
+        ("a case of sporadic convulsions",            InjuryKind.Wound, 2),
+        ("a strange case of muscle twitching",        InjuryKind.Wound, 1),
+        ("a very difficult time with muscle control", InjuryKind.Scar,  3),
+        ("constant muscle spasms",                    InjuryKind.Scar,  2),
+        ("developed slurred speech",                  InjuryKind.Scar,  1),
+    };
+
     // ── News-listing auto-link state (public issue #30) ──────────────────────
     // DR sends the `news` listing as PLAIN TEXT — the numbered item lines carry
     // no <d>/<a> tags, so they're not clickable on their own. We track the
@@ -330,6 +414,52 @@ public sealed class DrXmlParser : IDisposable
         if (guildMatch.Success)
             _events.OnNext(new GuildEvent(guildMatch.Groups[1].Value.Trim()));
 
+        // Lich ident reply (issue #127): the marker line is plumbing, not game
+        // text — emit the name event and swallow the line. Only an armed window
+        // can match, so ordinary text can never be eaten.
+        if (DateTimeOffset.UtcNow < _identDeadline)
+        {
+            var ident = _lichIdentRe.Match(stripped.TrimStart());
+            if (ident.Success)
+            {
+                _identDeadline = DateTimeOffset.MinValue;
+                _events.OnNext(new CharacterNameEvent(ident.Groups[1].Value));
+                return;
+            }
+        }
+
+        // Room seed capture (issue #126): tee the `look` response lines into
+        // synthetic room ComponentEvents. Never suppresses the line itself.
+        if (_roomSeedArmed)
+            TryCaptureRoomSeed(stripped, boldSpans, presetSpans);
+
+        // Nervous-system refinement (#18): the `health` verb's nerve line is the
+        // only wound-vs-scar source for the nsys region (the dialog image can't
+        // say). Always on — a user-typed `health` refines the panel exactly
+        // like an auto-refresh poll. Runs BEFORE silent suppression below so a
+        // polled response still yields its reading.
+        if (_activeStream == "main" && stripped.StartsWith("You", StringComparison.Ordinal))
+        {
+            foreach (var (phrase, kind, severity) in _nervePhrases)
+            {
+                if (!stripped.Contains(phrase, StringComparison.Ordinal)) continue;
+                _events.OnNext(new InjuryEvent("nsys", kind, severity));
+                break;
+            }
+        }
+
+        // Silent-health window: this line is part of a polled `health` response
+        // — consume it without emitting. Deadline + line-count valves stop the
+        // suppression from ever outliving one response.
+        if (_silentHealthActive)
+        {
+            if (DateTimeOffset.UtcNow < _silentHealthDeadline
+                && ++_silentHealthLines <= SilentHealthMaxLines)
+                return;
+            _silentHealthActive   = false;   // valve tripped — stop suppressing
+            _silentHealthDeadline = DateTimeOffset.MinValue;
+        }
+
         // News-listing auto-link (public issue #30). Updates the listing-context
         // state machine and, on a numbered item line, hands back a synthesized
         // click LinkSpan to merge with any tag-derived links (there are none on
@@ -339,6 +469,85 @@ public sealed class DrXmlParser : IDisposable
             links = links is null ? new[] { newsLink } : links.Append(newsLink).ToArray();
 
         _events.OnNext(new TextEvent(_activeStream, stripped, links, boldSpans, presetSpans));
+    }
+
+    // One armed `look` response → synthetic room ComponentEvents (issue #126).
+    // The look output carries the same data the login-block components did,
+    // just as display text:
+    //   <style id="roomName"/>[Title]        → room title
+    //   <preset id='roomDesc'>…</preset>     → room desc   (its own flush)
+    //   "You also see …"                     → room objs   (bold = creatures)
+    //   "Also here: …"                       → room players
+    //   "Obvious paths|exits: …"             → room exits  (completes capture)
+    // The roomName style toggle closes on the LINE AFTER the title, so at
+    // flush time the span isn't recorded yet — check the live toggle too.
+    private void TryCaptureRoomSeed(string stripped,
+                                    IReadOnlyList<BoldSpan>? boldSpans,
+                                    IReadOnlyList<PresetSpan>? presetSpans)
+    {
+        if (DateTimeOffset.UtcNow >= _roomSeedDeadline || ++_roomSeedLines > RoomSeedMaxLines)
+        {
+            _roomSeedArmed = false;
+            return;
+        }
+        if (_activeStream != "main") return;
+
+        if ((_styleStart >= 0 && _styleId == "roomName")
+            || (presetSpans is not null && presetSpans.Any(p => p.PresetId == "roomName")))
+        {
+            _events.OnNext(new ComponentEvent("room title", stripped.Trim()));
+            return;
+        }
+
+        var descSpan = presetSpans?.FirstOrDefault(p => p.PresetId == "roomDesc");
+        if (descSpan is not null)
+        {
+            // The parser flushes on </preset> for roomDesc, so the line IS the
+            // description; the span slice is a guard against leading fragments.
+            var desc = descSpan.Start >= 0 && descSpan.Start + descSpan.Length <= stripped.Length
+                ? stripped.Substring(descSpan.Start, descSpan.Length).Trim()
+                : stripped.Trim();
+            _events.OnNext(new ComponentEvent("room desc", desc));
+            return;
+        }
+
+        var t    = stripped.TrimStart();
+        var lead = stripped.Length - t.Length;
+
+        if (t.StartsWith("You also see", StringComparison.Ordinal))
+        {
+            // Rebase bold spans onto the trimmed text; bold phrases are the
+            // creatures (same convention as the real room objs component).
+            List<BoldSpan>? rebased = null;
+            List<string>?   names   = null;
+            if (boldSpans is not null)
+            {
+                rebased = new List<BoldSpan>();
+                names   = new List<string>();
+                foreach (var b in boldSpans)
+                {
+                    var start = b.Start - lead;
+                    if (start < 0 || start + b.Length > t.Length) continue;
+                    rebased.Add(new BoldSpan(start, b.Length));
+                    names.Add(t.Substring(start, b.Length));
+                }
+            }
+            _events.OnNext(new ComponentEvent("room objs", t, names, rebased));
+            return;
+        }
+
+        if (t.StartsWith("Also here:", StringComparison.Ordinal))
+        {
+            _events.OnNext(new ComponentEvent("room players", t));
+            return;
+        }
+
+        if (t.StartsWith("Obvious paths:", StringComparison.Ordinal)
+            || t.StartsWith("Obvious exits:", StringComparison.Ordinal))
+        {
+            _events.OnNext(new ComponentEvent("room exits", t));
+            _roomSeedArmed = false;   // room block complete
+        }
     }
 
     // Drive the news-listing state machine for one display line and, when the
@@ -508,7 +717,11 @@ public sealed class DrXmlParser : IDisposable
         // ── Session/connection info ─────────────────────────────────────────
         "playerid",
         // ── UI dialog layout ────────────────────────────────────────────────
-        "dialogdata", "opendialog", "detach", "skin", "radio", "image",
+        // "dialogdata" and "image" are NOT here — <dialogData id="injuries">
+        // carries the per-region injury <image> updates (issue #18), so both
+        // are handled explicitly; non-injuries dialog content is still
+        // discarded there.
+        "opendialog", "detach", "skin", "radio",
         // ── Text styling ────────────────────────────────────────────────────
         // "preset" is NOT here — its </preset> must reach HandleEndElement to
         // flush the room description before exits appear on the next line.
@@ -537,7 +750,7 @@ public sealed class DrXmlParser : IDisposable
     // Source of truth for "are we using 100% of the XML?". Three buckets:
     //   • Consumed       — produces a typed GameEvent (the HandleElement switch).
     //   • DroppedData     — IN _settingsTags but carries real game data we don't
-    //                       yet consume (injuries <image>/<skin>, server dialogs,
+    //                       yet consume (injuries <skin>, server dialogs,
     //                       exp <compDef>, …). The hunt targets.
     //   • DroppedSetting  — the Wrayth settings dump; correctly discarded.
     //   • Unknown         — neither handled nor skipped → emits UnknownTagEvent.
@@ -545,10 +758,11 @@ public sealed class DrXmlParser : IDisposable
     private static readonly HashSet<string> _handledTags = new(StringComparer.OrdinalIgnoreCase)
     {
         "a", "casttime", "clearstream", "compass", "component", "container",
-        "d", "dir", "endsetup", "indicator", "inv", "left", "nav", "openwindow",
-        "output", "popbold", "popstream", "preset", "progressbar", "prompt",
-        "pushbold", "pushstream", "resource", "right", "roundtime",
-        "settingsinfo", "spell", "streamwindow", "style",
+        "d", "dialogdata", "dir", "endsetup", "image", "indicator", "inv",
+        "left", "nav", "openwindow", "output", "popbold", "popstream",
+        "preset", "progressbar", "prompt", "pushbold", "pushstream",
+        "resource", "right", "roundtime", "settingsinfo", "spell",
+        "streamwindow", "style",
     };
 
     // Subset of _settingsTags that actually carries game data we drop today —
@@ -556,7 +770,7 @@ public sealed class DrXmlParser : IDisposable
     // is unchanged; this set only drives classification.)
     private static readonly HashSet<string> _droppedDataTags = new(StringComparer.OrdinalIgnoreCase)
     {
-        "image", "skin", "compdef", "dialogdata", "opendialog",
+        "skin", "compdef", "opendialog",
         "radio", "detach", "playerid", "exposecontainer", "clearcontainer",
     };
 
@@ -609,6 +823,10 @@ public sealed class DrXmlParser : IDisposable
                 _pendingComponentId = r["id"] ?? "";
                 _componentBuffer.Clear();
                 _inComponent = true;
+                // A real room component arrived (movement) — the armed Lich
+                // room seed (#126) must not overwrite genuine data.
+                if (_roomSeedArmed && _pendingComponentId.StartsWith("room", StringComparison.OrdinalIgnoreCase))
+                    _roomSeedArmed = false;
                 // Content accumulates in EmitText until </component>
                 break;
             }
@@ -888,6 +1106,9 @@ public sealed class DrXmlParser : IDisposable
                 // present — an empty one would fire an early fingerprint
                 // re-resolve against the not-yet-updated room title, transiently
                 // landing on the wrong node before the subtitle uid corrects it.
+                // Movement also cancels an armed Lich room seed (#126): real
+                // room components are about to arrive.
+                _roomSeedArmed = false;
                 if (r["rm"] is { Length: > 0 } navRm)
                     _events.OnNext(new NavEvent(navRm));
                 break;
@@ -910,10 +1131,89 @@ public sealed class DrXmlParser : IDisposable
                 break;
             }
 
+            // ── Server dialog data (injuries) ────────────────────────────────
+            // Only the injuries dialog carries game state we consume; every
+            // other dialogData block (minivitals skin layout, radio defs, …)
+            // is still dropped — its known children (<skin>, <radio>) stay in
+            // the skip set, and <progressBar> children were always consumed
+            // via the generic progressBar case. A self-closing
+            // <dialogData … /> has no children, so it must not open the
+            // context; any open tag for a DIFFERENT dialog closes it
+            // defensively (DR never nests dialogData).
+            case "dialogdata":
+                _inInjuriesDialog =
+                    string.Equals(r["id"], "injuries", StringComparison.OrdinalIgnoreCase)
+                    && !rawTag.TrimEnd().EndsWith("/>", StringComparison.Ordinal);
+                break;
+
+            // ── Injury reading (one body region) ─────────────────────────────
+            // <image id="rightLeg" name="Injury1"/> inside the injuries dialog.
+            // name == region id → healthy; "Injury<N>" → wound; "Scar<N>" →
+            // scar; "Nsys<N>" → nerve damage (the nsys region never uses the
+            // Injury/Scar names — Lich 5 xmlparser.rb:618). Severity runs 1–3
+            // for every kind; a 0 digit ("Nsys0") reads healthy. Note the
+            // healthy nsys echo is lowercase "nsys" (= the region id), which
+            // must hit the None branch, so the Nsys prefix check requires a
+            // digit after it. Outside the injuries dialog, <image> is UI
+            // layout only.
+            case "image" when _inInjuriesDialog:
+            {
+                var area = r["id"] ?? "";
+                if (area.Length == 0) break;
+                var imageName = r["name"] ?? "";
+                InjuryKind kind = InjuryKind.None;
+                int severity = 0;
+                if (imageName.StartsWith("Injury", StringComparison.OrdinalIgnoreCase))
+                {
+                    kind = InjuryKind.Wound;
+                    int.TryParse(imageName.AsSpan("Injury".Length), out severity);
+                }
+                else if (imageName.StartsWith("Scar", StringComparison.OrdinalIgnoreCase))
+                {
+                    kind = InjuryKind.Scar;
+                    int.TryParse(imageName.AsSpan("Scar".Length), out severity);
+                }
+                else if (imageName.Length > "Nsys".Length
+                         && imageName.StartsWith("Nsys", StringComparison.OrdinalIgnoreCase)
+                         && int.TryParse(imageName.AsSpan("Nsys".Length), out severity))
+                {
+                    kind = severity > 0 ? InjuryKind.Damage : InjuryKind.None;
+                }
+                // anything else (name echoes the region id) → healthy
+                if (kind == InjuryKind.None) severity = 0;
+                _events.OnNext(new InjuryEvent(area, kind, severity));
+                break;
+            }
+
+            case "image":
+                break;   // non-injuries <image> — dialog layout only, drop
+
             // ── Output class (bold, mono, etc.) ─────────────────────────
             case "output":
-                _events.OnNext(new OutputClassEvent(r["class"] ?? ""));
+            {
+                var cls = r["class"] ?? "";
+                // Silent-health window: swallow the mono/'' brackets around a
+                // polled `health` response (and everything between — see
+                // EmitLine). Only an armed window can open; an open window
+                // closes on the empty-class bracket.
+                if (!_silentHealthActive && cls == "mono"
+                    && DateTimeOffset.UtcNow < _silentHealthDeadline)
+                {
+                    FlushTextLine();   // anything buffered before the bracket is real text
+                    _silentHealthActive = true;
+                    _silentHealthLines  = 0;
+                    break;
+                }
+                if (_silentHealthActive && cls.Length == 0)
+                {
+                    _silentHealthActive   = false;
+                    _silentHealthDeadline = DateTimeOffset.MinValue;
+                    _textLineBuffer.Clear();   // drop any partial suppressed line
+                    break;
+                }
+                _events.OnNext(new OutputClassEvent(cls));
                 break;
+            }
 
             // ── Window routing + room-title carrier ──────────────────────
             // DR emits the current room name as the subtitle attribute of
@@ -1195,6 +1495,10 @@ public sealed class DrXmlParser : IDisposable
                 _compassBuffer.Clear();
                 break;
             }
+
+            case "dialogdata":
+                _inInjuriesDialog = false;
+                break;
         }
     }
 

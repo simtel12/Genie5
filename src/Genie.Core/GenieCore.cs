@@ -468,6 +468,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         SyncTrackerToggles();
         Config.ConfigChanged += field => { if (field == Genie.Core.Config.ConfigFieldUpdated.Trackers) SyncTrackerToggles(); };
 
+        // Honour the rule-engine master toggles (highlights / triggers /
+        // substitutes / gags / aliases), and re-sync on File ▸ Master Toggles
+        // or a typed `#config triggers off`.
+        SyncMasterToggles();
+        Config.ConfigChanged += field => { if (field == Genie.Core.Config.ConfigFieldUpdated.MasterToggles) SyncMasterToggles(); };
+
         // ScriptGlobalsSync (the live-game-state → $globals mirror) binds to the
         // per-connection parser + the connect's character identity, so it is built
         // per connect in BuildConnection().
@@ -493,6 +499,64 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             name => Scripts.Globals.TryGetValue(name, out var v) ? v : "");
         // Log every top-level command (incl. script-fired #goto) to the audit.
         Commands.CommandObserved = cmd => _liveAudit.Note("CMD", cmd);
+
+        // ── Injuries auto-refresh (#18) ───────────────────────────────────────
+        // Opt-in silent `health` poll that refines the nervous-system reading
+        // (wound vs scar — the dialog image can't say). A coarse 5 s ticker
+        // reads Config.InjuriesPollSeconds live each tick, so `#config
+        // injuriespoll N` (or the panel picker) applies without a restart and
+        // 0 keeps it fully idle. The tick itself gates on connection + prior
+        // injuries-dialog data, so Wizard/plain-text sessions never poll.
+        _injuriesPollTimer = new System.Threading.Timer(
+            _ => InjuriesPollTick(), null,
+            dueTime: TimeSpan.FromSeconds(5), period: TimeSpan.FromSeconds(5));
+    }
+
+    private System.Threading.Timer? _injuriesPollTimer;
+    private DateTimeOffset _lastInjuriesPoll = DateTimeOffset.MinValue;
+    private int _injuriesPollBusy;
+
+    /// <summary>
+    /// Live gate the host wires once: returns true while the Injuries panel is
+    /// actually open. The poll exists solely to feed that panel, so when the
+    /// window is closed there is no reason to send anything — the tick skips
+    /// (and resumes on the configured cadence when the panel reopens). A
+    /// callback rather than a pushed flag so it can never go stale; null
+    /// (headless Core, TestHarness) means "no panel concept — allow".
+    /// Read a cheap thread-safe snapshot here — the timer fires off the UI
+    /// thread, so don't walk UI trees in this callback.
+    /// </summary>
+    public Func<bool>? InjuriesPanelVisible { get; set; }
+
+    private void InjuriesPollTick()
+    {
+        var interval = Config.InjuriesPollSeconds;
+        if (interval <= 0) return;                       // feature off (default)
+        if (_connection is null || _parser is null) return;
+        if (InjuriesPanelVisible is { } panelOpen && !panelOpen()) return;
+
+        // Only poll sessions that have actually received the injuries dialog —
+        // this is what makes the poll meaningful AND excludes Wizard mode
+        // (plain text has no dialog, and no output-class brackets to gag).
+        if (_state.Injuries.IsEmpty) return;
+
+        if ((DateTimeOffset.UtcNow - _lastInjuriesPoll).TotalSeconds < interval) return;
+        if (System.Threading.Interlocked.Exchange(ref _injuriesPollBusy, 1) == 1) return;
+
+        _lastInjuriesPoll = DateTimeOffset.UtcNow;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                // Arm the parser's suppression window FIRST so the response is
+                // consumed silently, then send raw (no echo, no triggers —
+                // this is not user input).
+                _parser?.BeginSilentHealthWindow();
+                await SendCommandAsync("health");
+            }
+            catch { /* disconnected mid-poll — next tick re-checks */ }
+            finally { System.Threading.Volatile.Write(ref _injuriesPollBusy, 0); }
+        });
     }
 
     /// <summary>
@@ -640,12 +704,25 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // ── Ready-for-input signal ─────────────────────────────────────────────
         // StormFront / DevReplay: <settingsInfo/> is authoritative (see docs/SGE_PROTOCOL.md).
         // Wizard mode: no XML tags arrive, fire on TCP connect instead.
+        // Lich proxy: Lich performed the login and consumed <settingsInfo/>
+        // (and the whole login block, room components included) before we
+        // attached — it never reaches us, so waiting on it means the auto-look
+        // and connect script never run (issues #126/#127). Lich's detachable
+        // listener only accepts clients after login completes, so TCP
+        // Connected IS the ready signal in this mode.
         if (cfg.ClientMode == GameClientMode.Wizard)
         {
             _settingsInfoSub = connection.StateStream
                 .Where(e => e.Kind == ConnectionEventKind.Connected)
                 .Take(1)
                 .Subscribe(_ => OnConnectReady());
+        }
+        else if (cfg.Mode == ConnectionMode.LichProxy)
+        {
+            _settingsInfoSub = connection.StateStream
+                .Where(e => e.Kind == ConnectionEventKind.Connected)
+                .Take(1)
+                .Subscribe(_ => OnConnectReady(lichAttachParser: parser));
         }
         else
         {
@@ -884,9 +961,21 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         Plugins.DispatchGameText(line, "main");         // plugins observe the line
     }
 
-    private void OnConnectReady()
+    private void OnConnectReady(DrXmlParser? lichAttachParser = null)
     {
-        var __ = _connection?.SendCommandAsync("look");
+        // Lich attach (#126/#127): the login block Lich consumed was the only
+        // unprompted source of room components and character identity. Arm the
+        // parser's one-shot captures, then reconstruct both — `look` re-emits
+        // the room as display text (folded into synthetic components while the
+        // seed is armed), and the `,eq` ident query asks Lich itself for the
+        // bare character name (`info` can't be used: its Name field embeds
+        // optional pre-titles and surname).
+        if (lichAttachParser is not null)
+        {
+            lichAttachParser.BeginRoomSeedCapture();
+            lichAttachParser.BeginLichIdentWindow();
+        }
+        var __ = SendConnectSeedAsync(lichAttach: lichAttachParser is not null);
 
         var connectScript = Config.ConnectScript;
         if (!string.IsNullOrWhiteSpace(connectScript))
@@ -894,6 +983,22 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             try { Scripts.TryStart(connectScript.Trim(), Array.Empty<string>()); }
             catch { /* never let a connect-script error abort the session */ }
         }
+    }
+
+    /// <summary>The connect-ready sends, sequenced so the ident query can't
+    /// interleave with `look` on the socket. Failures are swallowed — a link
+    /// that dies mid-seed is reported by the disconnect path, not here.</summary>
+    private async Task SendConnectSeedAsync(bool lichAttach)
+    {
+        try
+        {
+            if (_connection is null) return;
+            await _connection.SendCommandAsync("look").ConfigureAwait(false);
+            if (lichAttach)
+                await _connection.SendCommandAsync(",eq respond \"GENIE5-IDENT \" + XMLData.name")
+                                 .ConfigureAwait(false);
+        }
+        catch { /* connection dropped during the seed — nothing to do */ }
     }
 
     /// <summary>Apply the settings.cfg tracker toggles (spelltimer / showexperience /
@@ -915,6 +1020,17 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                 case "TimeTracker": ext.Enabled = Config.ShowTimeTracker; break;
             }
         }
+    }
+
+    /// <summary>Apply the settings.cfg master toggles to the rule engines'
+    /// Enabled flags. Rules stay loaded; the engines just skip applying them.</summary>
+    private void SyncMasterToggles()
+    {
+        Highlights.Enabled  = Config.EnableHighlights;
+        Triggers.Enabled    = Config.EnableTriggers;
+        Substitutes.Enabled = Config.EnableSubstitutes;
+        Gags.Enabled        = Config.EnableGags;
+        Aliases.Enabled     = Config.EnableAliases;
     }
 
     void ICommandHost.StopScript(string? name)
@@ -1436,6 +1552,8 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         await TeardownConnectionAsync();
 
         // Then the once-per-app layer.
+        _injuriesPollTimer?.Dispose();
+        _injuriesPollTimer = null;
         _liveAudit.Dispose();
         AutoMapper.CurrentNodeChanged -= SyncMapperGlobals;
         Plugins.Shutdown();

@@ -82,6 +82,11 @@ public sealed class GameStateEngine : IDisposable
                 ApplyIndicator(ind);
                 break;
 
+            // ── Injuries (per body region) ────────────────────────────────
+            case InjuryEvent inj:
+                _state.Injuries[inj.Area] = new InjuryReading(inj.Kind, inj.Severity);
+                break;
+
             // ── Held items ────────────────────────────────────────────────
             case HeldItemEvent held:
                 if (held.Hand == Hand.Left)
@@ -125,6 +130,11 @@ public sealed class GameStateEngine : IDisposable
             case GuildEvent guild:
                 _state.GuildName = guild.Guild;
                 _state.Guild     = MapGuild(guild.Guild);
+                break;
+
+            // ── Character name (Lich attach ident, issue #127) ────────────
+            case CharacterNameEvent cn when !string.IsNullOrWhiteSpace(cn.Name):
+                _state.CharacterName = cn.Name.Trim();
                 break;
 
             // ── Compass exits ──────────────────────────────────────────────

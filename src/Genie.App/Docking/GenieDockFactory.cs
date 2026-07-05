@@ -194,6 +194,7 @@ public class GenieDockFactory : Factory
         var mobs       = new MobsTool      (_vm.Mobs,               ws.Get("mobs"));
         var players    = new PlayersTool   (_vm.Players,            ws.Get("players"));
         var rawXml     = new RawXmlTool    (_vm.RawXml,             ws.Get("raw-xml"));
+        var injuries   = new InjuriesTool  (_vm.Injuries,           ws.Get("injuries"));
 
         // ── Default ship layout — three vertical columns ─────────────────
         //   ┌──────────┬─────────────────────┬──────────┐
@@ -350,8 +351,8 @@ public class GenieDockFactory : Factory
         // Scripts: registered but hidden by default (like Vitals/Experience) —
         // re-opens beside the Backpack via Window → Scripts.
         _tools[scripts.Id]    = (scripts,    backpackDock.Id);
-        // Scene: room/scene artwork — also hidden by default (re-open via
-        // Window → Scene). Lives beside the Backpack when shown.
+        // Portrait (id "scene"): room/scene artwork — also hidden by default
+        // (re-open via Window → Portrait). Lives beside the Backpack when shown.
         _tools[scene.Id]      = (scene,      backpackDock.Id);
         // Mobs / Players: room-occupant lists — hidden by default (re-open via
         // Window → Mobs / Players). Home beside the Room panel they complement.
@@ -360,6 +361,9 @@ public class GenieDockFactory : Factory
         // Raw XML (#14): dev/debug protocol dump — hidden by default, re-opens
         // beside the Backpack via Window → Raw XML (grouped with Scripts/Scene).
         _tools[rawXml.Id]     = (rawXml,     backpackDock.Id);
+        // Injuries (#18): body-silhouette wound/scar display — hidden by
+        // default, re-opens beside the Backpack (with Vitals it complements).
+        _tools[injuries.Id]   = (injuries,   backpackDock.Id);
 
         // ── Home-dock recreation map ─────────────────────────────────────
         // Mirrors the proportions/alignments set on the ToolDocks above so a
@@ -431,6 +435,7 @@ public class GenieDockFactory : Factory
         var mobs       = new MobsTool         (_vm.Mobs,               ws.Get("mobs"));
         var players    = new PlayersTool      (_vm.Players,            ws.Get("players"));
         var rawXml     = new RawXmlTool       (_vm.RawXml,             ws.Get("raw-xml"));
+        var injuries   = new InjuriesTool     (_vm.Injuries,           ws.Get("injuries"));
 
         // Every MDI panel in canonical order, paired with its id.
         var panels = new (string Id, IDockable Dockable)[]
@@ -442,6 +447,7 @@ public class GenieDockFactory : Factory
             ("vitals", vitals), ("experience", experience), ("active-spells", activeSpells),
             ("scene", scene),
             ("mobs", mobs), ("players", players), ("raw-xml", rawXml),
+            ("injuries", injuries),
         };
 
         // Which panels open as windows. Default mirrors the tabbed layout
