@@ -938,6 +938,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
         ErrorLog.Initialize(_configDir);
 
+        // Announce the resolved data root as the first game-window line.
+        // "Which folder is Genie actually reading?" is the first question in
+        // every portable-install report (#138) — answer it up front instead
+        // of leaving users to folder archaeology.
+        GameText.AddSystemLine(
+            $"[data] root: {dir.Current.BasePath} ({(dir.Current.IsLocal ? "portable" : "user folder")})");
+
         // Maps live at the TOP LEVEL of the data tree, parallel to Config/
         // and Scripts/ — matching the Genie 4 layout users already know
         // (Genie 4 ships Art/, Config/, Help/, Icons/, Logs/, Maps/,
@@ -3179,6 +3186,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             dataDirectoryOverride: string.IsNullOrEmpty(_sessionDataRoot) ? null : _sessionDataRoot,
             aiConfig:              null,
             loggerFactory:         null);
+
+        // A profile Data Directory override repoints Core's whole data root
+        // away from the session default the startup [data] line announced —
+        // say so, or the two silently disagree (#138).
+        if (!string.IsNullOrEmpty(_sessionDataRoot))
+            GameText.AddSystemLine(
+                $"[data] profile override: scripts, rules and layouts load from {Path.GetFullPath(_sessionDataRoot)}");
 
         WireCore();
 
