@@ -19,6 +19,20 @@ public sealed class GenieConfig
     public char SeparatorChar { get; set; } = ';';
     public char CommandChar { get; set; } = '#';
     public bool TriggerOnInput { get; set; } = true;
+
+    /// <summary>Master enables for the five user rule engines (File ▸ Master
+    /// Toggles / <c>#config triggers off</c> …). Rule sets stay loaded and
+    /// editable while off — the engines just skip applying them. All default ON
+    /// (Genie 4 parity).</summary>
+    public bool EnableHighlights { get; set; } = true;
+    /// <inheritdoc cref="EnableHighlights"/>
+    public bool EnableTriggers { get; set; } = true;
+    /// <inheritdoc cref="EnableHighlights"/>
+    public bool EnableSubstitutes { get; set; } = true;
+    /// <inheritdoc cref="EnableHighlights"/>
+    public bool EnableGags { get; set; } = true;
+    /// <inheritdoc cref="EnableHighlights"/>
+    public bool EnableAliases { get; set; } = true;
     /// <summary>Game-window scrollback cap — how many rendered lines to keep
     /// before trimming the oldest. Genie 5 setting (the Genie 4 <c>maxrowbuffer</c>
     /// was a WinForms paint-batch knob with no Avalonia equivalent). Clamped to
@@ -81,6 +95,19 @@ public sealed class GenieConfig
     /// is on.</summary>
     public int AutoWalkUnfocusSeconds { get; set; } = 60;
     public double RoundTimeOffset { get; set; }
+
+    /// <summary>
+    /// Injuries auto-refresh (#18): seconds between silent <c>health</c> polls
+    /// that refine the nervous-system reading (the injuries dialog's Nsys image
+    /// can't say wound vs scar — only the <c>health</c> text can). 0 = off (the
+    /// default; Genie never sends unprompted commands unless the user opts in).
+    /// Non-zero values are floored at 10 s so a typo can't spam the server.
+    /// Set from the Injuries panel's Auto-refresh picker or
+    /// <c>#config injuriespoll N</c>. Polls additionally require the Injuries
+    /// panel to be open (<c>GenieCore.InjuriesPanelVisible</c> gate) — a
+    /// closed window has no reason to refresh.
+    /// </summary>
+    public int InjuriesPollSeconds { get; set; }
     public bool ShowLinks { get; set; } = true;
     /// <summary>MonsterBold (#131): render DR's &lt;pushBold&gt; creature names /
     /// combat hits in bold + the <c>creatures</c> preset colour, in every window
@@ -90,6 +117,14 @@ public sealed class GenieConfig
     public bool WebLinkSafety { get; set; } = true;
     public bool SizeInputToGame { get; set; }
     public bool UpdateMapperScripts { get; set; }
+    /// <summary>Keep the main window above all other applications (Genie 4's
+    /// <c>alwaysontop</c> key). The App binds <c>Window.Topmost</c> to its
+    /// display.json copy of this flag (so it applies at launch, before the core
+    /// exists) and keeps the two in sync: <c>#config alwaysontop on|off</c> /
+    /// <c>#config load</c> update the window live via
+    /// <see cref="ConfigFieldUpdated.AlwaysOnTop"/>, and the Layout-menu toggle
+    /// writes back here. When the stores disagree at core build, display.json
+    /// wins.</summary>
     public bool AlwaysOnTop { get; set; }
     public bool CheckForUpdates { get; set; } = true;
     public bool AutoUpdate { get; set; }
@@ -268,6 +303,11 @@ public sealed class GenieConfig
         ("separatorchar", SeparatorChar.ToString()),
         ("commandchar", CommandChar.ToString()),
         ("triggeroninput", TriggerOnInput.ToString()),
+        ("highlights", EnableHighlights.ToString()),
+        ("triggers", EnableTriggers.ToString()),
+        ("substitutes", EnableSubstitutes.ToString()),
+        ("gags", EnableGags.ToString()),
+        ("aliases", EnableAliases.ToString()),
         ("scrollbacklines", ScrollbackLines.ToString()),
         ("spelltimer", ShowSpellTimer.ToString()),
         ("showexperience", ShowExperience.ToString()),
@@ -286,6 +326,7 @@ public sealed class GenieConfig
         ("scripttimeout", ScriptTimeout.ToString()),
         ("maxgosubdepth", MaxGoSubDepth.ToString()),
         ("roundtimeoffset", RoundTimeOffset.ToString()),
+        ("injuriespoll", InjuriesPollSeconds.ToString()),
         ("scriptdir", ScriptDirRaw),
         ("sounddir", SoundDirRaw),
         ("ttsvoicedir", TtsVoiceDirRaw),
@@ -360,6 +401,7 @@ public sealed class GenieConfig
         ("Connection",       new[] { "classicconnect", "conndebug", "connectscript", "frontend", "reconnect" }),
         ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines" }),
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety" }),
+        ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "triggeroninput", "scripttimeout", "maxgosubdepth", "abortdupescript", "scriptextension", "editor" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "updatemapperscripts" }),
         ("Auto-Walk",        new[] { "autowalkpauseonunfocus", "autowalkunfocusseconds" }),
@@ -393,6 +435,11 @@ public sealed class GenieConfig
                 case "separatorchar": SeparatorChar = FirstCharOrDefault(value, SeparatorChar); break;
                 case "commandchar": CommandChar = FirstCharOrDefault(value, CommandChar); break;
                 case "triggeroninput": TriggerOnInput = ToBool(value); break;
+                case "highlights": EnableHighlights = ToBool(value); Notify(ConfigFieldUpdated.MasterToggles); break;
+                case "triggers": EnableTriggers = ToBool(value); Notify(ConfigFieldUpdated.MasterToggles); break;
+                case "substitutes": EnableSubstitutes = ToBool(value); Notify(ConfigFieldUpdated.MasterToggles); break;
+                case "gags": EnableGags = ToBool(value); Notify(ConfigFieldUpdated.MasterToggles); break;
+                case "aliases": EnableAliases = ToBool(value); Notify(ConfigFieldUpdated.MasterToggles); break;
                 case "scrollbacklines": ScrollbackLines = Math.Clamp(UtilityCore.StringToInteger(value), 100, 100000); break;
                 case "spelltimer": ShowSpellTimer = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "showexperience": ShowExperience = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
@@ -409,6 +456,12 @@ public sealed class GenieConfig
                 case "scripttimeout": ScriptTimeout = (int)UtilityCore.StringToDouble(value); break;
                 case "maxgosubdepth": MaxGoSubDepth = int.TryParse(value, out var mgd) ? mgd : MaxGoSubDepth; break;
                 case "roundtimeoffset": RoundTimeOffset = UtilityCore.StringToDouble(value); break;
+                case "injuriespoll":
+                    // 0 (off) or ≥10 s — floor non-zero values so a typo like
+                    // "1" can't hammer the server with health commands.
+                    var ips = (int)UtilityCore.StringToDouble(value);
+                    InjuriesPollSeconds = ips <= 0 ? 0 : Math.Max(10, ips);
+                    break;
                 case "scriptdir": ScriptDirRaw = SetDir(value); break;
                 case "sounddir": SoundDirRaw = SetDir(value); break;
                 case "ttsvoicedir": TtsVoiceDirRaw = SetDir(value); break;

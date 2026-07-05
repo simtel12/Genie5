@@ -59,6 +59,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// for parser dev / protocol debugging (#14). Hidden by default.</summary>
     public RawXmlViewModel     RawXml     { get; } = new();
 
+    /// <summary>Backs the dockable Injuries panel — body-silhouette wound/scar
+    /// display from the server's injuries dialog (#18). Hidden by default.</summary>
+    public InjuriesViewModel   Injuries   { get; } = new();
+
     /// <summary>
     /// Global layout presets, shared across every character —
     /// <c>{AppData}/Genie5/Layouts/</c>. Always present.
@@ -193,6 +197,109 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <summary>Menu header bound by MainWindow.axaml — appends a bullet when <see cref="UpdatesAvailable"/>.</summary>
     public string HelpMenuHeader => UpdatesAvailable ? "_Help ●" : "_Help";
 
+    // ── Help ▸ Update Settings (per-kind startup-check + auto-apply) ──────────
+    // Eight checkboxes persisted in update-feeds.json (FeedConfig.*Policy).
+    // Setters write through immediately; _updateTogglesLoading suppresses the
+    // write-back while the constructor seeds the initial values from disk.
+
+    private bool _updateTogglesLoading;
+    private bool _checkCoreOnStartup    = true;
+    private bool _checkMapsOnStartup    = true;
+    private bool _checkPluginsOnStartup = true;
+    private bool _checkScriptsOnStartup = true;
+    private bool _autoUpdateCore;
+    private bool _autoUpdateMaps;
+    private bool _autoUpdatePlugins;
+    private bool _autoUpdateScripts;
+
+    public bool CheckCoreOnStartup
+    {
+        get => _checkCoreOnStartup;
+        set { this.RaiseAndSetIfChanged(ref _checkCoreOnStartup, value); SaveUpdatePolicy(c => c.CorePolicy.CheckOnStartup = value); }
+    }
+    public bool CheckMapsOnStartup
+    {
+        get => _checkMapsOnStartup;
+        set { this.RaiseAndSetIfChanged(ref _checkMapsOnStartup, value); SaveUpdatePolicy(c => c.MapsPolicy.CheckOnStartup = value); }
+    }
+    public bool CheckPluginsOnStartup
+    {
+        get => _checkPluginsOnStartup;
+        set { this.RaiseAndSetIfChanged(ref _checkPluginsOnStartup, value); SaveUpdatePolicy(c => c.PluginsPolicy.CheckOnStartup = value); }
+    }
+    public bool CheckScriptsOnStartup
+    {
+        get => _checkScriptsOnStartup;
+        set { this.RaiseAndSetIfChanged(ref _checkScriptsOnStartup, value); SaveUpdatePolicy(c => c.ScriptsPolicy.CheckOnStartup = value); }
+    }
+    /// <summary>Auto-apply for Core downloads + stages via Velopack, installing
+    /// when the app EXITS — never a surprise restart mid-session.</summary>
+    public bool AutoUpdateCore
+    {
+        get => _autoUpdateCore;
+        set { this.RaiseAndSetIfChanged(ref _autoUpdateCore, value); SaveUpdatePolicy(c => c.CorePolicy.AutoApply = value); }
+    }
+    public bool AutoUpdateMaps
+    {
+        get => _autoUpdateMaps;
+        set { this.RaiseAndSetIfChanged(ref _autoUpdateMaps, value); SaveUpdatePolicy(c => c.MapsPolicy.AutoApply = value); }
+    }
+    public bool AutoUpdatePlugins
+    {
+        get => _autoUpdatePlugins;
+        set { this.RaiseAndSetIfChanged(ref _autoUpdatePlugins, value); SaveUpdatePolicy(c => c.PluginsPolicy.AutoApply = value); }
+    }
+    public bool AutoUpdateScripts
+    {
+        get => _autoUpdateScripts;
+        set { this.RaiseAndSetIfChanged(ref _autoUpdateScripts, value); SaveUpdatePolicy(c => c.ScriptsPolicy.AutoApply = value); }
+    }
+
+    /// <summary>Load-modify-save one policy field in update-feeds.json. Skipped
+    /// while the constructor is seeding the checkboxes from that same file.</summary>
+    private void SaveUpdatePolicy(Action<Genie.Core.Update.FeedConfig> mutate)
+    {
+        if (_updateTogglesLoading) return;
+        try
+        {
+            var store = new Genie.Core.Update.FeedConfigStore(_configDir);
+            var cfg   = store.Load();
+            mutate(cfg);
+            store.Save(cfg);
+        }
+        catch { /* a failed save costs one forgotten checkbox, not a crash */ }
+    }
+
+    /// <summary>Seed the eight Update Settings checkboxes from update-feeds.json.</summary>
+    private void LoadUpdatePolicies()
+    {
+        _updateTogglesLoading = true;
+        try
+        {
+            var cfg = new Genie.Core.Update.FeedConfigStore(_configDir).Load();
+            CheckCoreOnStartup    = cfg.CorePolicy.CheckOnStartup;
+            CheckMapsOnStartup    = cfg.MapsPolicy.CheckOnStartup;
+            CheckPluginsOnStartup = cfg.PluginsPolicy.CheckOnStartup;
+            CheckScriptsOnStartup = cfg.ScriptsPolicy.CheckOnStartup;
+            AutoUpdateCore        = cfg.CorePolicy.AutoApply;
+            AutoUpdateMaps        = cfg.MapsPolicy.AutoApply;
+            AutoUpdatePlugins     = cfg.PluginsPolicy.AutoApply;
+            AutoUpdateScripts     = cfg.ScriptsPolicy.AutoApply;
+        }
+        catch { /* defaults stand */ }
+        finally { _updateTogglesLoading = false; }
+    }
+
+    // ── Status-bar update notice (non-intrusive strip above the vitals bar) ──
+
+    /// <summary>One-line summary of what the startup check found / auto-applied
+    /// (e.g. "Updates available: Core, Scripts" or "Auto-updated Maps (3 files)").
+    /// Empty = the notice strip is collapsed. Click opens the Updates dialog;
+    /// the × dismisses until the next check finds something new.</summary>
+    [Reactive] public string UpdateNotice { get; private set; } = "";
+
+    public ReactiveCommand<Unit, Unit> DismissUpdateNoticeCommand { get; private set; } = null!;
+
     // ── Plugins menu ────────────────────────────────────────────────────────
     /// <summary>Loaded plugins shown in the Plugins menu (enable/disable).
     /// Rebuilt when the menu opens.</summary>
@@ -213,12 +320,19 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
     public Interaction<LayoutSavePrompt, LayoutSaveResult?> ShowLayoutSavePrompt   { get; } = new();
     public ReactiveCommand<Unit, Unit>                    ToggleStatusBarCommand   { get; }
+    public ReactiveCommand<Unit, Unit>                    ToggleIconBarCommand     { get; }
+
+    /// <summary>Backs the Icon Bar status-chip strip (Genie 4 parity, #26).</summary>
+    public IconBarViewModel IconBar { get; } = new();
+    public ReactiveCommand<Unit, Unit>                    ToggleMagicPanelsCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleZoneRoomIdCommand  { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleZoneRoomNumberCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleWindowedModeCommand{ get; }
     public ReactiveCommand<Unit, Unit>                    ToggleGuildInTitleCommand{ get; }
     /// <summary>Window → Disconnect Popup. Toggles the modal "Disconnected" notice (#114).</summary>
     public ReactiveCommand<Unit, Unit>                    ToggleDisconnectPopupCommand { get; }
+    /// <summary>Layout → Always on Top. Keeps the main window above other applications.</summary>
+    public ReactiveCommand<Unit, Unit>                    ToggleAlwaysOnTopCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleHandsBarCommand    { get; }
     /// <summary>Window → Hands Strip Position → Top. Snaps the strip to the top of the window.</summary>
     public ReactiveCommand<Unit, Unit>                    HandsBarToTopCommand     { get; }
@@ -234,6 +348,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// <summary>File → Record Session — toggle raw-XML capture on/off.</summary>
     public ReactiveCommand<Unit, Unit>                    ToggleRecordingCommand   { get; }
 
+    /// <summary>File → Mute Sounds — flip the <c>muted</c> config (the
+    /// <c>PlaySounds</c> gate in GenieCore.PlaySound) and persist settings.cfg.</summary>
+    public ReactiveCommand<Unit, Unit>                    ToggleMuteCommand        { get; }
+
     /// <summary>True iff the RT badge should render in its command-bar slot —
     /// i.e. the character is in RT AND the user has chosen the command-bar
     /// position. Computed from <see cref="VitalsViewModel.InRoundTime"/> and
@@ -248,6 +366,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// raw XML stream to disk. Drives the File-menu checkbox + the title-bar
     /// "● REC" suffix.</summary>
     [Reactive] public bool IsRecording        { get; private set; }
+
+    /// <summary>True while SFX are muted (<c>Config.PlaySounds</c> false / the
+    /// <c>muted</c> settings.cfg key). Drives the File-menu checkbox; kept in
+    /// sync with <c>#config muted</c> and profile loads via ConfigChanged.</summary>
+    [Reactive] public bool IsMuted            { get; private set; }
 
     /// <summary>Full window title with optional " ● REC" suffix when recording.
     /// Composed reactively from <see cref="ConnectionStatus"/>, <see cref="CharacterGuild"/>,
@@ -294,6 +417,18 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// AppData path, which most users can't easily find.
     /// </summary>
     public ReactiveCommand<Unit, Unit>                    OpenRecordingsFolderCommand { get; }
+
+    // File ▸ Open Directory submenu (issue #26 — Genie 4 had a single "Open
+    // Directory" that opened the data root; the submenu adds direct jumps).
+    // Maps / Scripts / Plugins reuse their existing commands.
+
+    /// <summary>Opens the user-data root ({AppData}/Genie5/ or the portable
+    /// dir) — Genie 4's File ▸ Open Directory.</summary>
+    public ReactiveCommand<Unit, Unit>                    OpenDataFolderCommand { get; }
+
+    /// <summary>Opens the active config directory — the per-character profile
+    /// dir when connected (Profiles/{Char}-{Acct}/), else the shared Config/.</summary>
+    public ReactiveCommand<Unit, Unit>                    OpenConfigFolderCommand { get; }
 
     // ── Analyst Capture (redacted, analyst-readable session captures) ──────────
 
@@ -361,6 +496,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     [Reactive] public bool MobsVisible     { get; private set; }   // hidden by default (opt-in)
     [Reactive] public bool PlayersVisible  { get; private set; }   // hidden by default (opt-in)
     [Reactive] public bool RawXmlVisible   { get; private set; }   // hidden by default (opt-in, #14)
+    [Reactive] public bool InjuriesVisible { get; private set; }   // hidden by default (opt-in, #18)
 
     // ── Toggle commands (one per dockable) ───────────────────────────────────
     public ReactiveCommand<Unit, Unit> ToggleGameCommand     { get; }
@@ -386,6 +522,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> ToggleMobsCommand     { get; }
     public ReactiveCommand<Unit, Unit> TogglePlayersCommand  { get; }
     public ReactiveCommand<Unit, Unit> ToggleRawXmlCommand   { get; }
+    public ReactiveCommand<Unit, Unit> ToggleInjuriesCommand { get; }
 
     // ── Core ──────────────────────────────────────────────────────────────────
 
@@ -466,6 +603,175 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     {
         get => _gagsSafety;
         set { this.RaiseAndSetIfChanged(ref _gagsSafety, value); if (_core is not null) _core.Gags.SafetyEnabled = value; }
+    }
+
+    // ── Master toggles (File ▸ Master Toggles) ─────────────────────────────
+    // Config-backed (settings.cfg keys highlights / triggers / substitutes /
+    // gags / aliases / showimages) so they survive restart and stay in sync
+    // with a typed `#config triggers off` via ConfigChanged(MasterToggles) —
+    // showimages fires ConfigChanged(ImagesEnabled) instead. Setters write
+    // through to config and persist; the engines follow via
+    // GenieCore.SyncMasterToggles (images via SceneViewModel). Rules stay
+    // loaded while off.
+
+    private bool _highlightsEnabled  = true;
+    private bool _triggersEnabled    = true;
+    private bool _substitutesEnabled = true;
+    private bool _gagsEnabled        = true;
+    private bool _aliasesEnabled     = true;
+    private bool _imagesEnabled      = true;
+    private bool _syncingMasterToggles;
+
+    /// <summary>Master enable for user highlight rules (colours + sounds).</summary>
+    public bool HighlightsEnabled
+    {
+        get => _highlightsEnabled;
+        set { this.RaiseAndSetIfChanged(ref _highlightsEnabled, value); WriteMasterToggle("highlights", value); }
+    }
+    /// <summary>Master enable for user triggers.</summary>
+    public bool TriggersEnabled
+    {
+        get => _triggersEnabled;
+        set { this.RaiseAndSetIfChanged(ref _triggersEnabled, value); WriteMasterToggle("triggers", value); }
+    }
+    /// <summary>Master enable for substitute rules.</summary>
+    public bool SubstitutesEnabled
+    {
+        get => _substitutesEnabled;
+        set { this.RaiseAndSetIfChanged(ref _substitutesEnabled, value); WriteMasterToggle("substitutes", value); }
+    }
+    /// <summary>Master enable for gag rules.</summary>
+    public bool GagsEnabled
+    {
+        get => _gagsEnabled;
+        set { this.RaiseAndSetIfChanged(ref _gagsEnabled, value); WriteMasterToggle("gags", value); }
+    }
+    /// <summary>Master enable for alias expansion.</summary>
+    public bool AliasesEnabled
+    {
+        get => _aliasesEnabled;
+        set { this.RaiseAndSetIfChanged(ref _aliasesEnabled, value); WriteMasterToggle("aliases", value); }
+    }
+    /// <summary>Master enable for room/scene artwork (settings.cfg key
+    /// <c>showimages</c>). SceneViewModel reacts to the resulting
+    /// ConfigChanged(ImagesEnabled) — off clears the picture, on re-fetches.</summary>
+    public bool ImagesEnabled
+    {
+        get => _imagesEnabled;
+        set { this.RaiseAndSetIfChanged(ref _imagesEnabled, value); WriteMasterToggle("showimages", value); }
+    }
+
+    /// <summary>Push a menu-toggle change into config and persist it. The
+    /// engines react to the resulting ConfigChanged(MasterToggles), so this
+    /// never touches them directly. No-op while syncing FROM config.</summary>
+    private void WriteMasterToggle(string key, bool value)
+    {
+        if (_syncingMasterToggles || _core is null) return;
+        _core.Config.SetSetting(key, value.ToString(), showException: false);
+        _core.Config.Save();
+    }
+
+    /// <summary>Pull the master toggles from config into the menu
+    /// checkboxes — on core wire-up and whenever config changes underneath us
+    /// (typed #config, settings.cfg load, profile switch).</summary>
+    private void SyncMasterTogglesFromConfig()
+    {
+        if (_core is null) return;
+        _syncingMasterToggles = true;
+        try
+        {
+            HighlightsEnabled  = _core.Config.EnableHighlights;
+            TriggersEnabled    = _core.Config.EnableTriggers;
+            SubstitutesEnabled = _core.Config.EnableSubstitutes;
+            GagsEnabled        = _core.Config.EnableGags;
+            AliasesEnabled     = _core.Config.EnableAliases;
+            ImagesEnabled      = _core.Config.ShowImages;
+        }
+        finally { _syncingMasterToggles = false; }
+    }
+
+    // ── Auto Log (File ▸ Auto Log) ─────────────────────────────────────────
+    // Config-backed (settings.cfg key `autolog`), same checkbox⇄config pattern
+    // as the master toggles — but also applied LIVE: flipping it mid-session
+    // starts/stops the logger instead of arming the next connect. Both routes
+    // (menu click and typed `#config autolog`) funnel through
+    // ConfigChanged(Autolog) → SyncAutoLogFromConfig, so they can't drift.
+
+    private bool   _autoLogEnabled = true;
+    private bool   _syncingAutoLog;
+    private string _autoLogCharacter = string.Empty;   // session identity captured in ConnectAsync
+    private string _autoLogGame      = string.Empty;   // so a mid-session enable names the file correctly
+
+    /// <summary>Automatic rendered-text session log (Genie 4 AutoLog) on/off.</summary>
+    public bool AutoLogEnabled
+    {
+        get => _autoLogEnabled;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _autoLogEnabled, value);
+            if (_syncingAutoLog || _core is null) return;
+            _core.Config.SetSetting("autolog", value.ToString(), showException: false);
+            _core.Config.Save();
+        }
+    }
+
+    // ── Align Input to Game Window (Layout menu — Genie 4 SizeInputToGame) ──
+    // Config-backed (settings.cfg key `sizeinputtogame` — defined since the
+    // config port but consumed by NOTHING until now). Horizontal-only per
+    // Jason's spec: when on, the command bar's left/right margins track the
+    // game window's horizontal extent inside the dock (MainWindow.axaml.cs
+    // does the geometry); off (default) = full-width command bar.
+
+    private bool _alignInputToGame;
+    private bool _syncingAlignInput;
+
+    /// <summary>Layout ▸ Align Input to Game Window on/off (Genie 4 parity).</summary>
+    public bool AlignInputToGame
+    {
+        get => _alignInputToGame;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _alignInputToGame, value);
+            if (_syncingAlignInput || _core is null) return;
+            _core.Config.SetSetting("sizeinputtogame", value.ToString(), showException: false);
+            _core.Config.Save();
+        }
+    }
+
+    /// <summary>Pull `sizeinputtogame` from config into the menu checkbox —
+    /// both routes (menu click and typed #config) funnel through
+    /// ConfigChanged(SizeInputToGame), same shape as the Auto Log sync.</summary>
+    private void SyncAlignInputFromConfig()
+    {
+        if (_core is null) return;
+        _syncingAlignInput = true;
+        try { AlignInputToGame = _core.Config.SizeInputToGame; }
+        finally { _syncingAlignInput = false; }
+    }
+
+    /// <summary>Pull `autolog` from config into the menu checkbox, then apply it
+    /// to the running session: start the logger on a mid-session enable, stop it
+    /// on a disable. While disconnected the flag only arms the next connect
+    /// (ConnectAsync does the connect-time start).</summary>
+    private void SyncAutoLogFromConfig()
+    {
+        if (_core is null) return;
+        _syncingAutoLog = true;
+        try { AutoLogEnabled = _core.Config.AutoLog; }
+        finally { _syncingAutoLog = false; }
+
+        if (!IsConnected || _autoLogCharacter.Length == 0) return;
+        if (_core.Config.AutoLog && !AutoLogger.IsLogging)
+        {
+            // Notice BEFORE Start subscribes, so it isn't itself logged.
+            GameText.AddSystemLine("[autolog] session logging on → Logs folder. Turn off with File ▸ Auto Log or #config autolog false.");
+            AutoLogger.Start(GameText, _autoLogCharacter, _autoLogGame);
+        }
+        else if (!_core.Config.AutoLog && AutoLogger.IsLogging)
+        {
+            AutoLogger.Stop();
+            GameText.AddSystemLine("[autolog] session logging off.");
+        }
     }
 
     /// <summary>
@@ -744,10 +1050,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         WindowSettings.Register("experience", "Experience");
         WindowSettings.Register("active-spells", "Active Spells");
         WindowSettings.Register("scripts",   "Scripts");
-        WindowSettings.Register("scene",     "Scene");
+        WindowSettings.Register("scene",     "Portrait");   // Genie 4's Portrait window (room/scene art); id predates the rename
         WindowSettings.Register("mobs",      "Mobs");
         WindowSettings.Register("players",   "Players");
         WindowSettings.Register("raw-xml",   "Raw XML");
+        WindowSettings.Register("injuries",  "Injuries");
 
         // ── Global → per-window propagation ─────────────────────────────
         // When the user changes DisplaySettings (color, font, etc.), the
@@ -838,7 +1145,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             // When the selected profile matches the connected one, edits go
             // straight to the live engines; otherwise edits act on draft
             // engines loaded from that profile's directory.
-            var cfgVm = new ConfigurationViewModel(_core, _configDir, Profiles, ConnectedProfile, WindowSettings);
+            var cfgVm = new ConfigurationViewModel(_core, _configDir, Profiles, ConnectedProfile, WindowSettings, Display, _displayPath);
             await ShowConfigurationDialog.Handle(cfgVm);
         });
 
@@ -993,7 +1300,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                                  : Path.Combine(Path.GetDirectoryName(_configDir)!, "Maps");
             var zoneRepo   = _core?.ZoneRepository ?? new Genie.Core.Mapper.MapZoneRepository();
             var pluginMgr  = _core?.Plugins;
-            var vm = new UpdatesDialogViewModel(store, mapsDir, _pluginsDir, zoneRepo, pluginMgr);
+            // Scripts pull into the SAME folder the script engine loads from
+            // (Core's resolved ScriptDir when connected — see issue #37's
+            // OpenScriptsFolder rationale); pre-connect, the shared root.
+            var scriptsDir = _core is not null
+                                 ? _core.Config.ScriptDir
+                                 : Path.Combine(Path.GetDirectoryName(_configDir)!, "Scripts");
+            var vm = new UpdatesDialogViewModel(store, mapsDir, _pluginsDir, scriptsDir, zoneRepo, pluginMgr);
             await ShowUpdatesDialog.Handle(vm);
             // Re-run a background check so the badge reflects post-dialog state
             // (a successful update during the session should clear the dot).
@@ -1043,11 +1356,20 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             try
             {
                 if (!Directory.Exists(scriptsDir)) Directory.CreateDirectory(scriptsDir);
-                // Cross-platform folder open: ShellExecute on Windows, `open`
-                // on macOS, `xdg-open` on Linux. Same approach as the Maps
-                // folder open under File → Maps.
-                System.Diagnostics.Process.Start(
-                    new System.Diagnostics.ProcessStartInfo(scriptsDir) { UseShellExecute = true });
+                // explorer.exe/open/xdg-open with the resolved absolute path —
+                // the SAME pattern as every other folder-open (Maps, Recordings,
+                // Plugins, Open Directory). The previous ShellExecute-on-the-dir
+                // route is exactly what OpenMapsFolder documents as failing with
+                // "Location is not available" on some Windows setups.
+                var nativePath = Path.GetFullPath(scriptsDir);
+                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                        System.Runtime.InteropServices.OSPlatform.Windows))
+                    System.Diagnostics.Process.Start("explorer.exe", nativePath);
+                else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                             System.Runtime.InteropServices.OSPlatform.OSX))
+                    System.Diagnostics.Process.Start("open", nativePath);
+                else
+                    System.Diagnostics.Process.Start("xdg-open", nativePath);
             }
             catch (Exception ex)
             {
@@ -1055,9 +1377,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             }
         });
 
-        // Fire-and-forget startup check so the Help-menu badge surfaces
-        // any pending updates without the user having to open the dialog.
-        // Errors are swallowed — badge stays clear on network failure.
+        // Seed the Help ▸ Update Settings checkboxes from update-feeds.json,
+        // then fire the startup check so the Help-menu badge + status-bar
+        // notice surface any pending updates without the user having to open
+        // the dialog. Errors are swallowed — badge stays clear on network
+        // failure. The check honours the per-kind CheckOnStartup policies and
+        // auto-applies where the matching Auto-Apply toggle is on.
+        LoadUpdatePolicies();
+        DismissUpdateNoticeCommand = ReactiveCommand.Create(() => { UpdateNotice = ""; });
         _ = CheckForUpdatesInBackgroundAsync();
 
         this.WhenAnyValue(x => x.UpdatesAvailable)
@@ -1077,6 +1404,18 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleStatusBarCommand = ReactiveCommand.Create(() =>
         {
             Display.ShowStatusBar = !Display.ShowStatusBar;
+            Display.Save(_displayPath);
+        });
+
+        ToggleIconBarCommand = ReactiveCommand.Create(() =>
+        {
+            Display.ShowIconBar = !Display.ShowIconBar;
+            Display.Save(_displayPath);
+        });
+
+        ToggleMagicPanelsCommand = ReactiveCommand.Create(() =>
+        {
+            Display.ShowMagicPanels = !Display.ShowMagicPanels;
             Display.Save(_displayPath);
         });
 
@@ -1134,6 +1473,19 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         {
             Display.ShowDisconnectPopup = !Display.ShowDisconnectPopup;
             Display.Save(_displayPath);
+        });
+
+        ToggleAlwaysOnTopCommand = ReactiveCommand.Create(() =>
+        {
+            Display.AlwaysOnTop = !Display.AlwaysOnTop;
+            Display.Save(_displayPath);
+            // Mirror into settings.cfg so #config alwaysontop / #config list
+            // report what the window is actually doing (Genie 4 parity key).
+            if (_core?.Config is { } cfg && cfg.AlwaysOnTop != Display.AlwaysOnTop)
+            {
+                cfg.AlwaysOnTop = Display.AlwaysOnTop;
+                cfg.Save();
+            }
         });
 
         ToggleHandsBarCommand = ReactiveCommand.Create(() =>
@@ -1225,6 +1577,35 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             IsRecording = Recorder.IsRecording;
         });
 
+        ToggleMuteCommand = ReactiveCommand.Create(() =>
+        {
+            var config = _core?.Config;
+            if (config is null)
+            {
+                // Same auto-toggle trap as Record Session above: the checkmark
+                // already flipped visually, so say why nothing happened and let
+                // the reconcile below repaint it unchecked.
+                GameText.AddSystemLine("[sounds] Connect to a game first — settings load with the session.");
+            }
+            else
+            {
+                // Route through SetSetting so this is the same write path as
+                // `#config muted` — it fires ConfigChanged(Muted) for any other
+                // listener — then persist like the #config handler does.
+                bool mute = config.PlaySounds;
+                config.SetSetting("muted", mute.ToString());
+                config.Save();
+                if (mute) _audio.Stop();   // cut any in-flight SFX immediately
+                GameText.AddSystemLine(mute
+                    ? "[sounds] muted — trigger/highlight sounds and #play are off (#config muted true)."
+                    : "[sounds] unmuted.");
+            }
+
+            // Reconcile the checkbox to the config's actual state (see the
+            // IsRecording note above for why this must run on every toggle).
+            IsMuted = !(_core?.Config.PlaySounds ?? true);
+        });
+
         // Title-bar composition — show "🔴 REC" suffix while recording so the
         // user can't forget the capture is running (matches the compliance
         // review's recommendation that recording always be visibly indicated).
@@ -1300,6 +1681,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleMobsCommand     = MakeToggleCommand("mobs",      v => MobsVisible     = v);
         TogglePlayersCommand  = MakeToggleCommand("players",   v => PlayersVisible  = v);
         ToggleRawXmlCommand   = MakeToggleCommand("raw-xml",   v => RawXmlVisible   = v);
+        ToggleInjuriesCommand = MakeToggleCommand("injuries",  v => InjuriesVisible = v);
 
         // (ResetLayoutCommand is assigned earlier — using ApplyLayout() with a
         // SavedLayout that goes through factory.BuildDefaultLayout(). A second
@@ -1321,6 +1703,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         SetMapsDirectoryCommand     = ReactiveCommand.CreateFromTask(SetMapsDirectoryAsync);
         OpenMapsFolderCommand       = ReactiveCommand.Create(OpenMapsFolder);
         OpenRecordingsFolderCommand = ReactiveCommand.Create(OpenRecordingsFolder);
+        // File ▸ Open Directory: data root + active config dir (Logs/Maps/
+        // Scripts/Plugins reuse their existing commands). The config dir is
+        // read at click time so it tracks the per-character profile switch.
+        OpenDataFolderCommand       = ReactiveCommand.Create(
+            () => OpenFolder(Path.GetDirectoryName(_configDir)!, "OpenDataFolder"));
+        OpenConfigFolderCommand     = ReactiveCommand.Create(
+            () => OpenFolder(_core?.Config.ConfigProfileDir ?? _configDir, "OpenConfigFolder"));
         TogglePerfOverlayCommand    = ReactiveCommand.Create(() => Perf.Toggle());
 
         // ── Analyst Capture commands ───────────────────────────────────────
@@ -1517,10 +1906,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
     // ── Help → Check for Updates: background check ─────────────────────────
     //
-    // Runs cheap CheckAsync on every enabled feed in the background and sets
-    // UpdatesAvailable. Drives the Help-menu badge so the user sees there's
-    // something to update without having to open the dialog. Failures are
-    // silent — we'd rather a flaky network not produce a misleading badge.
+    // Runs cheap CheckAsync on every enabled feed in the background, honouring
+    // the per-kind Help ▸ Update Settings policies: kinds with CheckOnStartup
+    // off are skipped entirely; kinds with Auto-Apply on install what the
+    // check finds (Maps / Plugins / Scripts immediately; Core stages via
+    // Velopack to install on exit — never a surprise restart). Results drive
+    // the Help-menu ● badge and the status-bar UpdateNotice strip. Failures
+    // are silent — we'd rather a flaky network not produce a misleading badge.
     private async Task CheckForUpdatesInBackgroundAsync()
     {
         try
@@ -1533,45 +1925,97 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             var zoneRepo = _core?.ZoneRepository ?? new Genie.Core.Mapper.MapZoneRepository();
             var pluginMgr = _core?.Plugins;
             var channel   = string.IsNullOrWhiteSpace(cfg.Core.Channel) ? "stable" : cfg.Core.Channel;
-            var any       = false;
 
-            foreach (var feed in cfg.Maps.Where(f => f.Enabled))
-            {
-                try
-                {
-                    var src = new Genie.Core.Update.Sources.GithubContentsSource(
-                        feed.Owner, feed.Repo, feed.Path, feed.Extension);
-                    var u = new Genie.Core.Update.Updaters.MapsUpdater(
-                        zoneRepo, mapsDir, new[] { (Genie.Core.Update.Sources.IFileListSource)src });
-                    if ((await u.CheckAsync()).UpdateAvailable) any = true;
-                }
-                catch { /* silent — see method header */ }
-            }
+            var available = new List<string>();   // kinds with updates awaiting a click
+            var applied   = new List<string>();   // kinds the auto-apply toggles handled
 
-            foreach (var feed in cfg.Plugins.Where(f => f.Enabled))
-            {
-                try
+            if (cfg.MapsPolicy.CheckOnStartup)
+                foreach (var feed in cfg.Maps.Where(f => f.Enabled))
                 {
-                    var src = new Genie.Core.Update.Sources.GithubReleasesSource(feed.Owner, feed.Repo);
-                    var u = new Genie.Core.Update.Updaters.PluginUpdater(
-                        feed, src, _pluginsDir, pluginMgr, channel);
-                    if ((await u.CheckAsync()).UpdateAvailable) any = true;
+                    try
+                    {
+                        var src = new Genie.Core.Update.Sources.GithubContentsSource(
+                            feed.Owner, feed.Repo, feed.Path, feed.Extension);
+                        var u = new Genie.Core.Update.Updaters.MapsUpdater(
+                            zoneRepo, mapsDir, new[] { (Genie.Core.Update.Sources.IFileListSource)src });
+                        if (!(await u.CheckAsync()).UpdateAvailable) continue;
+                        if (cfg.MapsPolicy.AutoApply && (await u.ApplyAsync()).Succeeded)
+                            applied.Add("Maps");
+                        else
+                            available.Add("Maps");
+                    }
+                    catch { /* silent — see method header */ }
                 }
-                catch { /* silent — see method header */ }
-            }
+
+            if (cfg.PluginsPolicy.CheckOnStartup)
+                foreach (var feed in cfg.Plugins.Where(f => f.Enabled))
+                {
+                    try
+                    {
+                        var src = new Genie.Core.Update.Sources.GithubReleasesSource(feed.Owner, feed.Repo);
+                        var u = new Genie.Core.Update.Updaters.PluginUpdater(
+                            feed, src, _pluginsDir, pluginMgr, channel);
+                        if (!(await u.CheckAsync()).UpdateAvailable) continue;
+                        if (cfg.PluginsPolicy.AutoApply && (await u.ApplyAsync()).Succeeded)
+                            applied.Add("Plugins");
+                        else
+                            available.Add("Plugins");
+                    }
+                    catch { /* silent — see method header */ }
+                }
+
+            var scriptsDir = _core is not null
+                                 ? _core.Config.ScriptDir
+                                 : Path.Combine(Path.GetDirectoryName(_configDir)!, "Scripts");
+            if (cfg.ScriptsPolicy.CheckOnStartup)
+                foreach (var feed in cfg.Scripts.Where(f => f.Enabled))
+                {
+                    try
+                    {
+                        var src = UpdatesDialogViewModel.MakeScriptsSource(feed);
+                        var u = new Genie.Core.Update.Updaters.ScriptsUpdater(scriptsDir, new[] { src });
+                        if (!(await u.CheckAsync()).UpdateAvailable) continue;
+                        if (cfg.ScriptsPolicy.AutoApply && (await u.ApplyAsync()).Succeeded)
+                            applied.Add("Scripts");
+                        else
+                            available.Add("Scripts");
+                    }
+                    catch { /* silent — see method header */ }
+                }
 
             // Core app — only meaningful when running from a Velopack install
             // (CoreAppUpdater short-circuits with "(dev build)" otherwise, so
             // there's no risk of spurious badges from dev runs).
-            try
-            {
-                var coreUrl = $"https://github.com/{cfg.Core.Owner}/{cfg.Core.Repo}";
-                var core    = new Services.CoreAppUpdater(coreUrl, channel);
-                if ((await core.CheckAsync()).UpdateAvailable) any = true;
-            }
-            catch { /* silent — see method header */ }
+            if (cfg.CorePolicy.CheckOnStartup)
+                try
+                {
+                    var coreUrl = $"https://github.com/{cfg.Core.Owner}/{cfg.Core.Repo}";
+                    var core    = new Services.CoreAppUpdater(coreUrl, channel);
+                    var chk     = await core.CheckAsync();
+                    if (chk.UpdateAvailable)
+                    {
+                        if (cfg.CorePolicy.AutoApply && (await core.StageOnExitAsync()).Succeeded)
+                            applied.Add($"Genie v{chk.LatestVersion} (installs on exit)");
+                        else
+                            available.Add("Genie");
+                    }
+                }
+                catch { /* silent — see method header */ }
 
-            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => UpdatesAvailable = any);
+            // Compose the status-bar notice. Both lists empty → clear it, so a
+            // previous notice whose updates have since been applied never lingers.
+            var avail = available.Distinct().ToList();
+            var done  = applied.Distinct().ToList();
+            var parts = new List<string>(2);
+            if (avail.Count > 0) parts.Add($"Updates available: {string.Join(", ", avail)}");
+            if (done.Count  > 0) parts.Add($"Auto-updated: {string.Join(", ", done)}");
+            var notice = string.Join("  ·  ", parts);
+
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                UpdatesAvailable = avail.Count > 0;
+                UpdateNotice     = notice;
+            });
         }
         catch { /* belt-and-braces */ }
     }
@@ -2143,6 +2587,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         SetVisibilityBool("mobs",      factory.IsToolVisible("mobs"));
         SetVisibilityBool("players",   factory.IsToolVisible("players"));
         SetVisibilityBool("raw-xml",   factory.IsToolVisible("raw-xml"));
+        SetVisibilityBool("injuries",  factory.IsToolVisible("injuries"));
     }
 
     // ── Plugin-created windows ───────────────────────────────────────────────
@@ -2589,6 +3034,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             case "mobs":      ForceSet(visible, v => MobsVisible     = v, () => MobsVisible);     break;
             case "players":   ForceSet(visible, v => PlayersVisible  = v, () => PlayersVisible);  break;
             case "raw-xml":   ForceSet(visible, v => RawXmlVisible   = v, () => RawXmlVisible);   break;
+            case "injuries":  ForceSet(visible, v => InjuriesVisible = v, () => InjuriesVisible); break;
         }
 
         static void ForceSet(bool target, Action<bool> set, Func<bool> get)
@@ -2680,7 +3126,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // false so runtime-added rules and a running script's state survive — the
         // whole point of the persistent core (issue #88 / #46 Phase 3). The same
         // flag gates the core's own .cfg load so both rule formats stay in lockstep.
-        var ruleKey      = $"{cfg.CharacterName} {cfg.AccountName}";
+        var ruleKey      = $"{cfg.CharacterName}\0{cfg.AccountName}";
         var alreadyLoaded = string.Equals(ruleKey, _loadedRuleKey, StringComparison.OrdinalIgnoreCase);
         // CLEAR the previous character's rules ONLY on a genuine A→B switch; the
         // first connect from offline must NOT clear (a logon script's #var/#class
@@ -2701,9 +3147,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
         // AutoLog (Genie 4): begin the rendered-text session log if enabled. The
         // notice is emitted BEFORE Start subscribes, so it isn't itself logged.
+        // The identity is remembered so a mid-session File ▸ Auto Log enable
+        // (SyncAutoLogFromConfig) names the file for THIS session.
+        _autoLogCharacter = cfg.CharacterName;
+        _autoLogGame      = cfg.GameCode;
         if (_core.Config.AutoLog)
         {
-            GameText.AddSystemLine("[autolog] session logging on → Logs folder. Turn off with #config autolog false.");
+            GameText.AddSystemLine("[autolog] session logging on → Logs folder. Turn off with File ▸ Auto Log or #config autolog false.");
             AutoLogger.Start(GameText, cfg.CharacterName, cfg.GameCode);
         }
 
@@ -2915,11 +3365,72 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     {
         if (_core is null) return;   // assigned by EnsureCoreBuilt immediately before this call
 
+        // Mute checkbox ⇄ config. Seed from the freshly built core's config,
+        // then track every later write — `#config muted`, settings.cfg loads at
+        // connect, `#config reload` — all of which land via SetSetting and fire
+        // ConfigChanged(Muted). SetSetting can run off the UI thread (scripts),
+        // so marshal the property write.
+        IsMuted = !_core.Config.PlaySounds;
+        _core.Config.ConfigChanged += field =>
+        {
+            if (field == Genie.Core.Config.ConfigFieldUpdated.Muted)
+                Avalonia.Threading.Dispatcher.UIThread.Post(
+                    () => IsMuted = !(_core?.Config.PlaySounds ?? true));
+        };
+
+        // Master-toggle checkboxes ⇄ config, same pattern as the mute checkbox:
+        // seed from the core's config, then follow every later write —
+        // `#config gags off`, settings.cfg loads, profile switches.
+        SyncMasterTogglesFromConfig();
+        _core.Config.ConfigChanged += field =>
+        {
+            if (field is Genie.Core.Config.ConfigFieldUpdated.MasterToggles
+                      or Genie.Core.Config.ConfigFieldUpdated.ImagesEnabled)
+                Avalonia.Threading.Dispatcher.UIThread.Post(SyncMasterTogglesFromConfig);
+        };
+
+        // Auto Log checkbox ⇄ config — and the live mid-session start/stop.
+        // This also covers the settings.cfg load during connect: ConnectAsync
+        // starts the logger from the pre-load config value, and if the loaded
+        // file disagrees this handler corrects it right after.
+        SyncAutoLogFromConfig();
+        _core.Config.ConfigChanged += field =>
+        {
+            if (field == Genie.Core.Config.ConfigFieldUpdated.Autolog)
+                Avalonia.Threading.Dispatcher.UIThread.Post(SyncAutoLogFromConfig);
+        };
+
+        // Align Input ⇄ config (`sizeinputtogame`), same seed-then-follow shape.
+        SyncAlignInputFromConfig();
+        _core.Config.ConfigChanged += field =>
+        {
+            if (field == Genie.Core.Config.ConfigFieldUpdated.SizeInputToGame)
+                Avalonia.Threading.Dispatcher.UIThread.Post(SyncAlignInputFromConfig);
+        };
+
         // Guild for the title bar — fires when the player runs `info`. DR has
         // no structured guild tag, so we parse it from the info output.
         _core.GameEvents.OfType<GuildEvent>()
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(e => CharacterGuild = e.Guild);
+
+        // Character name discovered mid-session (Lich attach ident, issue
+        // #127). A Lich quick-connect carries no name, so ConnectionStatus was
+        // built from an empty identity and the guild suffix read as the name.
+        // Adopt the discovered name into the status line and the remembered
+        // config (so Reconnect and the Connect dialog keep it) — but never
+        // override a name the user supplied.
+        _core.GameEvents.OfType<Genie.Core.Events.CharacterNameEvent>()
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(e =>
+            {
+                if (string.IsNullOrWhiteSpace(e.Name)) return;
+                if (!string.IsNullOrWhiteSpace(LastConnectionConfig?.CharacterName)) return;
+                if (LastConnectionConfig is not null)
+                    LastConnectionConfig = LastConnectionConfig with { CharacterName = e.Name };
+                if (IsConnected)
+                    ConnectionStatus = $"Connected — {Genie.Core.Profiles.CharacterIdentity.Format(e.Name, LastConnectionConfig?.AccountName ?? "")}";
+            });
 
         _core.ConnectionState.ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(e =>
@@ -3124,9 +3635,17 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ActiveSpells.Attach(_core);
         Scripts.Attach(_core);
         Scene.Attach(_core);
+        IconBar.Attach(_core);
         Mobs.Attach(_core);
         Players.Attach(_core);
         RawXml.Attach(_core);
+        Injuries.Attach(_core);
+        // Gate the injuries auto-refresh poll on the panel actually being open
+        // — no visible window, no silent `health` sends. InjuriesVisible is the
+        // canonical mirror of the dock tool's state (toggle commands + the
+        // X-close sync both maintain it), and a bare bool read is safe from the
+        // poll's timer thread.
+        _core.InjuriesPanelVisible = () => InjuriesVisible;
         AttachPluginWindows(_core);
 
         // Load external plugin DLLs from {AppData}/Genie5/Plugins (the builtin
@@ -3185,6 +3704,28 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // ReactiveCommand and the editor launch touches process state.
         _core.ConfigCommandRequested  += args =>
             Avalonia.Threading.Dispatcher.UIThread.Post(() => HandleConfigCommand(args));
+
+        // Always-on-top lives in display.json (applies at app launch, before any
+        // core exists) with settings.cfg's Genie 4 `alwaysontop` key as a live
+        // alias: #config alwaysontop on|off / #config load land here and drive
+        // the same Display flag the window's Topmost is bound to. The menu
+        // toggle writes both stores, so this only fires on a genuine change.
+        _core.Config.ConfigChanged += field =>
+        {
+            if (field != Genie.Core.Config.ConfigFieldUpdated.AlwaysOnTop) return;
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (_core is null || Display.AlwaysOnTop == _core.Config.AlwaysOnTop) return;
+                Display.AlwaysOnTop = _core.Config.AlwaysOnTop;
+                Display.Save(_displayPath);
+                GameText.AddSystemLine($"[layout] always on top {(Display.AlwaysOnTop ? "on" : "off")}");
+            });
+        };
+        // The ctor's settings.cfg load ran before this subscription, so a stale
+        // file value can't undo a toggle made while the core didn't exist yet —
+        // display.json is the authority: push it into the live config so
+        // #config alwaysontop / #config list report what the window is doing.
+        _core.Config.AlwaysOnTop = Display.AlwaysOnTop;
 
         // #goto / #go2 … from the command bar or a script — resolve the room
         // against the active zone and start an attended walk. UI-thread-bound

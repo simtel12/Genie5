@@ -7,6 +7,7 @@
         x:DataType="vm:MainWindowViewModel"
         Title="{Binding WindowTitle}"
         Icon="avares://Genie/Assets/app.png"
+        Topmost="{Binding Display.AlwaysOnTop}"
         Width="1280" Height="800"
         MinWidth="800" MinHeight="500">
 
@@ -27,14 +28,60 @@
         <MenuItem Header="_Connect..."    Command="{Binding ConnectCommand}"/>
         <MenuItem Header="_Disconnect"    Command="{Binding DisconnectCommand}"/>
         <Separator/>
+        <MenuItem Header="_Auto Log"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding AutoLogEnabled}"
+                  ToolTip.Tip="Automatically write the rendered game text (what you see in the Game window) to AppData/Genie5/Logs/ — one file per character per day; same-day sessions append. Same as `#config autolog`; saved to settings.cfg. Takes effect immediately, even mid-session."/>
         <MenuItem Header="_Record Session (raw XML)"
                   ToggleType="CheckBox"
                   IsChecked="{Binding IsRecording, Mode=OneWay}"
                   Command="{Binding ToggleRecordingCommand}"
                   ToolTip.Tip="Capture the raw game XML stream to a file under AppData/Genie5/Logs/ for later review. One file per Start. Stops automatically on disconnect. While active, the title bar shows ● REC. Use AFTER you connect — toggling before a live session is open captures nothing."/>
-        <MenuItem Header="Open Recordings _Folder"
-                  Command="{Binding OpenRecordingsFolderCommand}"
-                  ToolTip.Tip="Open the {AppData}/Genie5/Logs/ folder where Record Session saves its `.xml` captures. There's no in-App replay viewer yet — use the Console (dotnet run --project src/Genie.Core -- REPLAY &lt;file&gt;) to play recordings back."/>
+        <MenuItem Header="Open _Directory"
+                  ToolTip.Tip="Open a Genie data folder in your file browser — Genie 4's File ▸ Open Directory, split out per folder. Each entry also lives on its own menu (Maps, Scripts, Plugins).">
+          <MenuItem Header="_Data Folder"
+                    Command="{Binding OpenDataFolderCommand}"
+                    ToolTip.Tip="The whole Genie data tree — Config, Logs, Maps, Scripts, Plugins, Profiles side by side. {AppData}/Genie5/ (or the portable folder next to the exe)."/>
+          <Separator/>
+          <MenuItem Header="_Config"
+                    Command="{Binding OpenConfigFolderCommand}"
+                    ToolTip.Tip="Your active settings files (aliases.cfg, triggers.cfg, highlights.cfg, …). Opens the current character's profile folder when connected, otherwise the shared Config folder."/>
+          <MenuItem Header="_Logs"
+                    Command="{Binding OpenRecordingsFolderCommand}"
+                    ToolTip.Tip="Session logs and raw-XML recordings — Auto Log text files and File ▸ Record Session `.xml` captures both save here."/>
+          <MenuItem Header="_Maps"
+                    Command="{Binding OpenMapsFolderCommand}"
+                    ToolTip.Tip="The map zone XML files the Mapper reads (shared across all characters)."/>
+          <MenuItem Header="_Scripts"
+                    Command="{Binding OpenScriptsFolderCommand}"
+                    ToolTip.Tip="Your .cmd and .js script files."/>
+          <MenuItem Header="_Plugins"
+                    Command="{Binding OpenPluginsFolderCommand}"
+                    ToolTip.Tip="Installed plugin DLLs (shared across all characters)."/>
+        </MenuItem>
+        <Separator/>
+        <MenuItem Header="_Mute Sounds"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding IsMuted, Mode=OneWay}"
+                  Command="{Binding ToggleMuteCommand}"
+                  ToolTip.Tip="Silence all sound effects — trigger/highlight sounds and #play. Same as `#config muted true`; saved to settings.cfg so it persists across sessions. Does not affect #speak text-to-speech."/>
+        <Separator/>
+        <MenuItem Header="Master _Toggles"
+                  ToolTip.Tip="Turn whole features on or off without touching their rules or data — rules stay loaded and editable, they just stop applying. Genie 4 File-menu parity. Saved to settings.cfg; same as `#config triggers off` etc. Rule toggles apply to new lines — already-rendered text is unchanged.">
+          <MenuItem Header="_Highlights"  ToggleType="CheckBox" IsChecked="{Binding HighlightsEnabled}"
+                    ToolTip.Tip="User highlight rules — colours and highlight sounds (built-in default highlights and Names are unaffected)."/>
+          <MenuItem Header="_Triggers"    ToggleType="CheckBox" IsChecked="{Binding TriggersEnabled}"
+                    ToolTip.Tip="User triggers — no trigger fires while off."/>
+          <MenuItem Header="_Substitutes" ToggleType="CheckBox" IsChecked="{Binding SubstitutesEnabled}"
+                    ToolTip.Tip="Substitute rules — lines render exactly as the game sent them while off."/>
+          <MenuItem Header="_Gags"        ToggleType="CheckBox" IsChecked="{Binding GagsEnabled}"
+                    ToolTip.Tip="Gag rules — nothing is hidden while off."/>
+          <MenuItem Header="_Aliases"     ToggleType="CheckBox" IsChecked="{Binding AliasesEnabled}"
+                    ToolTip.Tip="Alias expansion — typed commands go to the game exactly as typed while off."/>
+          <Separator/>
+          <MenuItem Header="_Images"      ToggleType="CheckBox" IsChecked="{Binding ImagesEnabled}"
+                    ToolTip.Tip="Room/scene artwork in the Portrait panel — same as `#config showimages`. Off clears the current picture immediately; on re-fetches it."/>
+        </MenuItem>
         <Separator/>
         <MenuItem Header="_Import from Genie 4..."
                   Command="{Binding Genie4ImportCommand}"
@@ -43,6 +90,9 @@
         <MenuItem Header="E_xit"          Command="{Binding ExitCommand}"/>
       </MenuItem>
       <MenuItem Header="_Edit">
+        <MenuItem Header="Paste _Multi Line" Click="OnPasteMultiLine"
+                  ToolTip.Tip="Paste the clipboard into the command bar with each line joined by the command separator, so every line runs as its own command."/>
+        <Separator/>
         <MenuItem Header="_Configuration..."    Command="{Binding ConfigurationCommand}"/>
         <Separator/>
         <MenuItem Header="_Display Settings..." Command="{Binding DisplaySettingsCommand}"/>
@@ -137,6 +187,16 @@
                   IsChecked="{Binding Display.ShowStatusBar}"
                   Command="{Binding ToggleStatusBarCommand}"
                   ToolTip.Tip="Show/hide the Wrayth-style vitals strip at the bottom of the window"/>
+        <MenuItem Header="I_con Bar"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Display.ShowIconBar, Mode=OneWay}"
+                  Command="{Binding ToggleIconBarCommand}"
+                  ToolTip.Tip="Show/hide the character status chips below the vitals bar — posture plus stunned / bleeding / hidden / invisible / webbed / joined / poisoned / diseased (Genie 4's Icon Bar)."/>
+        <MenuItem Header="_Magic Panels"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Display.ShowMagicPanels}"
+                  Command="{Binding ToggleMagicPanelsCommand}"
+                  ToolTip.Tip="Show the magic widgets (Genie 4 parity): the mana bar on the status bar plus the prepared-spell label and cast bar on the hands strip. Turn off to reclaim the space on a non-caster."/>
         <MenuItem Header="_Zone / Room ID"
                   ToggleType="CheckBox"
                   IsChecked="{Binding Display.ShowZoneRoomId}"
@@ -158,6 +218,15 @@
                   IsChecked="{Binding Display.ShowGuildInTitle}"
                   Command="{Binding ToggleGuildInTitleCommand}"
                   ToolTip.Tip="Append the character's guild to the window title (after you've run 'info' this session). Off hides it."/>
+        <MenuItem Header="Always on _Top"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Display.AlwaysOnTop}"
+                  Command="{Binding ToggleAlwaysOnTopCommand}"
+                  ToolTip.Tip="Keep the Genie window above all other applications. Also settable as #config alwaysontop on|off."/>
+        <MenuItem Header="Align _Input to Game Window"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding AlignInputToGame}"
+                  ToolTip.Tip="Line the command bar up horizontally under the Game window instead of spanning the full width (Genie 4 parity). Follows the Game window as you re-dock or resize it; a floated-out Game window falls back to full width. Also settable as #config sizeinputtogame on|off."/>
         <MenuItem Header="_Disconnect Popup"
                   ToggleType="CheckBox"
                   IsChecked="{Binding Display.ShowDisconnectPopup}"
@@ -212,6 +281,11 @@
                   ToggleType="CheckBox"
                   IsChecked="{Binding VitalsVisible, Mode=OneWay}"
                   Command="{Binding ToggleVitalsCommand}"/>
+        <MenuItem Header="In_juries"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding InjuriesVisible, Mode=OneWay}"
+                  Command="{Binding ToggleInjuriesCommand}"
+                  ToolTip.Tip="Body-region wound/scar display from the server's injuries panel. Shows whichever view your injury display mode (_injury) has selected."/>
         <MenuItem Header="_Room"
                   ToggleType="CheckBox"
                   IsChecked="{Binding RoomVisible, Mode=OneWay}"
@@ -302,16 +376,16 @@
                   IsChecked="{Binding ScriptsVisible, Mode=OneWay}"
                   Command="{Binding ToggleScriptsCommand}"
                   ToolTip.Tip="Running scripts (.cmd and .js) with per-script Stop, a Start… file picker, and the script output log."/>
-        <MenuItem Header="Sce_ne"
+        <MenuItem Header="P_ortrait"
                   ToggleType="CheckBox"
                   IsChecked="{Binding SceneVisible, Mode=OneWay}"
                   Command="{Binding ToggleSceneCommand}"
-                  ToolTip.Tip="DR room/scene artwork for locations that have it. Requires #config showimages true (default). Empty for rooms without art."/>
+                  ToolTip.Tip="DR room/scene artwork for locations that have it — Genie 4's Portrait window (previously named Scene here). Requires #config showimages true (default). Empty for rooms without art."/>
         <MenuItem Header="Raw _XML"
                   ToggleType="CheckBox"
                   IsChecked="{Binding RawXmlVisible, Mode=OneWay}"
                   Command="{Binding ToggleRawXmlCommand}"
-                  ToolTip.Tip="Live verbatim server XML stream — the raw bytes the parser sees, before tag stripping. For parser development and 'where did that come from?' debugging. Local view only; default hidden."/>
+                  ToolTip.Tip="Live verbatim server XML stream — the raw bytes the parser sees, before tag stripping. Covers Genie 4's Debug and Raw windows. For parser development and 'where did that come from?' debugging. Local view only; default hidden."/>
 
         <!-- ── Plugin-created windows (dynamic) ─────────────────────────── -->
         <!-- Populated at runtime from the dock factory whenever a plugin     -->
@@ -482,7 +556,31 @@
       <MenuItem Header="{Binding HelpMenuHeader}">
         <MenuItem Header="Check for _Updates…"
                   Command="{Binding ShowUpdatesCommand}"
-                  ToolTip.Tip="Open the Updates dialog — Core / Maps / Plugins, with per-source enable, check, and update."/>
+                  ToolTip.Tip="Open the Updates dialog — Core / Maps / Plugins / Scripts, with per-source enable, check, and update."/>
+        <MenuItem Header="Update _Settings"
+                  ToolTip.Tip="What the silent startup update check covers, and what it's allowed to install by itself. Everything here is also visible in the Updates dialog.">
+          <MenuItem Header="Check on Startup">
+            <MenuItem Header="_Genie (Core App)" ToggleType="CheckBox" IsChecked="{Binding CheckCoreOnStartup}"
+                      ToolTip.Tip="Look for a newer Genie release at launch. Found updates light the Help ● badge and the status-bar notice — nothing installs without you."/>
+            <MenuItem Header="_Maps"             ToggleType="CheckBox" IsChecked="{Binding CheckMapsOnStartup}"
+                      ToolTip.Tip="Check the enabled map sources at launch."/>
+            <MenuItem Header="_Plugins"          ToggleType="CheckBox" IsChecked="{Binding CheckPluginsOnStartup}"
+                      ToolTip.Tip="Check the enabled plugin sources at launch."/>
+            <MenuItem Header="_Scripts"          ToggleType="CheckBox" IsChecked="{Binding CheckScriptsOnStartup}"
+                      ToolTip.Tip="Check the enabled script repositories at launch."/>
+          </MenuItem>
+          <MenuItem Header="Auto-Apply"
+                    ToolTip.Tip="Install what the startup check finds, without a click. All OFF by default — updates only ever download automatically if you opt in here.">
+            <MenuItem Header="_Genie (Core App)" ToggleType="CheckBox" IsChecked="{Binding AutoUpdateCore}"
+                      ToolTip.Tip="Download a found Genie update in the background and install it when you CLOSE Genie — never a restart mid-session. The status bar notes when a version is staged."/>
+            <MenuItem Header="_Maps"             ToggleType="CheckBox" IsChecked="{Binding AutoUpdateMaps}"
+                      ToolTip.Tip="Pull new/changed map files at startup (pure data — safest to automate)."/>
+            <MenuItem Header="_Plugins"          ToggleType="CheckBox" IsChecked="{Binding AutoUpdatePlugins}"
+                      ToolTip.Tip="Install plugin updates at startup. Plugins are executable code — enable only for sources you trust."/>
+            <MenuItem Header="_Scripts"          ToggleType="CheckBox" IsChecked="{Binding AutoUpdateScripts}"
+                      ToolTip.Tip="Pull script updates at startup. Scripts act as your character, and a repo file with the same name OVERWRITES a locally edited copy — enable only for sources you trust."/>
+          </MenuItem>
+        </MenuItem>
         <MenuItem Header="_Latest Release Page"
                   Command="{Binding OpenLatestReleaseCommand}"
                   ToolTip.Tip="Open the Genie 5 releases page on GitHub — download the newest signed build for your platform."/>
@@ -689,8 +787,16 @@
           <TextBlock Text="DEF" Foreground="#40d060" FontSize="10" FontWeight="SemiBold"/>
         </Border>
 
-        <StackPanel Orientation="Horizontal" Spacing="6"
-                    IsVisible="{Binding Vitals.IsSpellTimerVisible}">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <!-- Hidden entirely when Magic Panels is off (Genie 4 SetMagicPanels
+               hides LabelSpell/LabelSpellC too), AND-ed with the existing
+               #config spelltimer gate. -->
+          <StackPanel.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.And}">
+              <Binding Path="Vitals.IsSpellTimerVisible"/>
+              <Binding Path="Display.ShowMagicPanels"/>
+            </MultiBinding>
+          </StackPanel.IsVisible>
           <Border Background="#2a2a2a" CornerRadius="2" Padding="6,1">
             <TextBlock Text="S" Foreground="#aaa" FontWeight="SemiBold" FontSize="11"
                        ToolTip.Tip="Prepared spell. (N) is seconds since prep started."/>
@@ -718,12 +824,19 @@
              the spell name on the left. A faint BorderBrush draws the edge
              so even when the bar is mostly empty (low remaining seconds) the
              outline is clearly demarcated. -->
-        <Border IsVisible="{Binding Vitals.IsPrepping}"
-                MinWidth="90" Width="100"
+        <Border MinWidth="90" Width="100"
                 Margin="6,0,6,0"
                 VerticalAlignment="Center"
                 BorderBrush="#7a3580" BorderThickness="1" CornerRadius="3"
                 ToolTip.Tip="Seconds remaining until the prepared spell is fully harnessed.">
+          <!-- Genie 4's SetMagicPanels hides the Castbar too — AND-ed with
+               the only-while-prepping collapse. -->
+          <Border.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.And}">
+              <Binding Path="Vitals.IsPrepping"/>
+              <Binding Path="Display.ShowMagicPanels"/>
+            </MultiBinding>
+          </Border.IsVisible>
           <Grid>
             <ProgressBar Value="{Binding Vitals.CastBarSecondsRemaining}"
                          Maximum="{Binding Vitals.CastBarSecondsTotal}"
@@ -821,10 +934,90 @@
       </StackPanel>
     </Border>
 
+    <!-- ── Icon Bar (Genie 4 ComponentIconBar parity, #26) ──────────────── -->
+    <!-- Character status chips: posture (dead > standing > kneeling >        -->
+    <!-- sitting > prone, G4 priority) + condition flags, all fed by          -->
+    <!-- IndicatorEvent via IconBarViewModel. Declared BEFORE the vitals      -->
+    <!-- status bar so DockPanel stacks it BELOW it (very bottom edge).       -->
+    <!-- Dims while disconnected (G4 grayed icons). Layout ▸ Icon Bar.        -->
+    <Border DockPanel.Dock="Bottom"
+            IsVisible="{Binding Display.ShowIconBar}"
+            Background="#161a1d" BorderBrush="#3a4148" BorderThickness="0,1,0,0"
+            Padding="6,2"
+            Classes.offline="{Binding !IsConnected}">
+      <Border.Styles>
+        <Style Selector="Border.offline"><Setter Property="Opacity" Value="0.4"/></Style>
+        <Style Selector="Border.chip">
+          <Setter Property="CornerRadius" Value="3"/>
+          <Setter Property="Padding" Value="7,1"/>
+          <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Border.chip TextBlock">
+          <Setter Property="FontSize" Value="11"/>
+          <Setter Property="FontWeight" Value="SemiBold"/>
+          <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+      </Border.Styles>
+      <StackPanel Orientation="Horizontal" Spacing="4">
+        <Border Classes="chip" Background="#223042" BorderBrush="#3a5570"
+                IsVisible="{Binding IconBar.PostureText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                ToolTip.Tip="Posture — what the server says your body is doing (dead beats everything, then standing / kneeling / sitting / prone).">
+          <TextBlock Text="{Binding IconBar.PostureText}" Foreground="#9fc0dd"/>
+        </Border>
+        <Border Classes="chip" Background="#4a3818" BorderBrush="#C09040"
+                IsVisible="{Binding IconBar.Stunned}"
+                ToolTip.Tip="Stunned — you can't act until it wears off.">
+          <TextBlock Text="STUNNED" Foreground="#ffd890"/>
+        </Border>
+        <Border Classes="chip" Background="#3a1010" BorderBrush="#8a2a2a"
+                IsVisible="{Binding IconBar.Bleeding}"
+                ToolTip.Tip="Bleeding — you have open wounds. HEALTH shows where.">
+          <TextBlock Text="BLEEDING" Foreground="#ffb0b0"/>
+        </Border>
+        <Border Classes="chip" Background="#22301a" BorderBrush="#6a8a30"
+                IsVisible="{Binding IconBar.Poisoned}"
+                ToolTip.Tip="Poisoned — venom is in your system.">
+          <TextBlock Text="POISONED" Foreground="#cfe08a"/>
+        </Border>
+        <Border Classes="chip" Background="#322a16" BorderBrush="#8a7430"
+                IsVisible="{Binding IconBar.Diseased}"
+                ToolTip.Tip="Diseased — infection is setting in.">
+          <TextBlock Text="DISEASED" Foreground="#e0cf8a"/>
+        </Border>
+        <Border Classes="chip" Background="#1d2a33" BorderBrush="#3f5a6e"
+                IsVisible="{Binding IconBar.Hidden}"
+                ToolTip.Tip="Hidden — you are concealed from view.">
+          <TextBlock Text="HIDDEN" Foreground="#9fc4da"/>
+        </Border>
+        <Border Classes="chip" Background="#2a1444" BorderBrush="#8040C0"
+                IsVisible="{Binding IconBar.Invisible}"
+                ToolTip.Tip="Invisible.">
+          <TextBlock Text="INVISIBLE" Foreground="#d0b0ff"/>
+        </Border>
+        <Border Classes="chip" Background="#2e2e2e" BorderBrush="#777777"
+                IsVisible="{Binding IconBar.Webbed}"
+                ToolTip.Tip="Webbed / immobilized — you can't move until you break free.">
+          <TextBlock Text="WEBBED" Foreground="#d8d8d8"/>
+        </Border>
+        <Border Classes="chip" Background="#143a14" BorderBrush="#40A040"
+                IsVisible="{Binding IconBar.Joined}"
+                ToolTip.Tip="Joined — you are following / grouped with another character.">
+          <TextBlock Text="JOINED" Foreground="#a8e0a8"/>
+        </Border>
+      </StackPanel>
+    </Border>
+
     <!-- ── Status bar (Wrayth-style, docks below the command bar) ───────── -->
     <!-- Declared BEFORE the command bar so DockPanel puts it at the very     -->
     <!-- bottom edge. Toggle via View → Toggle Status Bar.                    -->
-    <Grid DockPanel.Dock="Bottom"
+    <!-- The mana column collapses when Magic Panels is off (View → Magic
+         Panels) — Genie 4's SetMagicPanels drops the bar row from 5 columns
+         to 4 so the remaining vitals stretch equally. The column-width flip
+         lives in code-behind (ColumnDefinition isn't bindable from XAML);
+         the IsVisible on the mana cell hides the content, the width change
+         reclaims the space. -->
+    <Grid x:Name="StatusBarGrid"
+          DockPanel.Dock="Bottom"
           IsVisible="{Binding Display.ShowStatusBar}"
           ColumnDefinitions="*,*,*,*,*"
           Margin="4,2,4,4">
@@ -838,7 +1031,8 @@
                    FontSize="11" Foreground="#fff" FontWeight="SemiBold"/>
       </Grid>
 
-      <Grid Grid.Column="1" Margin="2,0">
+      <Grid Grid.Column="1" Margin="2,0"
+            IsVisible="{Binding Display.ShowMagicPanels}">
         <ProgressBar Value="{Binding Vitals.Mana}" Maximum="100"
                      Foreground="#4060C0" Background="#172040" Height="18"
                      CornerRadius="3"/>
@@ -885,6 +1079,28 @@
                  FontFamily="Consolas,Courier New,monospace" FontSize="11"
                  Foreground="#8aa3b5" VerticalAlignment="Center"
                  ToolTip.Tip="Current mapper zone and DR server room id (#66)"/>
+    </Border>
+
+    <!-- ── Update notice strip (non-intrusive; auto-shows only when the       -->
+    <!-- startup check found or auto-applied something, auto-hides otherwise). -->
+    <!-- Independent of the vitals Status Bar toggle so the notice survives    -->
+    <!-- a hidden status bar. Click opens the Updates dialog; × dismisses.     -->
+    <Border DockPanel.Dock="Bottom"
+            IsVisible="{Binding UpdateNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+            Background="#1b2024" BorderBrush="#3a4148" BorderThickness="0,1,0,0"
+            Padding="6,1">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Content="✕"
+                Command="{Binding DismissUpdateNoticeCommand}"
+                Background="Transparent" BorderThickness="0" Padding="4,0"
+                FontSize="10" Foreground="#8aa3b5"
+                ToolTip.Tip="Dismiss this notice (it returns if the next check still finds updates)"/>
+        <Button Content="{Binding UpdateNotice}"
+                Command="{Binding ShowUpdatesCommand}"
+                Background="Transparent" BorderThickness="0" Padding="2,0"
+                HorizontalAlignment="Left" FontSize="11" Foreground="#8aa3b5"
+                ToolTip.Tip="Click to open the Updates dialog"/>
+      </DockPanel>
     </Border>
 
     <!-- ── Hands strip (bottom position — Genie 4 style) ────────────────── -->
@@ -993,8 +1209,16 @@
           <TextBlock Text="DEF" Foreground="#40d060" FontSize="10" FontWeight="SemiBold"/>
         </Border>
 
-        <StackPanel Orientation="Horizontal" Spacing="6"
-                    IsVisible="{Binding Vitals.IsSpellTimerVisible}">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <!-- Hidden entirely when Magic Panels is off (Genie 4 SetMagicPanels
+               hides LabelSpell/LabelSpellC too), AND-ed with the existing
+               #config spelltimer gate. -->
+          <StackPanel.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.And}">
+              <Binding Path="Vitals.IsSpellTimerVisible"/>
+              <Binding Path="Display.ShowMagicPanels"/>
+            </MultiBinding>
+          </StackPanel.IsVisible>
           <Border Background="#2a2a2a" CornerRadius="2" Padding="6,1">
             <TextBlock Text="S" Foreground="#aaa" FontWeight="SemiBold" FontSize="11"
                        ToolTip.Tip="Prepared spell. (N) is seconds since prep started."/>
@@ -1022,12 +1246,19 @@
              the spell name on the left. A faint BorderBrush draws the edge
              so even when the bar is mostly empty (low remaining seconds) the
              outline is clearly demarcated. -->
-        <Border IsVisible="{Binding Vitals.IsPrepping}"
-                MinWidth="90" Width="100"
+        <Border MinWidth="90" Width="100"
                 Margin="6,0,6,0"
                 VerticalAlignment="Center"
                 BorderBrush="#7a3580" BorderThickness="1" CornerRadius="3"
                 ToolTip.Tip="Seconds remaining until the prepared spell is fully harnessed.">
+          <!-- Genie 4's SetMagicPanels hides the Castbar too — AND-ed with
+               the only-while-prepping collapse. -->
+          <Border.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.And}">
+              <Binding Path="Vitals.IsPrepping"/>
+              <Binding Path="Display.ShowMagicPanels"/>
+            </MultiBinding>
+          </Border.IsVisible>
           <Grid>
             <ProgressBar Value="{Binding Vitals.CastBarSecondsRemaining}"
                          Maximum="{Binding Vitals.CastBarSecondsTotal}"
@@ -1213,7 +1444,7 @@
          badge is only visible while a roundtime is active; it ticks down live
          courtesy of the VitalsViewModel timer. The type-ahead counter sits
          between RT and the input and is always visible (dim when idle). -->
-    <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,Auto,*,Auto" Margin="4,2">
+    <Grid x:Name="CommandBarGrid" DockPanel.Dock="Bottom" ColumnDefinitions="Auto,Auto,*,Auto" Margin="4,2">
 
       <Border Grid.Column="0"
               IsVisible="{Binding ShowRtInCommandBar}"

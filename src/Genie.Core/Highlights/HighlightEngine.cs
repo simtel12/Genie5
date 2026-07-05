@@ -8,6 +8,10 @@ public sealed class HighlightEngine
     public IReadOnlyList<HighlightRule> Rules => _rules;
     public ClassEngine? Classes { get; set; }
 
+    /// <summary>Master enable (File ▸ Master Toggles / <c>#config highlights</c>).
+    /// When off, no rule matches — rules stay loaded and editable.</summary>
+    public bool Enabled { get; set; } = true;
+
     private bool _safetyEnabled = true;
     /// <summary>When true, regex-type highlight rules run with a match-timeout +
     /// literal pre-filter. Toggling rebuilds every rule.</summary>
@@ -33,6 +37,7 @@ public sealed class HighlightEngine
 
     public HighlightRule? Match(string plainText)
     {
+        if (!Enabled) return null;
         foreach (var rule in _rules)
             if (rule.IsEnabled && (Classes?.IsActive(rule.ClassName) ?? true) && rule.Matches(plainText))
                 return rule;

@@ -203,7 +203,7 @@ public static class DefaultHighlights
         // ── User-defined highlights from the live HighlightEngine ─────
         // Timed into the Highlights stage (no-op overhead when the overlay is
         // hidden). This is the render-path cost of user highlight rules.
-        if (UserHighlights.Engine is { } engine)
+        if (UserHighlights.Engine is { Enabled: true } engine)
         {
             void ApplyUserHighlights()
             {

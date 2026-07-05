@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.ReactiveUI;
 using Avalonia.Threading;
@@ -89,6 +90,55 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                     Position = new PixelPoint(x, y);
                 }
             };
+
+            // Magic Panels (Genie 4 SetMagicPanels): collapse the status bar's
+            // mana column so the other four vitals stretch equally — G4 flips
+            // TableLayoutPanelBars.ColumnCount 5 ↔ 4. Done here because
+            // ColumnDefinition.Width can't be data-bound from XAML; the mana
+            // cell's own IsVisible binding hides the content.
+            d(ViewModel!.Display.WhenAnyValue(x => x.ShowMagicPanels)
+                .Subscribe(show => StatusBarGrid.ColumnDefinitions[1].Width =
+                    show ? new GridLength(1, GridUnitType.Star) : new GridLength(0)));
+
+            // Align Input to Game Window (Genie 4 SizeInputToGame — horizontal
+            // only): pad the command bar's side margins so it spans the Game
+            // window's horizontal extent. Recomputed on every dock layout pass
+            // (re-dock, resize, splitter drag all funnel through LayoutUpdated);
+            // the 0.5px equality guard stops margin-write → layout → recompute
+            // loops. Game window floated out or missing → full-width fallback.
+            void UpdateCommandBarAlignment()
+            {
+                var target = new Thickness(4, 2, 4, 2);
+                if (ViewModel?.AlignInputToGame == true)
+                {
+                    // The game document's BODY presenter — largest visual
+                    // presenting the GameTextDocument (the tab-strip header
+                    // presenter shows the same content but is tiny).
+                    var game = MainDock.GetVisualDescendants()
+                        .OfType<Avalonia.Controls.Presenters.ContentPresenter>()
+                        .Where(p => p.Content is Docking.GameTextDocument && p.Bounds.Width > 0)
+                        .OrderByDescending(p => p.Bounds.Width * p.Bounds.Height)
+                        .FirstOrDefault();
+                    if (game is not null &&
+                        game.TranslatePoint(new Point(0, 0), this) is { } tl)
+                    {
+                        var left  = Math.Max(4, tl.X);
+                        var right = Math.Max(4, Bounds.Width - (tl.X + game.Bounds.Width));
+                        if (Bounds.Width - left - right > 120)   // never squeeze the input away
+                            target = new Thickness(left, 2, right, 2);
+                    }
+                }
+                var cur = CommandBarGrid.Margin;
+                if (Math.Abs(cur.Left - target.Left) > 0.5 || Math.Abs(cur.Right - target.Right) > 0.5)
+                    CommandBarGrid.Margin = target;
+            }
+
+            EventHandler alignInputHandler = (_, _) => UpdateCommandBarAlignment();
+            MainDock.LayoutUpdated += alignInputHandler;
+            d(System.Reactive.Disposables.Disposable.Create(
+                () => MainDock.LayoutUpdated -= alignInputHandler));
+            d(ViewModel!.WhenAnyValue(x => x.AlignInputToGame)
+                .Subscribe(_ => Dispatcher.UIThread.Post(UpdateCommandBarAlignment)));
 
             d(ViewModel!.ShowConnectDialog.RegisterHandler(async ctx =>
             {
@@ -569,6 +619,28 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 
         ViewModel.Core.ProcessInput(macro.Action);
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// Edit → "Paste Multi Line" (Genie 4's SpecialPaste): joins the clipboard's
+    /// lines with the command separator char so each line executes as its own
+    /// command when sent — ProcessInput splits on the separator. Genie 4
+    /// hardcoded ';' and only handled CRLF; here the separator is the user's
+    /// configured one and lone-LF clipboards (copied from macOS/Linux, or a
+    /// browser) split correctly too. Blank lines are dropped rather than sent
+    /// as empty commands.
+    /// </summary>
+    private async void OnPasteMultiLine(object? sender, RoutedEventArgs e)
+    {
+        if (Clipboard is not { } cb) return;
+        var text = await cb.TryGetTextAsync();
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        var separator = ViewModel?.Core?.Config.SeparatorChar ?? ';';
+        var lines = text.Split('\n')
+                        .Select(l => l.Trim())
+                        .Where(l => l.Length > 0);
+        AppendToCommandBar(string.Join(separator, lines));
     }
 
     private void AppendToCommandBar(string selection)

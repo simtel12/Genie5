@@ -46,6 +46,10 @@ public sealed class SubstituteEngine
     public IReadOnlyList<SubstituteRule> Rules => _rules;
     public ClassEngine? Classes { get; set; }
 
+    /// <summary>Master enable (File ▸ Master Toggles / <c>#config substitutes</c>).
+    /// When off, <see cref="Apply"/> returns lines untouched — rules stay loaded.</summary>
+    public bool Enabled { get; set; } = true;
+
     private bool _safetyEnabled = true;
     /// <summary>When true, substitute regexes run with a match-timeout + literal
     /// pre-filter. Toggling rebuilds every rule.</summary>
@@ -68,6 +72,7 @@ public sealed class SubstituteEngine
 
     public string Apply(string line)
     {
+        if (!Enabled) return line;
         foreach (var rule in _rules)
         {
             if (Classes is not null && !Classes.IsActive(rule.ClassName)) continue;

@@ -24,6 +24,11 @@ public sealed class AliasEngine
 
     public IReadOnlyList<AliasRule> Aliases => _aliases;
 
+    /// <summary>Master enable (File ▸ Master Toggles / <c>#config aliases</c>).
+    /// When off, <see cref="TryProcess"/> expands nothing — input passes through
+    /// as typed. Rules stay loaded and editable.</summary>
+    public bool Enabled { get; set; } = true;
+
     public AliasRule AddAlias(string name, string expansion, bool isEnabled = true, string className = "default")
     { var a = new AliasRule(name, expansion, isEnabled, className); _aliases.Add(a); return a; }
 
@@ -40,7 +45,7 @@ public sealed class AliasEngine
 
     public bool TryProcess(string input)
     {
-        if (string.IsNullOrWhiteSpace(input)) return false;
+        if (!Enabled || string.IsNullOrWhiteSpace(input)) return false;
         var parts = input.Split(' ', 2);
         var alias = _aliases.FirstOrDefault(a =>
             a.IsEnabled

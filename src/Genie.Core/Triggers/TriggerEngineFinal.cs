@@ -21,6 +21,10 @@ public sealed class TriggerEngineFinal
     public IReadOnlyList<TriggerRule> Triggers => _triggers;
     public ClassEngine? Classes { get; set; }
 
+    /// <summary>Master enable (File ▸ Master Toggles / <c>#config triggers</c>).
+    /// When off, <see cref="ProcessLine"/> fires nothing — rules stay loaded.</summary>
+    public bool Enabled { get; set; } = true;
+
     private bool _safetyEnabled = true;
     /// <summary>When true, trigger regexes run with a match-timeout + literal
     /// pre-filter — the main guard against a catastrophic user pattern freezing
@@ -53,6 +57,7 @@ public sealed class TriggerEngineFinal
 
     public void ProcessLine(string line, bool echoTriggerDebug = true)
     {
+        if (!Enabled) return;
         foreach (var trigger in _triggers)
         {
             if (!trigger.IsEnabled) continue;

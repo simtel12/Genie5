@@ -47,6 +47,10 @@ public sealed class GagEngine
     public IReadOnlyList<GagRule> Rules => _rules;
     public ClassEngine? Classes { get; set; }
 
+    /// <summary>Master enable (File ▸ Master Toggles / <c>#config gags</c>).
+    /// When off, <see cref="ShouldGag"/> never gags — rules stay loaded.</summary>
+    public bool Enabled { get; set; } = true;
+
     private bool _safetyEnabled = true;
     /// <summary>When true, gag regexes run with a match-timeout + literal
     /// pre-filter. Toggling rebuilds every rule.</summary>
@@ -69,6 +73,7 @@ public sealed class GagEngine
 
     public bool ShouldGag(string line)
     {
+        if (!Enabled) return false;
         foreach (var rule in _rules)
         {
             if (Classes is not null && !Classes.IsActive(rule.ClassName)) continue;

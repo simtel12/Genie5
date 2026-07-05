@@ -5,9 +5,12 @@ using Genie.Core.Layout;
 namespace Genie.App.Docking;
 
 /// <summary>
-/// Scene tool — shows DR room/scene artwork (the <c>&lt;resource picture&gt;</c>
-/// image). Hidden by default; re-open via Window → Scene. Only the title syncs
-/// from <see cref="WindowSettings"/>; the image fills the panel.
+/// Portrait tool — shows DR room/scene artwork (the <c>&lt;resource picture&gt;</c>
+/// image). This is Genie 4's Portrait window (issue #26 menu parity); it was
+/// briefly named "Scene" in early alphas — the internal id stays <c>scene</c>
+/// so saved layouts keep restoring it. Hidden by default; re-open via
+/// Window → Portrait. Only the title syncs from <see cref="WindowSettings"/>;
+/// the image fills the panel.
 /// </summary>
 public class SceneTool : Tool, IWindowMenuHost
 {
@@ -19,8 +22,8 @@ public class SceneTool : Tool, IWindowMenuHost
     public SceneTool(SceneViewModel vm, WindowSettings? settings = null)
     {
         ViewModel = vm;
-        Id        = "scene";
-        Title     = "Scene";
+        Id        = "scene";     // stable id — saved layouts predate the rename
+        Title     = "Portrait";
 
         if (settings is not null)
         {

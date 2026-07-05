@@ -60,6 +60,25 @@ public sealed class DisplaySettings : ReactiveObject
     [Reactive] public bool   ShowStatusBar { get; set; } = true;
 
     /// <summary>
+    /// Whether the Icon Bar — the Genie 4 status-chip strip (posture, stunned,
+    /// bleeding, hidden, invisible, webbed, joined, poisoned, diseased) — is
+    /// shown below the vitals status bar. Default on (Genie 4 parity);
+    /// Layout ▸ Icon Bar toggles it.
+    /// </summary>
+    [Reactive] public bool   ShowIconBar { get; set; } = true;
+
+    /// <summary>
+    /// Genie 4 "Magic Panels" (<c>SetMagicPanels</c> / config key
+    /// <c>Genie/HealthBar Magic</c>): whether the magic widgets are shown —
+    /// the mana bar on the status bar (its column collapses so the other four
+    /// vitals stretch, G4's 5 → 4 ColumnCount flip) plus the prepared-spell
+    /// label and cast bar on the hands strip. Default on, like Genie 4;
+    /// non-casters turn it off to reclaim the space. Toggle via
+    /// View → Magic Panels.
+    /// </summary>
+    [Reactive] public bool   ShowMagicPanels { get; set; } = true;
+
+    /// <summary>
     /// Whether the optional zone/room location line (the mapper's current zone
     /// + <c>$roomid</c>) is shown at the bottom of the window (#66). Opt-in (off
     /// by default) — handy for travel/scripting so you can always see where you
@@ -98,6 +117,16 @@ public sealed class DisplaySettings : ReactiveObject
     /// to the built-in layout.
     /// </summary>
     [Reactive] public string GlobalDefaultLayout { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Keep the main window above all other applications (binds
+    /// <c>Window.Topmost</c>). Persisted here so it applies from the moment the
+    /// window opens, before any session/core exists. Mirrored into the Genie 4
+    /// parity key <c>settings.cfg alwaysontop</c> (<c>GenieConfig.AlwaysOnTop</c>)
+    /// so <c>#config alwaysontop on|off</c> drives the same toggle — this
+    /// display.json value is the authority when the two disagree.
+    /// </summary>
+    [Reactive] public bool AlwaysOnTop { get; set; }
 
     /// <summary>
     /// Whether the character's guild is appended to the window title

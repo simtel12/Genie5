@@ -12,7 +12,8 @@ using ReactiveUI.Fody.Helpers;
 namespace Genie.App.ViewModels;
 
 /// <summary>
-/// Backs the dockable Scene panel — DR room/scene artwork. Subscribes to
+/// Backs the dockable Portrait panel (Genie 4's Portrait window; internal id
+/// <c>scene</c>) — DR room/scene artwork. Subscribes to
 /// <see cref="RoomImageEvent"/>, and (when <c>showimages</c> is on) fetches the
 /// image via <see cref="RoomArtService"/> and shows it. Hidden by default; the
 /// panel is empty for rooms without art (most of them), which is expected.
@@ -42,6 +43,33 @@ public sealed class SceneViewModel : ReactiveObject
             .OfType<RoomImageEvent>()
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(e => OnRoomImage(e.PictureId));
+
+        // File ▸ Master Toggles ▸ Images / `#config showimages` applies live:
+        // off clears the current picture, on re-fetches it (SetSetting can run
+        // off the UI thread, so marshal).
+        if (core.Config is { } cfg)
+            cfg.ConfigChanged += field =>
+            {
+                if (field == Genie.Core.Config.ConfigFieldUpdated.ImagesEnabled)
+                    Dispatcher.UIThread.Post(OnImagesToggled);
+            };
+    }
+
+    private void OnImagesToggled()
+    {
+        if (_core?.Config?.ShowImages == true)
+        {
+            // Re-run the current room's art through the normal path; the dedup
+            // would otherwise swallow it, so reset it first.
+            var id = _lastPictureId;
+            _lastPictureId = "";
+            OnRoomImage(id);
+        }
+        else
+        {
+            // Keep _lastPictureId so toggling back on can re-fetch this room.
+            SetImage(null);
+        }
     }
 
     // async void: the synchronous head (dedup + clear) runs on the UI thread
@@ -58,7 +86,7 @@ public sealed class SceneViewModel : ReactiveObject
             return;
         }
 
-        // showimages gate (read live so a #config change applies next room).
+        // showimages gate — OnImagesToggled also re-enters here on toggle-on.
         if (_core?.Config?.ShowImages != true || _art is null) return;
 
         try
