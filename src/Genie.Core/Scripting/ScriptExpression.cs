@@ -432,13 +432,15 @@ internal sealed class ScriptExpression
             case "length":     return (double)A(0).Length;
             case "count":
             {
-                // Genie4 semantics: element count when splitting the list by
-                // the separator. "a|b|c" with "|" → 3, not 2. Empty string
-                // yields 0 elements; empty separator falls back to char count.
+                // Genie4 parity (Eval.cs Count): the number of OCCURRENCES of
+                // the substring — NOT the element count. "a|b|c" with "|" → 2,
+                // count("barbar","foo") → 0. Community scripts depend on this:
+                // they iterate 0..count INCLUSIVE to walk a pipe list (e.g.
+                // cyclic.cmd), so returning elements would overrun by one (#134).
+                // Genie 4 loops forever on an empty match; return 0 instead.
                 var s = A(0); var sep = A(1);
-                if (s.Length == 0) return 0.0;
-                if (sep.Length == 0) return (double)s.Length;
-                int n = 1, idx = 0;
+                if (s.Length == 0 || sep.Length == 0) return 0.0;
+                int n = 0, idx = 0;
                 while ((idx = s.IndexOf(sep, idx, StringComparison.Ordinal)) >= 0)
                 { n++; idx += sep.Length; }
                 return (double)n;

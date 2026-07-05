@@ -82,4 +82,15 @@ public class ScriptExpressionTests
     [InlineData("equipment", "equipment")]  // `eq` must NOT fire inside an identifier
     public void Eval_string_results(string expr, string expected)
         => Assert.Equal(expected, ScriptExpression.Eval(expr, NewInst())?.ToString());
+
+    [Theory]
+    // #134: count() counts OCCURRENCES (Genie 4 Eval.cs Count), not elements.
+    [InlineData("count(\"barbar\",\"foo\")", "0")]   // the #134 repro: absent ⇒ 0
+    [InlineData("count(\"foo\",\"foo\")",    "1")]
+    [InlineData("count(\"barbar\",\"bar\")", "2")]
+    [InlineData("count(\"a|b|c\",\"|\")",    "2")]   // pipe-list idiom: elements − 1
+    [InlineData("count(\"\",\"foo\")",       "0")]
+    [InlineData("count(\"abc\",\"\")",       "0")]   // G4 hangs here; we return 0
+    public void Eval_count_counts_occurrences(string expr, string expected)
+        => Assert.Equal(expected, ScriptExpression.Eval(expr, NewInst())?.ToString());
 }
