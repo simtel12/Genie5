@@ -1,3 +1,72 @@
+# Genie 5 — v5.0.0-alpha.8
+
+The Genie 4 menu-parity milestone: the full menu audit closes with master
+toggles, an Icon Bar, Update Settings, and a stack of muscle-memory items —
+plus an Injuries panel, a Scripts updater, a Lich-attach fix, and a round of
+scripting-language fixes from community reports.
+
+> **Alpha software.** Windows SmartScreen may warn on first launch
+> (More info → Run anyway) while code signing is being rolled out — tracked
+> in #33.
+
+## ✨ New
+
+- **Master Toggles (File menu)** — turn whole rule engines on or off without
+  touching the rules: Highlights, Triggers, Substitutes, Gags, Aliases, and
+  Images. Rules stay loaded and editable while off; each toggle is also a
+  `#config` key (`#config triggers off`) and the menu stays in sync either
+  way. Images clears or re-fetches the room art live.
+- **Icon Bar** — Genie 4's status strip returns as colour-coded chips below
+  the vitals bar: your posture (dead / standing / kneeling / sitting / prone)
+  plus STUNNED, BLEEDING, HIDDEN, INVISIBLE, WEBBED, JOINED — and two Genie 4
+  never had: POISONED and DISEASED. Dims while disconnected. Layout ▸ Icon
+  Bar to hide.
+- **Injuries panel (#18)** — a dockable body silhouette showing per-region
+  wounds and scars from the game's injury data, colour-coded by severity with
+  a text list alongside. An opt-in auto-refresh (`#config injuriespoll N`)
+  can poll `health` to refine the nervous-system reading while the panel is
+  open.
+- **Scripts updater** — the Updates dialog grows a Scripts tab: subscribe to
+  GitHub script repositories and pull new/changed `.cmd`/`.js` files like a
+  git pull, subfolders included; your local-only files are never touched.
+  The community DR-Genie-Scripts repo ships as a ready-to-enable row.
+- **Update Settings (Help menu)** — choose what the silent startup check
+  covers (Core / Maps / Plugins / Scripts) and what it may install by itself.
+  Auto-applied client updates install when you *close* Genie — never a
+  mid-session restart. A quiet notice above the status bar reports "Updates
+  available" / "Auto-updated" and opens the dialog on click.
+- **Open Directory (File menu)** — jump to any Genie data folder: Data root,
+  Config (profile-aware), Logs, Maps, Scripts, Plugins.
+- **Menu parity round-up** — Auto Log checkbox (applies live mid-session),
+  Edit ▸ Paste Multi Line, Layout ▸ Always on Top, Layout ▸ Align Input to
+  Game Window (the command bar tracks the Game window's width), Layout ▸
+  Magic Panels (hide the mana bar / cast bar / spell labels on a non-caster),
+  and the room-art panel takes its Genie 4 name: **Portrait**.
+- **PageUp / PageDown scrolling (#136)** — page the selected game window from
+  the keyboard; Ctrl+PageUp/PageDown jump to top/bottom. Focus stays in the
+  command bar, Genie 3/4 style.
+
+## 🐛 Fixed
+
+- **Lich attach shows your room and character (#126, #127)** — attaching to a
+  running Lich session after Lich did the login left the Room panel and title
+  bar empty; Genie now rebuilds both from the first `look` after attach.
+- **Script `count()` counts occurrences (#134)** — Genie 4 semantics restored:
+  `count("a|b|c","|")` is the separator count, so classic `0..count`
+  inclusive loops over pipe lists work again.
+- **`if` with an unset variable no longer eats the whole condition (#133)** —
+  a missing operand (`(%unset = 1)` arriving as `( = 1)`) reads as the empty
+  string, so the defined side of an `||` still decides the outcome.
+- **Unbalanced-quote hint (#135)** — when a stray quote makes an `if` line
+  unparseable, the "missing 'then'" warning now suggests the actual problem:
+  `(unbalanced " quotes?)`.
+- **Bad conditions warn instead of failing silently** — a condition that
+  can't parse echoes a once-per-line `[script] … bad condition` notice
+  (covers hung `waiteval` too) instead of silently evaluating false.
+- **Open Scripts Folder** — no longer fails with "Location is not available"
+  on some Windows setups; it now opens the folder the same way every other
+  folder menu item does.
+
 # Genie 5 — v5.0.0-alpha.7.11
 
 Menu-script windows arrive — the Genie 4 named-window command family (`#log`,

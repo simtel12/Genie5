@@ -4,7 +4,22 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.7.11 — Named Windows & Panel Filters
+## Latest: v5.0.0-alpha.8 — Menu Parity
+
+The Genie 4 menu-parity milestone: master toggles for every rule engine, the Icon Bar status strip, an Injuries panel, a Scripts updater with per-component Update Settings, and a stack of muscle-memory menu items — plus Lich-attach and scripting fixes from community reports.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8** as a delta.
+
+- **Master Toggles** — File-menu switches for Highlights / Triggers / Substitutes / Gags / Aliases / Images; rules stay loaded, they just stop applying. Mirrored by `#config triggers off` etc.
+- **Icon Bar** — posture + condition chips (stunned, bleeding, hidden, invisible, webbed, joined — plus poisoned and diseased, new over Genie 4) below the vitals bar.
+- **Injuries panel** — colour-coded body silhouette of wounds and scars, with opt-in `health`-poll refinement ([#18](https://github.com/GenieClient/Genie5/issues/18)).
+- **Scripts updater + Update Settings** — pull community script repos like a git pull; choose per component (client / maps / plugins / scripts) what the startup check covers and what may auto-install. Auto client updates apply on exit, never mid-session.
+- **Menu parity round-up** — Open Directory submenu, Auto Log toggle, Paste Multi Line, Always on Top, Align Input to Game Window, Magic Panels, and the room-art panel under its Genie 4 name, **Portrait**.
+- **Fixes** — Lich attach rebuilds room + character identity ([#126](https://github.com/GenieClient/Genie5/issues/126), [#127](https://github.com/GenieClient/Genie5/issues/127)); script `count()` occurrence semantics ([#134](https://github.com/GenieClient/Genie5/issues/134)); `||` with an unset variable ([#133](https://github.com/GenieClient/Genie5/issues/133)); unbalanced-quote hint ([#135](https://github.com/GenieClient/Genie5/issues/135)); bad conditions warn instead of silently failing; PageUp/PageDown window scrolling ([#136](https://github.com/GenieClient/Genie5/issues/136)); Open Scripts Folder on locked-down Windows setups.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8)
+
+## v5.0.0-alpha.7.11 — Named Windows & Panel Filters
 
 The Genie 4 named-window command family (`#log`, `#link`, `#clear`, `#window`) so classic menu scripts run as-is, directed-echo routing fixes from a community report, MonsterBold in the Room panel, and type-to-filter boxes on the Configuration panels.
 
