@@ -54,6 +54,8 @@ public sealed class PersistenceService
             CaseSensitive = t.CaseSensitive,
             IsEnabled = t.IsEnabled,
             ClassName = t.ClassName,
+            SoundFile = t.SoundFile,
+            Speak = t.Speak,
         });
 
         File.WriteAllText(path, JsonSerializer.Serialize(data, _options));
@@ -94,6 +96,8 @@ public sealed class PersistenceService
             CaseSensitive = r.CaseSensitive,
             IsEnabled = r.IsEnabled,
             ClassName = r.ClassName,
+            SoundFile = r.SoundFile,
+            Speak = r.Speak,
         });
         File.WriteAllText(path, JsonSerializer.Serialize(data, _options));
     }

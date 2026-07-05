@@ -242,12 +242,14 @@ public interface ICommandHost
 
     /// <summary>
     /// Speak <paramref name="text"/> aloud via text-to-speech (the <c>#speak</c>
-    /// command, and later per-stream read-aloud). The host owns the TTS engine
-    /// and platform audio; the Console build with no engine is a no-op. Blank
-    /// text is ignored. Synthesis runs off the caller's thread so a slow voice
-    /// never blocks the game loop.
+    /// command and per-rule trigger/highlight speak). The host owns the TTS
+    /// engine and platform audio; the Console build with no engine is a no-op.
+    /// Blank text is ignored. Synthesis runs off the caller's thread so a slow
+    /// voice never blocks the game loop. <paramref name="urgent"/> marks a
+    /// hand-picked alert (per-rule speak) that should be spoken first and may
+    /// barge in over ordinary read-aloud chatter.
     /// </summary>
-    void Speak(string text);
+    void Speak(string text, bool urgent = false);
 
     /// <summary>
     /// Handle a <c>#tts</c> management subcommand (<c>install</c>, <c>voices</c>,

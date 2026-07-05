@@ -142,7 +142,7 @@ public class LogCommandTests : IDisposable
         public void MapperGoto(string args) { }
         public void MapperReset() { }
         public void PlaySound(string soundName) { }
-        public void Speak(string text) { }
+        public void Speak(string text, bool urgent = false) { }
         public void TtsCommand(string args) { }
         public void Connect(ConnectRequest request) { }
     }

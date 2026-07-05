@@ -2879,7 +2879,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 core.Highlights.AddRule(
                     m.Pattern, m.ForegroundColor, m.BackgroundColor,
                     Enum.TryParse<HighlightMatchType>(m.MatchType, out var mt) ? mt : HighlightMatchType.String,
-                    m.CaseSensitive, m.IsEnabled, m.ClassName);
+                    m.CaseSensitive, m.IsEnabled, m.ClassName, m.SoundFile, m.Speak);
             }
         });
 
@@ -2888,7 +2888,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             foreach (var m in p.LoadTriggers(path))
             {
                 core.Triggers.RemoveTrigger(m.Pattern);
-                core.Triggers.AddTrigger(m.Pattern, m.Action, m.CaseSensitive, m.IsEnabled, m.ClassName);
+                core.Triggers.AddTrigger(m.Pattern, m.Action, m.CaseSensitive, m.IsEnabled, m.ClassName,
+                                         m.SoundFile, m.Speak);
             }
         });
 
@@ -3222,9 +3223,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 $"restart Genie to switch data directories. In use: {(have.Length == 0 ? "(default)" : have)}.");
     }
 
-    /// <summary>Handle a <c>#tts</c> subcommand (install / voices / status).
-    /// Runs on the engine (UI) thread; the actual download runs off-thread and
-    /// reports back via UI-marshaled system lines.</summary>
+    /// <summary>Handle a <c>#tts</c> subcommand (install / use / voices / read /
+    /// mute / rate / volume / stop / status). Runs on the engine (UI) thread; the
+    /// actual download runs off-thread and reports back via UI-marshaled system
+    /// lines.</summary>
     private void HandleTtsCommand(string args)
     {
         if (_core is null) return;
@@ -3336,6 +3338,32 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 Echo("[tts] stopped.");
                 break;
 
+            case "rate":
+            {
+                if (parts.Length < 2)
+                {
+                    Echo($"[tts] rate: {FormatRate(_core.Config.TtsRate)} (0.5–3, 1 = normal). Usage: #tts rate <n>");
+                    break;
+                }
+                // SetSetting owns the parse + clamp; garbage leaves the value as-is.
+                _core.Config.SetSetting("ttsrate", parts[1], showException: false);
+                Echo($"[tts] rate: {FormatRate(_core.Config.TtsRate)}. Applies from the next spoken line; persists when settings are saved.");
+                break;
+            }
+
+            case "volume":
+            case "vol":
+            {
+                if (parts.Length < 2)
+                {
+                    Echo($"[tts] volume: {_core.Config.TtsVolume}% (0–100). Usage: #tts volume <n>");
+                    break;
+                }
+                _core.Config.SetSetting("ttsvolume", parts[1], showException: false);
+                Echo($"[tts] volume: {_core.Config.TtsVolume}%. Applies from the next spoken line; persists when settings are saved.");
+                break;
+            }
+
             case "status":
             {
                 Echo($"[tts] voice dir: {voiceDir}");
@@ -3346,11 +3374,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 if (n == 0) Echo("  no voices installed — run #tts install");
                 Echo($"  read-aloud: {(_core.Config.TtsRead ? "on" : "off")}; " +
                      $"streams: {_core.Config.TtsReadStreamsRaw}");
+                Echo($"  rate: {FormatRate(_core.Config.TtsRate)}; volume: {_core.Config.TtsVolume}%");
                 break;
             }
 
             default:
-                Echo("Usage: #tts install [voice] | use <voice> | voices | read [on|off|<stream>] | mute <stream> | stop | status");
+                Echo("Usage: #tts install [voice] | use <voice> | voices | read [on|off|<stream>] | mute <stream> | rate <n> | volume <n> | stop | status");
                 break;
         }
     }
@@ -3368,6 +3397,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     private static SortedSet<string> SplitStreams(string csv) =>
         new(csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                .Select(s => s.ToLowerInvariant()));
+
+    /// <summary>Rate as typed/stored ("1", "1.25") — invariant dot decimal, no
+    /// trailing zeros — so the echo matches what #config ttsrate round-trips.</summary>
+    private static string FormatRate(double rate) =>
+        rate.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>One-time wiring of the persistent core to the App: VM attaches,
     /// observable subscriptions, #-command handlers, link/sound handlers, plugin
@@ -3604,6 +3638,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // which raises SoundRequested for the audio backend below.
         Highlighting.DefaultHighlights.OnHighlightSound = name => _core?.PlaySound(name);
 
+        // Per-highlight speak → route through GenieCore.Speak as urgent, so a
+        // speak-flagged highlight barges in over ordinary stream read-aloud.
+        Highlighting.DefaultHighlights.OnHighlightSpeak = text => _core?.Speak(text, urgent: true);
+
         // SFX backend: play gate-passed absolute paths from trigger/highlight
         // sounds and #play.
         _core.SoundRequested += path => _audio.Play(path);
@@ -3615,8 +3653,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _tts = new Services.TtsService(
             () => _core.Config.TtsVoiceDir,
             () => _core.Config.TtsVoice,
-            msg => Avalonia.Threading.Dispatcher.UIThread.Post(() => GameText.AddSystemLine(msg)));
-        _core.SpeakRequested += text => _tts.Speak(text);
+            msg => Avalonia.Threading.Dispatcher.UIThread.Post(() => GameText.AddSystemLine(msg)),
+            rateProvider: () => (float)_core.Config.TtsRate,
+            volumeProvider: () => _core.Config.TtsVolume / 100f);
+        _core.SpeakRequested += (text, urgent) =>
+            _tts.Speak(text, urgent ? Services.TtsPriority.High : Services.TtsPriority.Normal);
 
         // #tts install / voices / status — manage downloadable voices.
         _core.TtsCommandRequested += HandleTtsCommand;

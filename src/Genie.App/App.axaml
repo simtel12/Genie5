@@ -246,12 +246,25 @@
 
     <!-- ── Mobs ───────────────────────────────────────────────────────────── -->
     <!-- Creatures in the room, one per line (issue #86). Sourced from the
-         engine's ignore-filtered Creatures list, so ground items don't show. -->
+         engine's ignore-filtered Creatures list, so ground items don't show.
+         The gear button opens the ignore-list editor (the server bolds
+         familiars/pets identically to hostile creatures, so filtering them is
+         the user's call): one regex alternative per row, right-click a mob to
+         ignore it exactly. Edits persist to settings.cfg via the same
+         mechanism as `#config monstercountignorelist` and re-filter the list
+         immediately. -->
     <DataTemplate DataType="docking:MobsTool">
-      <Grid RowDefinitions="Auto,*">
-        <TextBlock Grid.Row="0" Margin="8,6,8,2" FontSize="10"
-                   Foreground="#7a92a8" FontWeight="SemiBold"
-                   Text="{Binding ViewModel.Count, StringFormat='MOBS ({0})'}"/>
+      <Grid RowDefinitions="Auto,*,Auto">
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="8,6,8,2">
+          <TextBlock Grid.Column="0" FontSize="10" VerticalAlignment="Center"
+                     Foreground="#7a92a8" FontWeight="SemiBold"
+                     Text="{Binding ViewModel.Count, StringFormat='MOBS ({0})'}"/>
+          <ToggleButton Grid.Column="1" Content="⚙" FontSize="11"
+                        Padding="4,0" MinHeight="0" MinWidth="0"
+                        Background="Transparent" BorderThickness="0" Foreground="#7a92a8"
+                        IsChecked="{Binding ViewModel.IsEditingIgnores}"
+                        ToolTip.Tip="Edit the ignore list (hide familiars, pets, …)"/>
+        </Grid>
         <ScrollViewer Grid.Row="1">
           <StackPanel Margin="8,2,8,8">
             <TextBlock Text="No creatures here." Foreground="#777" FontSize="11"
@@ -259,14 +272,66 @@
             <ItemsControl ItemsSource="{Binding ViewModel.Mobs}"
                           IsVisible="{Binding !ViewModel.IsEmpty}">
               <ItemsControl.ItemTemplate>
-                <DataTemplate DataType="x:String">
-                  <SelectableTextBlock Text="{Binding}" Foreground="#e0a060"
-                                       FontSize="12" TextWrapping="Wrap" Margin="0,1"/>
+                <DataTemplate DataType="vm:MobItem">
+                  <SelectableTextBlock Text="{Binding Text}" Foreground="#e0a060"
+                                       FontSize="12" TextWrapping="Wrap" Margin="0,1">
+                    <SelectableTextBlock.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="Ignore this creature"
+                                  Command="{Binding IgnoreCommand}"
+                                  ToolTip.Tip="Adds the exact phrase to the ignore list"/>
+                      </ContextMenu>
+                    </SelectableTextBlock.ContextMenu>
+                  </SelectableTextBlock>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
           </StackPanel>
         </ScrollViewer>
+        <Border Grid.Row="2" IsVisible="{Binding ViewModel.IsEditingIgnores}"
+                BorderBrush="#333" BorderThickness="0,1,0,0"
+                Background="#1a1a1a" Padding="8,6">
+          <StackPanel Spacing="4">
+            <TextBlock Text="IGNORE LIST" FontSize="10"
+                       Foreground="#7a92a8" FontWeight="SemiBold"/>
+            <TextBlock FontSize="10" Foreground="#777" TextWrapping="Wrap"
+                       Text="Creatures matching any pattern are hidden here and excluded from $monstercount. Patterns are case-insensitive regexes — right-click a mob above to ignore it exactly."/>
+            <ItemsControl ItemsSource="{Binding ViewModel.IgnorePatterns}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:IgnorePatternItem">
+                  <Grid ColumnDefinitions="*,Auto" Margin="0,1">
+                    <SelectableTextBlock Grid.Column="0" Text="{Binding Pattern}"
+                                         FontSize="11" Foreground="#bbb"
+                                         TextWrapping="Wrap" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Content="✕" FontSize="10"
+                            Padding="4,0" MinHeight="0" MinWidth="0"
+                            Background="Transparent" BorderThickness="0" Foreground="#a55"
+                            Command="{Binding RemoveCommand}"
+                            ToolTip.Tip="Remove this pattern"/>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBox Grid.Column="0" Text="{Binding ViewModel.NewPattern}"
+                       Watermark="Add pattern…" FontSize="11" MinHeight="0" Padding="6,3">
+                <TextBox.KeyBindings>
+                  <KeyBinding Gesture="Enter" Command="{Binding ViewModel.AddPatternCommand}"/>
+                </TextBox.KeyBindings>
+              </TextBox>
+              <Button Grid.Column="1" Content="Add" Margin="4,0,0,0"
+                      FontSize="11" MinHeight="0" Padding="8,3"
+                      Command="{Binding ViewModel.AddPatternCommand}"/>
+            </Grid>
+            <TextBlock Text="{Binding ViewModel.EditorError}" FontSize="10"
+                       Foreground="#e06060" TextWrapping="Wrap"
+                       IsVisible="{Binding ViewModel.EditorError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+            <Button Content="Restore defaults" FontSize="10" MinHeight="0" Padding="6,2"
+                    HorizontalAlignment="Left"
+                    Command="{Binding ViewModel.RestoreDefaultsCommand}"
+                    ToolTip.Tip="Reset to the Genie 4 default: appears dead|(dead)"/>
+          </StackPanel>
+        </Border>
       </Grid>
     </DataTemplate>
 

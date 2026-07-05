@@ -117,8 +117,13 @@ public partial class HighlightStringsPanel : UserControl
             catch (RegexParseException ex) { StatusText.Text = $"Invalid regex: {ex.Message}"; return; }
         }
 
+        // Carry the CLI-managed fields (per-rule sound + speak) through the
+        // edit — the form doesn't surface them, and dropping them here would
+        // silently strip a #highlight-added sound/speak on every dialog save.
+        var existing = _engine.Rules.FirstOrDefault(r => r.Pattern == pattern);
         _engine.RemoveRule(pattern);
-        _engine.AddRule(pattern, color, bgColor, matchType, caseSensitive, enabled, className);
+        _engine.AddRule(pattern, color, bgColor, matchType, caseSensitive, enabled, className,
+                        existing?.SoundFile ?? "", existing?.Speak ?? "");
         Refresh();
         _onRulesChanged?.Invoke();
         UserHighlights.NotifyRulesChanged();

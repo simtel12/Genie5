@@ -36,9 +36,10 @@ public sealed class TriggerEngineFinal
     }
 
     public TriggerRule AddTrigger(string pattern, string action, bool caseSensitive = false,
-                                  bool isEnabled = true, string className = "", string soundFile = "")
+                                  bool isEnabled = true, string className = "", string soundFile = "",
+                                  string speak = "")
     {
-        var trigger = new TriggerRule(pattern, action, caseSensitive, isEnabled, className, _safetyEnabled, soundFile);
+        var trigger = new TriggerRule(pattern, action, caseSensitive, isEnabled, className, _safetyEnabled, soundFile, speak);
         _triggers.Add(trigger);
         if (!string.IsNullOrEmpty(className)) Classes?.Ensure(className);
         return trigger;
@@ -66,6 +67,12 @@ public sealed class TriggerEngineFinal
             // Optional per-trigger SFX (host applies the PlaySounds gate).
             if (!string.IsNullOrEmpty(trigger.SoundFile))
                 _host?.PlaySound(trigger.SoundFile);
+            // Optional per-trigger TTS: "*" speaks the matched line, anything
+            // else speaks that text with $0..$n expanded. Urgent — these are the
+            // user's hand-picked alerts, so they barge in over stream read-aloud.
+            if (!string.IsNullOrEmpty(trigger.Speak))
+                _host?.Speak(trigger.Speak == "*" ? line : ExpandAction(trigger.Speak, match),
+                             urgent: true);
             var expandedAction = ExpandAction(trigger.Action, match);
             // Automated (game-text-driven) — not interactive, so a #var/#tvar in
             // the action sets silently instead of echoing "Variable set:".

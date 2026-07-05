@@ -14,6 +14,9 @@ public sealed class TriggerPersistenceModel
     public bool CaseSensitive { get; set; }
     public bool IsEnabled { get; set; } = true;
     public string ClassName { get; set; } = string.Empty;
+    public string SoundFile { get; set; } = string.Empty;
+    /// <summary>Per-rule TTS: "" = off, "*" = speak the matched line, else the text to speak.</summary>
+    public string Speak { get; set; } = string.Empty;
 }
 
 public sealed class VariablePersistenceModel
@@ -38,6 +41,9 @@ public sealed class HighlightPersistenceModel
     public bool CaseSensitive { get; set; }
     public bool IsEnabled { get; set; } = true;
     public string ClassName { get; set; } = string.Empty;
+    public string SoundFile { get; set; } = string.Empty;
+    /// <summary>Per-rule TTS: "" = off, "*" = speak the matched line, else the text to speak.</summary>
+    public string Speak { get; set; } = string.Empty;
 }
 
 public sealed class ClassPersistenceModel

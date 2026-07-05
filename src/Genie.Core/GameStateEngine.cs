@@ -225,6 +225,7 @@ public sealed class GameStateEngine : IDisposable
                 // Monster count: filter the bold creature phrases through the
                 // ignore list (Genie 4 default "appears dead|(dead)"). Recomputes
                 // every room update — empty when nothing is bold.
+                _lastRoomBoldNames       = comp.BoldNames;
                 _state.Room.Creatures    = FilterCreatures(comp.BoldNames, Config?.IgnoreMonsterList);
                 _state.Room.MonsterCount = _state.Room.Creatures.Count;
                 break;
@@ -350,6 +351,25 @@ public sealed class GameStateEngine : IDisposable
             "defensive" => Stance.Defensive,
             _           => Stance.Unknown
         };
+
+    // Bold phrases from the most recent "room objs" event, kept so the ignore
+    // filter can be re-applied when the list changes between room updates.
+    private IReadOnlyList<string>? _lastRoomBoldNames;
+
+    /// <summary>
+    /// Re-filter the current room's creatures against the live ignore list
+    /// without waiting for the next <c>room objs</c> event. GenieCore calls
+    /// this when <c>monstercountignorelist</c> changes (Mobs-panel editor or
+    /// typed <c>#config</c>). No-op before the first room update — there is
+    /// nothing recorded to re-filter, and Room.Creatures may hold state carried
+    /// across a reconnect that we must not wipe.
+    /// </summary>
+    public void RecomputeCreatures()
+    {
+        if (_lastRoomBoldNames is null) return;
+        _state.Room.Creatures    = FilterCreatures(_lastRoomBoldNames, Config?.IgnoreMonsterList);
+        _state.Room.MonsterCount = _state.Room.Creatures.Count;
+    }
 
     /// <summary>
     /// Filter the room's bold creature phrases through the monster-count ignore

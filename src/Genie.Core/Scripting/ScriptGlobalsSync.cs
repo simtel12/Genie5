@@ -220,6 +220,19 @@ public sealed class ScriptGlobalsSync : IDisposable
     private void OnHeldItem(HeldItemEvent held)
         => SetHand(held.Hand, held.Noun, held.ExistId);
 
+    /// <summary>
+    /// Re-mirror <c>$monstercount</c>/<c>$monsterlist</c> from the (just
+    /// recomputed) Room state. Called by GenieCore when the monster-count
+    /// ignore list changes between room updates, so scripts see the same
+    /// filtered list as the Mobs panel without waiting for the next
+    /// <c>room objs</c> event.
+    /// </summary>
+    public void RefreshMonsterVars()
+    {
+        Set("monstercount", _state.Room.MonsterCount.ToString(CultureInfo.InvariantCulture));
+        Set("monsterlist",  string.Join(", ", _state.Room.Creatures));
+    }
+
     private void OnComponent(ComponentEvent comp)
     {
         switch (comp.ComponentId?.ToLowerInvariant())

@@ -434,8 +434,8 @@ public sealed class CommandEngine
                     _host.Echo("Usage: #speak <text>");
                 break;
             case "tts":
-                // #tts <install|voices|status> — manage TTS voices. Forwarded
-                // whole (minus the verb) so the App can download/list voices.
+                // #tts <install|use|voices|read|mute|rate|volume|stop|status> —
+                // manage TTS. Forwarded whole (minus the verb) to the App host.
                 _host.TtsCommand(string.Join(" ", parts.Skip(1)));
                 break;
             case "goto":
@@ -1132,28 +1132,30 @@ public sealed class CommandEngine
 
         if (sub == "add")
         {
-            if (parts.Count < 4) { _host.Echo("Usage: #highlight add {pattern} {fg} [{bg}] [{matchType}] [{class}] [{sound}]"); return; }
+            if (parts.Count < 4) { _host.Echo("Usage: #highlight add {pattern} {fg} [{bg}] [{matchType}] [{class}] [{sound}] [{speak: * = line, or text}]"); return; }
             var pattern  = parts[2];
             var fg       = parts[3];
             var bg       = parts.Count > 4 ? parts[4] : "";
             var match    = ParseMatchType(parts.Count > 5 ? parts[5] : "string");
             var cls      = parts.Count > 6 ? parts[6] : "";
             var sound    = parts.Count > 7 ? parts[7] : "";
+            var speak    = parts.Count > 8 ? parts[8] : "";
             Highlights.RemoveRule(pattern);            // upsert
-            Highlights.AddRule(pattern, fg, bg, match, false, true, cls, sound);
+            Highlights.AddRule(pattern, fg, bg, match, false, true, cls, sound, speak);
             _host.Echo($"Highlight added: {pattern} fg={fg}{(string.IsNullOrEmpty(bg) ? "" : $" bg={bg}")}");
             return;
         }
 
-        // Implicit positional: #highlight {pattern} {fg} [{bg}] [{matchType}] [{class}] [{sound}]
+        // Implicit positional: #highlight {pattern} {fg} [{bg}] [{matchType}] [{class}] [{sound}] [{speak}]
         var pPattern = parts[1];
         var pFg      = parts.Count > 2 ? parts[2] : "";
         var pBg      = parts.Count > 3 ? parts[3] : "";
         var pMatch   = ParseMatchType(parts.Count > 4 ? parts[4] : "string");
         var pCls     = parts.Count > 5 ? parts[5] : "";
         var pSound   = parts.Count > 6 ? parts[6] : "";
+        var pSpeak   = parts.Count > 7 ? parts[7] : "";
         Highlights.RemoveRule(pPattern);
-        Highlights.AddRule(pPattern, pFg, pBg, pMatch, false, true, pCls, pSound);
+        Highlights.AddRule(pPattern, pFg, pBg, pMatch, false, true, pCls, pSound, pSpeak);
         _host.Echo($"Highlight added: {pPattern} fg={pFg}{(string.IsNullOrEmpty(pBg) ? "" : $" bg={pBg}")}");
     }
 
@@ -1182,7 +1184,7 @@ public sealed class CommandEngine
         if (Highlights is null) return;
         var path  = Path.Combine(_config.ConfigProfileDir, "highlights.cfg");
         var lines = Highlights.Rules.Select(r =>
-            $"#highlight add {ConfigPersistence.FormatArg(r.Pattern)} {ConfigPersistence.FormatArg(r.ForegroundColor)} {ConfigPersistence.FormatArg(r.BackgroundColor)} {ConfigPersistence.FormatArg(r.MatchType.ToString())} {ConfigPersistence.FormatArg(r.ClassName)} {ConfigPersistence.FormatArg(r.SoundFile)}");
+            $"#highlight add {ConfigPersistence.FormatArg(r.Pattern)} {ConfigPersistence.FormatArg(r.ForegroundColor)} {ConfigPersistence.FormatArg(r.BackgroundColor)} {ConfigPersistence.FormatArg(r.MatchType.ToString())} {ConfigPersistence.FormatArg(r.ClassName)} {ConfigPersistence.FormatArg(r.SoundFile)} {ConfigPersistence.FormatArg(r.Speak)}");
         if (ConfigPersistence.WriteLines(path, lines))
             _host.Echo("Highlights Saved");
         else
@@ -1245,32 +1247,34 @@ public sealed class CommandEngine
 
         if (sub == "add")
         {
-            if (parts.Count < 4) { _host.Echo("Usage: #trigger add {pattern} {action} [{class}] [{sound}]"); return; }
+            if (parts.Count < 4) { _host.Echo("Usage: #trigger add {pattern} {action} [{class}] [{sound}] [{speak: * = line, or text}]"); return; }
             var pattern = parts[2];
             var action  = parts[3];
             var cls     = parts.Count > 4 ? parts[4] : "";
             var sound   = parts.Count > 5 ? parts[5] : "";
+            var speak   = parts.Count > 6 ? parts[6] : "";
             Triggers.RemoveTrigger(pattern);
             try
             {
-                Triggers.AddTrigger(pattern, action, false, true, cls, sound);
+                Triggers.AddTrigger(pattern, action, false, true, cls, sound, speak);
                 _host.Echo($"Trigger added: {pattern} → {action}");
             }
             catch (ArgumentException) { _host.Echo($"Invalid regexp in trigger: {pattern}"); }
             return;
         }
 
-        // Implicit: #trigger {pattern} {action} [{class}] [{sound}]
+        // Implicit: #trigger {pattern} {action} [{class}] [{sound}] [{speak}]
         if (parts.Count >= 3)
         {
             var pattern = parts[1];
             var action  = parts[2];
             var cls     = parts.Count > 3 ? parts[3] : "";
             var sound   = parts.Count > 4 ? parts[4] : "";
+            var speak   = parts.Count > 5 ? parts[5] : "";
             Triggers.RemoveTrigger(pattern);
             try
             {
-                Triggers.AddTrigger(pattern, action, false, true, cls, sound);
+                Triggers.AddTrigger(pattern, action, false, true, cls, sound, speak);
                 _host.Echo($"Trigger added: {pattern} → {action}");
             }
             catch (ArgumentException) { _host.Echo($"Invalid regexp in trigger: {pattern}"); }
@@ -1301,7 +1305,7 @@ public sealed class CommandEngine
         if (Triggers is null) return;
         var path  = Path.Combine(_config.ConfigProfileDir, "triggers.cfg");
         var lines = Triggers.Triggers.Select(t =>
-            $"#trigger add {ConfigPersistence.FormatArg(t.Pattern)} {ConfigPersistence.FormatArg(t.Action)} {ConfigPersistence.FormatArg(t.ClassName)} {ConfigPersistence.FormatArg(t.SoundFile)}");
+            $"#trigger add {ConfigPersistence.FormatArg(t.Pattern)} {ConfigPersistence.FormatArg(t.Action)} {ConfigPersistence.FormatArg(t.ClassName)} {ConfigPersistence.FormatArg(t.SoundFile)} {ConfigPersistence.FormatArg(t.Speak)}");
         if (ConfigPersistence.WriteLines(path, lines))
             _host.Echo("Triggers Saved");
         else

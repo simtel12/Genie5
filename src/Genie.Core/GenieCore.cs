@@ -474,6 +474,20 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         SyncMasterToggles();
         Config.ConfigChanged += field => { if (field == Genie.Core.Config.ConfigFieldUpdated.MasterToggles) SyncMasterToggles(); };
 
+        // Re-filter the room's creature list the moment the monster-count
+        // ignore list changes (Mobs-panel editor or typed `#config
+        // monstercountignorelist`), and re-mirror $monstercount/$monsterlist
+        // so scripts stay consistent with the panel. The Mobs panel subscribes
+        // to the same ConfigChanged event later (at Attach), so it reads the
+        // recomputed state — the same ordering guarantee the room-objs path
+        // relies on.
+        Config.ConfigChanged += field =>
+        {
+            if (field != Genie.Core.Config.ConfigFieldUpdated.MonsterIgnore) return;
+            _stateEngine?.RecomputeCreatures();
+            _globalsSync?.RefreshMonsterVars();
+        };
+
         // ScriptGlobalsSync (the live-game-state → $globals mirror) binds to the
         // per-connection parser + the connect's character identity, so it is built
         // per connect in BuildConnection().
@@ -1244,25 +1258,27 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// backend.</summary>
     public event Action<string>? SoundRequested;
 
-    void ICommandHost.Speak(string text) => Speak(text);
+    void ICommandHost.Speak(string text, bool urgent) => Speak(text, urgent);
 
     /// <summary>
-    /// Speak <paramref name="text"/> aloud via TTS (<c>#speak</c>, and later
-    /// per-stream read-aloud). Trims and ignores blank input, then raises
+    /// Speak <paramref name="text"/> aloud via TTS (<c>#speak</c>, per-rule
+    /// trigger/highlight speak). Trims and ignores blank input, then raises
     /// <see cref="SpeakRequested"/>. The App owns the TTS engine + audio and
     /// synthesizes off-thread; Console builds with no handler are a silent
     /// no-op. The voice/engine lives in the App layer (native libs) so
-    /// <see cref="Genie.Core"/> stays UI- and platform-free.
+    /// <see cref="Genie.Core"/> stays UI- and platform-free. <paramref name="urgent"/>
+    /// = speak first / barge in (per-rule alerts).
     /// </summary>
-    public void Speak(string text)
+    public void Speak(string text, bool urgent = false)
     {
         if (string.IsNullOrWhiteSpace(text)) return;
-        SpeakRequested?.Invoke(text.Trim());
+        SpeakRequested?.Invoke(text.Trim(), urgent);
     }
 
-    /// <summary>Raised with the (trimmed, non-empty) text to speak whenever TTS
-    /// is requested. The App subscribes and dispatches to its TTS backend.</summary>
-    public event Action<string>? SpeakRequested;
+    /// <summary>Raised with the (trimmed, non-empty) text to speak and its
+    /// urgency whenever TTS is requested. The App subscribes and dispatches to
+    /// its TTS backend (urgent → high priority / barge-in).</summary>
+    public event Action<string, bool>? SpeakRequested;
 
     void ICommandHost.TtsCommand(string args) => TtsCommandRequested?.Invoke(args ?? "");
 

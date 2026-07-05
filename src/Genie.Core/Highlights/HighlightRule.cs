@@ -14,7 +14,7 @@ public sealed class HighlightRule
     public HighlightRule(string pattern, string foregroundColor, string backgroundColor = "",
                          HighlightMatchType matchType = HighlightMatchType.String,
                          bool caseSensitive = false, bool isEnabled = true, string className = "",
-                         bool safe = true, string soundFile = "")
+                         bool safe = true, string soundFile = "", string speak = "")
     {
         Pattern         = pattern;
         ForegroundColor = foregroundColor;
@@ -24,6 +24,7 @@ public sealed class HighlightRule
         IsEnabled       = isEnabled;
         ClassName       = className;
         SoundFile       = soundFile;
+        Speak           = speak;
         Rebuild(safe);
     }
 
@@ -37,6 +38,10 @@ public sealed class HighlightRule
     /// <summary>Optional sound played when this highlight matches a line
     /// (resolved against SoundDir). Empty = silent.</summary>
     public string             SoundFile       { get; set; }
+    /// <summary>Optional TTS when this highlight matches a line: empty = silent,
+    /// <c>*</c> = speak the whole matched line, anything else = speak that text.
+    /// Spoken urgent — it barges in over stream read-aloud.</summary>
+    public string             Speak           { get; set; }
 
     public bool Matches(string line)
     {

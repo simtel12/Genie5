@@ -11,7 +11,7 @@ public sealed class TriggerRule
 
     public TriggerRule(string pattern, string action, bool caseSensitive = false,
                        bool isEnabled = true, string className = "", bool safe = true,
-                       string soundFile = "")
+                       string soundFile = "", string speak = "")
     {
         Pattern       = pattern;
         Action        = action;
@@ -19,6 +19,7 @@ public sealed class TriggerRule
         IsEnabled     = isEnabled;
         ClassName     = className;
         SoundFile     = soundFile;
+        Speak         = speak;
         _cmp          = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
         Rebuild(safe);
     }
@@ -30,6 +31,10 @@ public sealed class TriggerRule
     /// <summary>Optional sound played when this trigger fires (resolved against
     /// SoundDir). Empty = silent.</summary>
     public string SoundFile     { get; set; }
+    /// <summary>Optional TTS when this trigger fires: empty = silent, <c>*</c> =
+    /// speak the matched line, anything else = speak that text ($0..$n capture
+    /// groups expand). Spoken urgent — it barges in over stream read-aloud.</summary>
+    public string Speak         { get; set; }
     public Regex  Regex         { get; private set; } = null!;
 
     public bool IsMatch(string line) => IsEnabled && SafeMatch(line) is { Success: true };

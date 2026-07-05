@@ -58,7 +58,50 @@ public sealed class GenieConfig
     public bool PromptBreak { get; set; } = true;
     public bool PromptForce { get; set; } = true;
     public bool Condensed { get; set; }
-    public string IgnoreMonsterList { get; set; } = "appears dead|(dead)";
+    /// <summary>Genie 4 ships this ignore list out of the box — dead creatures
+    /// don't count toward <c>$monstercount</c>. The Mobs-panel editor's
+    /// "Restore defaults" resets to this.</summary>
+    public const string DefaultIgnoreMonsterList = "appears dead|(dead)";
+    public string IgnoreMonsterList { get; set; } = DefaultIgnoreMonsterList;
+
+    /// <summary>
+    /// Split a pipe-joined regex (the <see cref="IgnoreMonsterList"/> format)
+    /// on its TOP-LEVEL <c>|</c> alternatives only — a naive Split('|') would
+    /// break apart groups like <c>(rat|hog)</c>. Tracks escapes, character
+    /// classes, and group nesting; empty alternatives are dropped. The inverse
+    /// of <c>string.Join("|", …)</c>, used by the Mobs-panel ignore-list
+    /// editor to show one alternative per row.
+    /// </summary>
+    public static List<string> SplitTopLevelAlternatives(string pattern)
+    {
+        var parts = new List<string>();
+        if (string.IsNullOrWhiteSpace(pattern)) return parts;
+
+        var current = new System.Text.StringBuilder();
+        var depth   = 0;
+        var inClass = false;
+        var escaped = false;
+
+        foreach (var ch in pattern)
+        {
+            if (escaped) { current.Append(ch); escaped = false; continue; }
+            switch (ch)
+            {
+                case '\\':                                  current.Append(ch); escaped = true; break;
+                case '[' when !inClass:                     current.Append(ch); inClass = true; break;
+                case ']' when inClass:                      current.Append(ch); inClass = false; break;
+                case '(' when !inClass:                     current.Append(ch); depth++; break;
+                case ')' when !inClass && depth > 0:        current.Append(ch); depth--; break;
+                case '|' when !inClass && depth == 0:
+                    if (current.Length > 0) parts.Add(current.ToString());
+                    current.Clear();
+                    break;
+                default:                                    current.Append(ch); break;
+            }
+        }
+        if (current.Length > 0) parts.Add(current.ToString());
+        return parts;
+    }
     public int ScriptTimeout { get; set; } = 5000;
     public int MaxGoSubDepth { get; set; } = 50;
     public bool Reconnect { get; set; } = true;
@@ -179,6 +222,14 @@ public sealed class GenieConfig
         TtsReadStreamsRaw
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Any(s => s.Equals(stream, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>TTS speaking rate multiplier — 1.0 = the voice's natural pace,
+    /// higher = faster. Clamped 0.5–3.0. <c>#tts rate</c>.</summary>
+    public double TtsRate { get; set; } = 1.0;
+
+    /// <summary>TTS output volume, 0–100 percent of the voice's full level
+    /// (attenuation only, so it can never clip). <c>#tts volume</c>.</summary>
+    public int TtsVolume { get; set; } = 100;
     /// <summary>Local cache dir for DR room/scene art (downloaded JPGs). Backs
     /// <c>showimages</c> / the Scene panel.</summary>
     public string ArtDir => _localDirectory.Current.ResolvePath(ArtDirRaw);
@@ -333,6 +384,8 @@ public sealed class GenieConfig
         ("ttsvoice", TtsVoice),
         ("ttsread", TtsRead.ToString()),
         ("ttsreadstreams", TtsReadStreamsRaw),
+        ("ttsrate", TtsRate.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+        ("ttsvolume", TtsVolume.ToString()),
         ("artdir", ArtDirRaw),
         ("mapdir", MapDirRaw),
         ("plugindir", PluginDirRaw),
@@ -405,7 +458,7 @@ public sealed class GenieConfig
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "triggeroninput", "scripttimeout", "maxgosubdepth", "abortdupescript", "scriptextension", "editor" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "updatemapperscripts" }),
         ("Auto-Walk",        new[] { "autowalkpauseonunfocus", "autowalkunfocusseconds" }),
-        ("Sound / TTS",      new[] { "muted", "ttsvoice", "ttsvoicedir", "ttsread", "ttsreadstreams" }),
+        ("Sound / TTS",      new[] { "muted", "ttsvoice", "ttsvoicedir", "ttsread", "ttsreadstreams", "ttsrate", "ttsvolume" }),
         ("Logging",          new[] { "autolog" }),
         ("Updates",          new[] { "autoupdate", "checkforupdates" }),
         ("Directories",      new[] { "scriptdir", "sounddir", "artdir", "mapdir", "plugindir", "configdir", "logdir" }),
@@ -452,7 +505,7 @@ public sealed class GenieConfig
                 case "promptbreak": PromptBreak = ToBool(value); break;
                 case "promptforce": PromptForce = ToBool(value); break;
                 case "condensed": Condensed = ToBool(value); break;
-                case "monstercountignorelist": IgnoreMonsterList = value; break;
+                case "monstercountignorelist": IgnoreMonsterList = value; Notify(ConfigFieldUpdated.MonsterIgnore); break;
                 case "scripttimeout": ScriptTimeout = (int)UtilityCore.StringToDouble(value); break;
                 case "maxgosubdepth": MaxGoSubDepth = int.TryParse(value, out var mgd) ? mgd : MaxGoSubDepth; break;
                 case "roundtimeoffset": RoundTimeOffset = UtilityCore.StringToDouble(value); break;
@@ -468,6 +521,16 @@ public sealed class GenieConfig
                 case "ttsvoice": TtsVoice = value.Trim(); break;
                 case "ttsread": TtsRead = ToBool(value); break;
                 case "ttsreadstreams": TtsReadStreamsRaw = value.Trim(); break;
+                case "ttsrate":
+                    // Ignore garbage (StringToDouble returns -1) rather than
+                    // stomping the current rate; clamp real values to sane speech.
+                    var ttsRate = UtilityCore.StringToDouble(value);
+                    if (ttsRate > 0) TtsRate = Math.Clamp(ttsRate, 0.5, 3.0);
+                    break;
+                case "ttsvolume":
+                    var ttsVol = (int)UtilityCore.StringToDouble(value);
+                    if (ttsVol >= 0) TtsVolume = Math.Clamp(ttsVol, 0, 100);
+                    break;
                 case "artdir": ArtDirRaw = SetDir(value); break;
                 case "mapdir": MapDirRaw = SetDir(value); break;
                 case "plugindir": PluginDirRaw = SetDir(value); break;

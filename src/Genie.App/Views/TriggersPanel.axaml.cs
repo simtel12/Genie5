@@ -70,8 +70,13 @@ public partial class TriggersPanel : UserControl
         try { _ = new Regex(pattern); }
         catch (RegexParseException ex) { StatusText.Text = $"Invalid regex: {ex.Message}"; return; }
 
+        // Carry the CLI-managed fields (per-rule sound + speak) through the
+        // edit — the form doesn't surface them, and dropping them here would
+        // silently strip a #trigger-added sound/speak on every dialog save.
+        var existing = _engine.Triggers.FirstOrDefault(t => t.Pattern == pattern);
         _engine.RemoveTrigger(pattern);
-        _engine.AddTrigger(pattern, action, caseSensitive, enabled, className);
+        _engine.AddTrigger(pattern, action, caseSensitive, enabled, className,
+                           existing?.SoundFile ?? "", existing?.Speak ?? "");
         Refresh();
         _onChanged?.Invoke();
         StatusText.Text = "Saved.";

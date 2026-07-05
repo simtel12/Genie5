@@ -21,5 +21,9 @@ public enum ConfigFieldUpdated
     /// <summary>A rule-engine master enable changed (highlights / triggers /
     /// substitutes / gags / aliases) — GenieCore re-syncs each engine's
     /// Enabled flag and the File ▸ Master Toggles menu re-reads its checks.</summary>
-    MasterToggles
+    MasterToggles,
+    /// <summary>The monster-count ignore list changed (Mobs-panel editor or a
+    /// typed <c>#config monstercountignorelist</c>) — GenieCore re-filters
+    /// Room.Creatures and the Mobs panel reloads its rows.</summary>
+    MonsterIgnore
 }

@@ -64,6 +64,15 @@ public static class DefaultHighlights
     public static System.Action<string>? OnHighlightSound;
 
     /// <summary>
+    /// TTS dispatcher for per-highlight speak. Set by <c>MainWindowViewModel</c>
+    /// at connect time to route to the TTS engine at high priority (a speak-
+    /// flagged highlight is a hand-picked alert, so it barges in over stream
+    /// read-aloud). Invoked once per line a speak-carrying highlight matches,
+    /// with the text to say. Null until connect → silent.
+    /// </summary>
+    public static System.Action<string>? OnHighlightSpeak;
+
+    /// <summary>
     /// Master toggle that mirrors <c>GenieConfig.ShowLinks</c>. When false,
     /// link spans render as ordinary text (no underline, no cursor change,
     /// no click handler) — useful for users who find the underlines noisy.
@@ -227,6 +236,10 @@ public static class DefaultHighlights
                     // Optional per-highlight SFX, once per matching line.
                     if (matched && !string.IsNullOrEmpty(rule.SoundFile))
                         OnHighlightSound?.Invoke(rule.SoundFile);
+                    // Optional per-highlight TTS, once per matching line:
+                    // "*" speaks the whole line, anything else that text.
+                    if (matched && !string.IsNullOrEmpty(rule.Speak))
+                        OnHighlightSpeak?.Invoke(rule.Speak == "*" ? text : rule.Speak);
                 }
             }
 

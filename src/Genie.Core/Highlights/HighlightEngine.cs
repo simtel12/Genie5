@@ -24,9 +24,9 @@ public sealed class HighlightEngine
     public HighlightRule AddRule(string pattern, string foregroundColor, string backgroundColor = "",
                                  HighlightMatchType matchType = HighlightMatchType.String,
                                  bool caseSensitive = false, bool isEnabled = true, string className = "",
-                                 string soundFile = "")
+                                 string soundFile = "", string speak = "")
     {
-        var rule = new HighlightRule(pattern, foregroundColor, backgroundColor, matchType, caseSensitive, isEnabled, className, _safetyEnabled, soundFile);
+        var rule = new HighlightRule(pattern, foregroundColor, backgroundColor, matchType, caseSensitive, isEnabled, className, _safetyEnabled, soundFile, speak);
         _rules.Add(rule);
         if (!string.IsNullOrEmpty(className)) Classes?.Ensure(className);
         return rule;

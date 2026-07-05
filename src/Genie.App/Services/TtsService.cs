@@ -34,6 +34,8 @@ public sealed class TtsService : IDisposable
 {
     private readonly Func<string> _voiceDirProvider;
     private readonly Func<string?>? _selectedVoiceProvider;
+    private readonly Func<float>? _rateProvider;     // speed multiplier, 1 = natural
+    private readonly Func<float>? _volumeProvider;   // linear gain 0..1
     private readonly Action<string>? _notify;
     private readonly TtsPlayer _player = new();
 
@@ -59,10 +61,14 @@ public sealed class TtsService : IDisposable
     public TtsService(
         Func<string> voiceDirProvider,
         Func<string?>? selectedVoiceProvider = null,
-        Action<string>? notify = null)
+        Action<string>? notify = null,
+        Func<float>? rateProvider = null,
+        Func<float>? volumeProvider = null)
     {
         _voiceDirProvider = voiceDirProvider;
         _selectedVoiceProvider = selectedVoiceProvider;
+        _rateProvider = rateProvider;
+        _volumeProvider = volumeProvider;
         _notify = notify;
         _worker = new Thread(WorkerLoop) { IsBackground = true, Name = "TTS" };
         _worker.Start();
@@ -141,9 +147,22 @@ public sealed class TtsService : IDisposable
             _interruptCurrent = false;
             try
             {
-                var gen = new OfflineTtsGenerationConfig { Sid = 0, Speed = 1.0f };
+                // Rate + volume are read live per utterance so #tts rate/volume
+                // apply from the very next spoken line, no engine rebuild needed.
+                float rate = _rateProvider?.Invoke() ?? 1.0f;
+                var gen = new OfflineTtsGenerationConfig { Sid = 0, Speed = rate > 0 ? rate : 1.0f };
                 var audio = engine.GenerateWithConfig(req.Text, gen, null);
-                _player.Play(audio.Samples, audio.SampleRate, () => _interruptCurrent || !_running);
+
+                float gain = Math.Clamp(_volumeProvider?.Invoke() ?? 1.0f, 0f, 1f);
+                if (gain > 0f)
+                {
+                    if (gain < 1f)
+                    {
+                        var s = audio.Samples;
+                        for (int i = 0; i < s.Length; i++) s[i] *= gain;
+                    }
+                    _player.Play(audio.Samples, audio.SampleRate, () => _interruptCurrent || !_running);
+                }
             }
             catch (Exception ex)
             {
