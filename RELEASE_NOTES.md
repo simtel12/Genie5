@@ -1,3 +1,37 @@
+# Genie 5 — v5.0.0-alpha.8.1
+
+A portable-install follow-up driven by community reports: the executable is
+now `Genie5.exe` everywhere, and Genie announces which data folder it is
+using the moment it starts.
+
+> **Alpha software.** Windows SmartScreen may warn on first launch
+> (More info → Run anyway) while code signing is being rolled out — tracked
+> in #33.
+
+## ✨ New
+
+- **`[data]` startup line** — the first line in the game window shows the
+  data root Genie resolved and the mode it chose, e.g.
+  `[data] root: D:\Genie 5 (portable)`. If a connect profile's Data
+  Directory override repoints scripts/rules/layouts somewhere else, a second
+  `[data] profile override: …` line says so. "Which folder is Genie actually
+  reading?" is now answered at a glance (#138).
+
+## 🔧 Changed
+
+- **The executable is `Genie5.exe` on every platform (#137)** — the app exe,
+  the process name in Task Manager, and the portable launcher now all say
+  `Genie5`. Previously the portable zip's launcher was `Genie5.exe` but the
+  app it started was `Genie.exe`, which made pinned icons and shortcuts tell
+  a confusing story after auto-updates — and collided with Genie 4's own
+  `Genie.exe` for players running both.
+
+> **⚠️ One-time shortcut note (portable installs).** If you made a shortcut
+> directly to `current\Genie.exe`, it stops working after this update — the
+> file is now `current\Genie5.exe`. Re-point shortcuts at the root
+> `Genie5.exe`, which survives every update. Start-menu shortcuts from the
+> Setup install update themselves.
+
 # Genie 5 — v5.0.0-alpha.8
 
 The Genie 4 menu-parity milestone: the full menu audit closes with master

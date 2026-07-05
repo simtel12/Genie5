@@ -4,7 +4,18 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8 — Menu Parity
+## Latest: v5.0.0-alpha.8.1 — Genie5.exe Everywhere
+
+A portable-install follow-up: the executable is now **`Genie5.exe`** on every platform, and Genie announces which data folder it is using the moment it starts.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.1** as a delta.
+
+- **One executable name (#137)** — the app exe, the Task Manager process name, and the portable launcher all say `Genie5` now (the app inside `current\` used to be `Genie.exe`). ⚠️ **One-time note:** shortcuts made directly to `current\Genie.exe` stop working — re-point them at the root `Genie5.exe`, which survives every update.
+- **`[data]` startup line ([#138](https://github.com/GenieClient/Genie5/issues/138))** — the first game-window line shows the resolved data root and mode, e.g. `[data] root: D:\Genie 5 (portable)`; a second line appears when a profile's Data Directory override repoints scripts/rules/layouts elsewhere.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.1)
+
+## v5.0.0-alpha.8 — Menu Parity
 
 The Genie 4 menu-parity milestone: master toggles for every rule engine, the Icon Bar status strip, an Injuries panel, a Scripts updater with per-component Update Settings, and a stack of muscle-memory menu items — plus Lich-attach and scripting fixes from community reports.
 
