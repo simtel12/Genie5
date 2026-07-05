@@ -3,6 +3,7 @@ using System.IO;
 using System.Reactive;
 using System.Reactive.Linq;
 using Genie.App.Highlighting;
+using Genie.App.Settings;
 using Genie.Core;
 using Genie.Core.Aliases;
 using Genie.Core.Classes;
@@ -47,6 +48,8 @@ public class ConfigurationViewModel : ReactiveObject
     private readonly string               _configRoot;
     private readonly ConnectionProfile?   _connectedProfile;
     private readonly WindowSettingsStore  _windowSettings;
+    private readonly DisplaySettings?     _display;
+    private readonly string?              _displayPath;
     private readonly PersistenceService   _persistence = new();
 
     /// <summary>List of saved profiles for the picker dropdown. Plus a synthetic
@@ -74,12 +77,16 @@ public class ConfigurationViewModel : ReactiveObject
         string               configRoot,
         ProfileStore         profiles,
         ConnectionProfile?   connectedProfile,
-        WindowSettingsStore  windowSettings)
+        WindowSettingsStore  windowSettings,
+        DisplaySettings?     display     = null,
+        string?              displayPath = null)
     {
         _core             = core;
         _configRoot       = configRoot;
         _connectedProfile = connectedProfile;
         _windowSettings   = windowSettings;
+        _display          = display;
+        _displayPath      = displayPath;
 
         foreach (var p in profiles.Profiles) Profiles.Add(p);
 
@@ -126,6 +133,15 @@ public class ConfigurationViewModel : ReactiveObject
     /// active.
     /// </summary>
     public WindowSettingsStore WindowSettings => _windowSettings;
+
+    /// <summary>
+    /// App-wide display / window-behaviour settings (Always on Top, …) — the
+    /// live <see cref="DisplaySettings"/> instance the main window binds to, so
+    /// edits here update the window and the Layout-menu checkmarks immediately.
+    /// Stored in <c>display.json</c>, not per-profile. Null only when the dialog
+    /// is opened without one (defensive; the app always supplies it).
+    /// </summary>
+    public DisplaySettings? Display => _display;
 
     /// <summary>
     /// Global script-engine settings (script/command characters, timeout,
@@ -213,6 +229,23 @@ public class ConfigurationViewModel : ReactiveObject
         var config = _core?.Config;
         if (config is null) return;
         TrySave(() => config.Save());
+    }
+
+    /// <summary>Persist display.json after a window-behaviour edit (Always on
+    /// Top). The panel mutates the live <see cref="DisplaySettings"/> directly —
+    /// so the window's <c>Topmost</c> and the Layout-menu checkmark update at
+    /// once — and this flushes it to disk. Always on Top is also mirrored into
+    /// <c>settings.cfg</c> so <c>#config alwaysontop</c> / <c>#config list</c>
+    /// stay in step, matching the Layout-menu toggle's behaviour.</summary>
+    public void OnDisplaySettingsChanged()
+    {
+        if (_display is null) return;
+        if (_displayPath is not null) TrySave(() => _display.Save(_displayPath));
+        if (_core?.Config is { } cfg && cfg.AlwaysOnTop != _display.AlwaysOnTop)
+        {
+            cfg.AlwaysOnTop = _display.AlwaysOnTop;
+            TrySave(() => cfg.Save());
+        }
     }
 
     private static void TrySave(Action save)

@@ -60,6 +60,10 @@ public partial class ConfigurationDialog : ReactiveWindow<ConfigurationViewModel
         // per-profile, so no nullability check.
         LayoutPanelCtrl.Initialize(vm.WindowSettings, vm.OnWindowSettingsChanged);
 
+        // App-wide window-behaviour toggles (Always on Top). Also profile-
+        // independent — binds the same DisplaySettings the main window uses.
+        LayoutSettingsPanelCtrl.Initialize(vm.Display, vm.OnDisplaySettingsChanged);
+
         // Script settings live on the global GenieConfig (settings.cfg), so
         // they're profile-independent. ScriptConfig is null pre-connect — the
         // panel disables itself and shows a hint in that case.

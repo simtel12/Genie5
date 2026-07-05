@@ -79,6 +79,9 @@
           <TabItem Header="Windows">
             <views:LayoutPanel Name="LayoutPanelCtrl"/>
           </TabItem>
+          <TabItem Header="Settings">
+            <views:LayoutSettingsPanel Name="LayoutSettingsPanelCtrl"/>
+          </TabItem>
         </TabControl>
       </TabItem>
 

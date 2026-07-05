@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Genie.App.Views.LayoutSettingsPanel">
+
+  <!-- App-wide window-behaviour settings (display.json), not per-profile — the
+       banner makes that explicit. Each toggle applies live (it mutates the same
+       DisplaySettings the main window binds to) and persists immediately, so no
+       Apply button is needed. Mirrors the Layout-menu checkboxes. -->
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="4">
+    <StackPanel Margin="4" Spacing="4">
+
+      <!-- Scope banner — these settings are app-wide, shared by every profile. -->
+      <Border Background="#0e2438" CornerRadius="3" Padding="8,4" Margin="0,0,0,8">
+        <TextBlock Text="Window settings are global (display.json) — they apply to every profile."
+                   Foreground="#9bcbe8" TextWrapping="Wrap"/>
+      </Border>
+
+      <TextBlock Text="Window behaviour" FontWeight="SemiBold" Margin="0,0,0,4"/>
+
+      <CheckBox Name="AlwaysOnTopCheck"
+                Content="Always on top"
+                IsCheckedChanged="OnAlwaysOnTopChanged"
+                ToolTip.Tip="Keep the Genie window above all other applications. Same as Layout → Always on Top and #config alwaysontop on|off."/>
+
+      <TextBlock Name="StatusText" Foreground="Gray" FontStyle="Italic" Margin="0,4,0,0"/>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
