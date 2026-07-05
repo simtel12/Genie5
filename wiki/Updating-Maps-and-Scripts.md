@@ -24,7 +24,15 @@ If a zone file ever gets corrupted by bad edits, delete it from the Maps folder 
 
 ### Auto-update on launch
 
-The `updatemapperscripts` setting (see `#config` / **Configuration…**) controls whether helper map scripts are refreshed as part of updates. Repo URLs are configurable via the `maprepo` and `scriptrepo` settings if you point Genie at a fork or mirror.
+The `updatemapperscripts` setting (see `#config` / **Configuration…**) controls whether helper map scripts are refreshed as part of updates. Repo URLs are configurable via the `maprepo` and `scriptrepo` settings if you point Genie at a fork or mirror. **Help → Update Settings…** decides whether the silent startup check covers Maps and Scripts at all, and whether found updates install by themselves.
+
+## Updating scripts from community repositories
+
+The Updates dialog's **Scripts** tab (see [Keeping Up to Date](Updates#scripts)) subscribes your Scripts folder to one or more GitHub script repositories and pulls new and changed `.cmd` / `.js` files down — like a `git pull`, subfolders included:
+
+- **Your local-only files are never touched.** Only files that exist in a subscribed repo are compared and updated; anything you wrote yourself is invisible to the updater.
+- **The community repo is one click away.** [DR-Genie-Scripts](https://github.com/Tirost/DR-Genie-Scripts) — the largest community script collection — ships as a ready-to-enable subscription row.
+- **Add your own rows** for any other GitHub script repository (or your fork of the community one).
 
 ## Importing maps from a Genie 4 install
 

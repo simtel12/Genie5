@@ -59,7 +59,9 @@ Genie5/
 | `Profiles/` | One subfolder per character (`<Char>-<Account>/`) holding that character's own copy of the rule `.cfg` files. The first time a character connects, the folder is seeded from your shared `Config/` files, then diverges independently. | Created automatically. Edit the per-character files here, or via the GUI while that character is connected. |
 | `Scripts/` | Your `.cmd` script files, plus any helper scripts you pull from the community repo. | Drop any script here to run it as `.scriptname` (or `put .scriptname`). |
 | `Maps/` | Zone files in Genie 4's XML format (`Map1_Crossing.xml`, …) and `ZoneConnections.xml` (the cross-zone transit graph). | Populated via **File → Import from Genie 4…** or **File → Update Maps from Official Repo…**. Jump there via **File → Open Maps Folder**. |
-| `Logs/` | When AutoLog is on, each session writes a `<character>_<timestamp>` log of plain in/out text. | Read-only from the app's view. Safe to delete or archive. |
+| `Logs/` | When AutoLog is on, each session writes a `<character>_<timestamp>` log of plain in/out text. Toggle it live with the **File → Auto Log** checkbox — it applies mid-session. | Read-only from the app's view. Safe to delete or archive. |
+
+> **Jumping to any of these:** **File → Open Directory** opens the folder of your choice — Data root, Config (profile-aware), Logs, Maps, Scripts, or Plugins — in your system file manager.
 
 > **Note on formats.** Genie 5 stores rule config as Genie 4-style `.cfg` files (one command per line) and zone maps as Genie 4-style XML — not JSON. This keeps round-tripping with the Genie 4 ecosystem and the community Maps repo clean.
 

@@ -20,6 +20,17 @@ Either way, rules are saved to plain-text `.cfg` files and reloaded automaticall
 | **Variables** | Store reusable values, readable in scripts as `$name`. | `#var`, `#tvar` |
 | **Classes** | Named groups that turn sets of rules on/off together. | `#class` |
 
+### Master toggles — whole engines on/off
+
+The **File** menu has a master switch for each engine — **Highlights**, **Triggers**, **Substitutes**, **Gags**, **Aliases**, and **Images** — so you can silence a whole rule type without touching the rules. Everything stays loaded and editable while an engine is off. Each toggle is also a `#config` key, and the menu stays in sync whichever way you flip it:
+
+```
+#config triggers off
+#config highlights on
+```
+
+(The Images toggle clears or re-fetches the room art live.) For finer-grained switching, use [classes](#classes--grouping-rules).
+
 ### Aliases — typing shortcuts
 
 Expand a short token into a full command:

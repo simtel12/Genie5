@@ -45,7 +45,7 @@ The deep end: the full scripting language, the mapper's internals, plugins, and 
 | **[Scripting Reference](Scripting-Reference)** | The complete `.cmd` vocabulary, `%`/`$` variable scopes, the roundtime gate, type-ahead, and where Genie 5 diverges from Genie 4. |
 | **[Cross-Zone Travel](Cross-Zone-Travel)** | The `ZoneConnections.xml` transit graph, the multi-zone pathfinder, and the connection editor. |
 | **[Plugins](Plugins)** | The plugin contract, the `#plugin` command, the Experience-tracker example, and the trust model. |
-| **[Keeping Up to Date](Updates)** | The integrated updater — Core app, maps, and plugins. |
+| **[Keeping Up to Date](Updates)** | The integrated updater — Core app, maps, plugins, and scripts — and the per-kind auto-update settings. |
 | **[AI Advisor (planned)](AI-Advisor)** 🚧 | The advisor-only AI design and its privacy guarantees — opt-in, never agentive. |
 | **[Policy Compliance](Policy-Compliance)** | How Genie 5 stays a responsive, good-citizen frontend — and the hard "nevers" it holds about its own behavior. |
 | **[Architecture](Architecture)** | The one-way pipeline, the `Genie.Core` / `Genie.App` split, and the embedding story. |

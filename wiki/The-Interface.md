@@ -23,7 +23,8 @@ Out of the box you get a three-column arrangement:
 | **Experience** | Live skill learning states. A **Density** slider on the panel condenses each skill line to taste (**Full → No count → Numbers only → Short names → Brief**); the same setting is scriptable as `#config experiencedensity`. |
 | **Active Spells** | Your running spell effects with time remaining. |
 | **Scripts** | A separate scrollback for script output (`[script]` lines, `#echo`, debug traces), so a busy hunt script doesn't clutter the main window. |
-| **Scene** | DragonRealms room/scene artwork for the current area (`#config showimages`). |
+| **Injuries** | A body silhouette showing per-region wounds and scars from the game's injury data, colour-coded by severity, with a text list alongside. An opt-in auto-refresh (`#config injuriespoll N`) can poll `health` every *N* seconds to refine the nervous-system reading while the panel is open. |
+| **Portrait** | DragonRealms room/scene artwork for the current area (`#config showimages`) — the panel Genie 4 called Portrait. |
 | **Raw XML** | The unparsed server stream, for debugging and parser spelunking. |
 | **Stream tabs** | DragonRealms routes certain text to named streams. Genie surfaces **Talk**, **Whispers**, **Thoughts**, **Combat**, **Logons**, **Familiar**, **Deaths**, **Assess**, **Atmospherics**, **Log**, and **Item Log** as their own windows so they each keep a clean scrollback. (Speech and whispers also appear in the main window — DragonRealms sends them to both by design.) |
 
@@ -36,6 +37,7 @@ Scripts can create their **own named windows** too — the Genie 4 menu-script c
 ## The bottom strips
 
 - **Vitals** — bars for **health, mana, stamina, spirit, and concentration**, plus status badges (kneeling, prone, stunned, hidden, bleeding, …).
+- **Icon Bar** — Genie 4's status strip: colour-coded chips below the vitals bar for your posture (dead / standing / kneeling / sitting / prone) plus **STUNNED**, **BLEEDING**, **HIDDEN**, **INVISIBLE**, **WEBBED**, **JOINED** — and two Genie 4 never had: **POISONED** and **DISEASED**. It dims while disconnected. Hide it via **Layout → Icon Bar**.
 - **Hands strip** — what's in your **left** and **right** hands, your **prepared spell** (with a cast-time bar), and your **stance**. Its position (top or bottom) is configurable from the **Window** menu.
 - **Command bar** — where you type. A **roundtime** indicator shows here (or on the hands strip — your choice) so you can see when you can act again.
 
@@ -48,6 +50,8 @@ Type a game command and press **Enter**. Beyond plain commands:
 - **Scripts** start with `.` — `.hunt` runs `Scripts/hunt.cmd`. See [Scripting](Scripting).
 - **Tab-completion** — start typing a `.scriptname` and press **Tab** to complete it.
 - **Multiple commands** — chain with `;` (the separator character).
+- **Multi-line paste** — **Edit → Paste Multi Line** pastes clipboard text one line per command.
+- **Keyboard scrolling** — **PageUp / PageDown** page the selected game window without leaving the command bar; **Ctrl+PageUp / Ctrl+PageDown** jump to top / bottom, Genie 3/4-style.
 
 ## Clickable links
 
@@ -73,6 +77,10 @@ Rearrange the panels however you like, then keep the arrangement — the **Layou
 - **Layout → Save Layout As… / Load Layout / Manage Layouts…** — keep several named layouts (a "Combat" layout vs. an "In-Character" layout) and switch between them; **Manage Layouts…** also picks the default.
 - **Layout → Reset to Default Layout** restores the three-column arrangement.
 - **Layout → Windowed Mode (MDI)** switches from docked panels to free-floating child windows, Genie 4-style.
+- **Layout → Always on Top** keeps Genie above other windows.
+- **Layout → Align Input to Game Window** makes the command bar track the Game window's width instead of spanning the full frame.
+- **Layout → Magic Panels** hides the mana bar, cast bar, and spell labels — tidy on a non-caster.
+- **Layout → Icon Bar** shows or hides the status-chip strip.
 - Floating the Mapper, hiding panels you don't use, and moving the hands strip are all remembered.
 
 > 🚧 **Roadmap:** light/dark themes are planned but not in the alpha yet.

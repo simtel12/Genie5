@@ -1,16 +1,17 @@
 # Keeping Up to Date
 
-Genie 5 has a built-in updater so you can keep three things current without hunting for downloads: the **app itself**, your **zone maps**, and your **plugins**. It's an *in-process* update system — distinct from Genie 4's separate `Lamp.exe` updater.
+Genie 5 has a built-in updater so you can keep four things current without hunting for downloads: the **app itself**, your **zone maps**, your **plugins**, and your **scripts**. It's an *in-process* update system — distinct from Genie 4's separate `Lamp.exe` updater.
 
 ## The Updates dialog
 
-Open it from the **Help** menu (a badge appears there when something is available). It has three tabs:
+Open it from the **Help** menu (a badge appears there when something is available). It has four tabs:
 
 | Tab | Updates | Source |
 | --- | --- | --- |
 | **Core** | The Genie 5 application. | GitHub Releases. |
 | **Maps** | Community zone maps. | The community Maps repository. |
 | **Plugins** | Installed plugins. | Each plugin's configured release feed. |
+| **Scripts** | `.cmd` / `.js` scripts from repositories you subscribe to. | GitHub script repositories. |
 
 The updater uses your system's default network settings, so OS-level proxy configuration is honored automatically.
 
@@ -40,13 +41,24 @@ The Maps tab (equivalently **File → Update Maps from Official Repo…**) pulls
 
 The Plugins tab checks each installed plugin against its configured release feed and offers updates. See [Plugins](Plugins) for installing and managing them.
 
+## Scripts
+
+The Scripts tab lets you subscribe to GitHub script repositories and pull new and changed `.cmd` / `.js` files into your Scripts folder — like a `git pull`, subfolders included. Files that exist only locally are never touched, so your own scripts are safe. The community [DR-Genie-Scripts](https://github.com/Tirost/DR-Genie-Scripts) repository ships as a ready-to-enable row; add more repositories (or a fork) as rows of your own. See [Updating Maps & Scripts](Updating-Maps-and-Scripts) for details.
+
+## Update Settings — what runs by itself
+
+**Help → Update Settings…** controls the silent check that runs at startup: choose which kinds it covers (**Core / Maps / Plugins / Scripts**) and, per kind, whether Genie may install what it finds by itself or just tell you.
+
+- Auto-applied **client** updates install when you **close** Genie — never a mid-session restart.
+- A quiet notice above the status bar reports **"Updates available"** / **"Auto-updated"**; click it to open the Updates dialog.
+
 ## Under the hood
 
-The updater is built around small, swappable pieces: a file-list source and a release source (with implementations for GitHub Contents and GitHub Releases), plus per-domain updaters for the app, maps, and plugins. That platform-neutral design is what lets the same dialog drive three very different update flows, and it's what let the macOS and Linux app-update channels slot in (in v5.0.0-alpha.3.1) without reworking the UI.
+The updater is built around small, swappable pieces: a file-list source and a release source (with implementations for GitHub Contents and GitHub Releases), plus per-domain updaters for the app, maps, plugins, and scripts. That platform-neutral design is what lets the same dialog drive four very different update flows, and it's what let the macOS and Linux app-update channels slot in (in v5.0.0-alpha.3.1) without reworking the UI.
 
 ## What it never does
 
-- **No silent auto-update that resumes your game.** Updating is something you initiate; it doesn't run unattended while you're logged in and playing. This keeps Genie on the right side of [policy](Policy-Compliance) and avoids surprises mid-session.
+- **No mid-session restarts, no touching your game.** Updates never interrupt a running session: client updates that you've allowed to auto-apply install as Genie **closes**, and nothing ever reconnects or resumes play for you. This keeps Genie on the right side of [policy](Policy-Compliance) and avoids surprises mid-session.
 
 ## Related
 

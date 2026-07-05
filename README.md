@@ -35,23 +35,23 @@ The Genie 4 codebase is WinForms + Windows-only and hasn't kept pace with modern
 | DragonRealms XML parser (`<component>`, `<d>`, `<a href>`, `<container>`, `<roundTime>`, etc.) | ✅ Working |
 | Live game session — connect (Direct SGE / Lich proxy picker), play, type commands | ✅ Working |
 | Genie 4 `.cmd` script engine (labels, `MATCH`, `GOSUB`, `$variables`, `WAITFOR`, etc.) | ✅ Working |
-| Rules engines (`#alias`, `#trigger`, `#highlight`, `#substitute`, `#gag`, `#macro`, `#class`, `#var`) | ✅ Working with `.cfg` persistence |
+| Rules engines (`#alias`, `#trigger`, `#highlight`, `#substitute`, `#gag`, `#macro`, `#class`, `#var`) + per-engine master toggles (File menu / `#config`) | ✅ Working with `.cfg` persistence |
 | Per-character profile storage with AES-GCM password encryption | ✅ Working |
-| Dockable UI panels (vitals, room, mobs/players, inventory, mapper, experience, active spells, stream tabs) — named save/load layouts + MDI windowed mode | ✅ Working |
+| Dockable UI panels (vitals, icon bar, room, mobs/players, inventory, mapper, experience, active spells, injuries, stream tabs) — named save/load layouts + MDI windowed mode | ✅ Working |
 | Named script windows (`#window`, `#link`, `#log`, `#clear`, directed `#echo >window`) — Genie 4 menu scripts (`mm_train` et al.) run as-is | ✅ Working |
 | Mapper — click-to-goto, `#goto`/`#go2`, room/zone tags + `#goto @tag`, `$roomid`/`$zoneid`/`$zonename` script vars, zone fingerprinting, Less Obvious Paths | ✅ Working (auto-walk is a roadmap item) |
 | Session Recorder for raw-XML capture | ✅ Working |
 | Lich 5 proxy mode (`ConnectionMode.LichProxy`) | ✅ Working |
 | Dev-replay mode (replay recorded sessions through the engine) | ✅ Working (via Console) |
 | ~~LAMP 2.0 cross-platform updater~~ | ❌ Canceled — superseded by the in-app updater below |
-| In-app updater (Velopack) — Core / Maps / Plugins update tabs, Help-menu badge, startup background check | ✅ Working (macOS/Linux Core packaging on the roadmap) |
+| In-app updater (Velopack) — Core / Maps / Plugins / Scripts update tabs, per-kind auto-update policies (Update Settings), apply-on-close client updates, Help-menu badge, startup background check | ✅ Working (macOS/Linux Core packaging on the roadmap) |
 | Plugin host — `IGeniePlugin`/`IPluginHost` contract, per-plugin assembly-load-context (load/unload/reload), Plugins menu + `#plugin` command, first external plugin (`Plugin_EXPTrackerV5`) | ✅ Working (marketplace + plugin signing/trust on the roadmap) |
 | JavaScript (`.js`) array scripts via Jint — `genie.*` API (put/waitFor/matchWait/pause/timers/vars), coexists with `.cmd`, memory + runaway-loop guards | ✅ Working |
 | `#connect` / `#reconnect` / `#lichconnect` — typed/scripted login (Genie 4 parity; saved-profile, explicit, and reconnect forms; password-masked) | ✅ Working |
 | Analyst Capture — redacted, recipe-driven session capture for parser/analysis (other-player speech stripped by default) | ✅ Working |
 | Performance overlay — live per-stage pipeline timing + running-`.js` list, behind the Performance menu | ✅ Working |
 | Game prompt in the window — `prompt` string + `promptbreak` (own-line) / `promptforce` (reconstructed status letters) | ✅ Working |
-| Scene panel — DR room/scene artwork (`#config showimages`), fetched from the play.net art CDN | ✅ Working |
+| Portrait panel — DR room/scene artwork (`#config showimages`), fetched from the play.net art CDN | ✅ Working |
 | Preset colouring — room descriptions / whispers / speech render in their palette colours (Configuration → Presets), plus MonsterBold creature highlighting | ✅ Working |
 | Sound — SFX on triggers/highlights + `#play` command (cross-platform: winmm / afplay / paplay) | ✅ Working |
 | `#config` settings system (`settings.cfg`, ~20 Genie 4 settings + Scripts tab); reserved/live `$variables` exposed and listed by `#var` | ✅ Working |
