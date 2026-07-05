@@ -451,7 +451,7 @@ Both clients support a flexible dockable-panel layout, but the implementation te
 
 | Feature | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
-| **Auto Log** (rendered text to disk) | ✅ `autolog` config + File menu | 🗓 backlog | 🗓 BETA OK — ~80 LOC, see backlog |
+| **Auto Log** (rendered text to disk) | ✅ `autolog` config + File menu | ✅ `#config autolog` + File ▸ Auto Log checkbox (live mid-session) | 🚀 SHIP |
 | **Open Log In Editor** menu | ✅ | 🗓 backlog | 🗓 BETA OK (depends on Auto Log) |
 | **Session XML capture** | partial (built-in XML stream save) | 🆕 explicit File → Record Session toggle | 🆕 |
 | **REC indicator in title bar** | ❌ | 🆕 (red 🔴 REC) | 🆕 |
