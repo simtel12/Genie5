@@ -1095,7 +1095,13 @@ public sealed class ScriptEngine
                 int thenIdx = ScriptParser.FindThenKeyword(rest);
                 if (thenIdx < 0)
                 {
-                    _echo($"[script] {inst.Name}:{lineNo} '{lower}' missing 'then'");
+                    // #135: the usual cause is a quote typo — an odd number of
+                    // " makes the quote-aware then-scanner read the tail of the
+                    // line (including the real `then`) as string content.
+                    int quotes = 0;
+                    foreach (var ch in rest) if (ch == '"') quotes++;
+                    var hint = quotes % 2 == 1 ? " (unbalanced \" quotes?)" : "";
+                    _echo($"[script] {inst.Name}:{lineNo} '{lower}' missing 'then'{hint}");
                     return true;
                 }
                 var condText  = rest[..thenIdx].Trim();

@@ -80,6 +80,21 @@ public class ConditionParseWarningTests
     }
 
     [Fact]
+    public void Missing_then_from_quote_typo_hints_unbalanced_quotes()
+    {
+        // #135: `("%v = "baz")` — quote typo swallows the real `then`, so the
+        // scanner can't find it. The error should point at the quotes.
+        var o = RunFixture(
+            "var testvar foo\n" +
+            "if ((\"%testvar\" = \"foo\") || (\"%testvar\" = \"bar\") || (\"%testvar = \"baz\")) then echo Y\n" +
+            "else echo N\n");
+
+        Assert.Contains(o, l => l.Contains("missing 'then'")
+                             && l.Contains("unbalanced \" quotes?"));
+        Assert.Contains("N", o);
+    }
+
+    [Fact]
     public void Balanced_condition_still_matches()
     {
         // The corrected form of the community repro evaluates true, no warning.
