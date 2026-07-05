@@ -38,6 +38,14 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         AddHandler(Control.ContextRequestedEvent, OnGlobalContextRequested,
                    RoutingStrategies.Tunnel, handledEventsToo: true);
 
+        // PageUp/PageDown page the selected game window; Ctrl+PageUp/PageDown
+        // jump to its top/bottom (#136, Genie 3/4 parity — focus stays in the
+        // command bar the whole time). Tunnel phase so the keystroke wins
+        // before the focused control can consume it, same as Genie 4 where
+        // these keys always scroll the active output window.
+        AddHandler(InputElement.KeyDownEvent, OnPageScrollKeyDown,
+                   RoutingStrategies.Tunnel);
+
         // Keyboard macros — F-keys + modifier+letter/digit. Bubble phase
         // (the default) so any inner control that wants to capture the
         // keystroke first (e.g. the MacrosPanel KeyBox capture mode) can
@@ -497,6 +505,23 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             _suppressNextContextMenu = false;
             e.Handled = true;
         }
+    }
+
+    /// <summary>
+    /// PageUp/PageDown → scroll the selected game window (#136). Registered on
+    /// the tunnel phase (see ctor). Plain = one page, Ctrl = top/bottom;
+    /// Alt combos and multiline editors are left alone.
+    /// </summary>
+    private void OnPageScrollKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key is not (Key.PageUp or Key.PageDown)) return;
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Alt)) return;
+
+        // A focused multiline editor keeps the native page-the-caret behavior.
+        if (FocusManager?.GetFocusedElement() is TextBox { AcceptsReturn: true }) return;
+
+        if (PageScroll.HandleKey(e.Key, e.KeyModifiers))
+            e.Handled = true;
     }
 
     /// <summary>

@@ -122,11 +122,16 @@
                       IsVisible="{Binding WindowMenu.ShowPauseScroll}" />
           </ContextMenu>
         </Grid.ContextMenu>
+        <!-- PageScroll (#136): PageUp/PageDown page the last-clicked game
+             window from the command bar; the main game window is the default
+             target before any click. -->
         <ScrollViewer x:Name="gameScroll"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
                       Width="{Binding $parent[Grid].Bounds.Width}"
                       Height="{Binding $parent[Grid].Bounds.Height}"
+                      controls:PageScroll.IsTarget="True"
+                      controls:PageScroll.IsDefaultTarget="True"
                       controls:AutoScrollBehavior.ItemsSource="{Binding ViewModel.Lines}"
                       controls:AutoScrollBehavior.Paused="{Binding IsScrollPaused}">
           <!-- Plain ItemsControl (keeps its default control-theme so it renders),
@@ -815,6 +820,7 @@
                       VerticalScrollBarVisibility="Auto"
                       Width="{Binding $parent[Grid].Bounds.Width}"
                       Height="{Binding $parent[Grid].Bounds.Height}"
+                      controls:PageScroll.IsTarget="True"
                       controls:AutoScrollBehavior.ItemsSource="{Binding Buffer.Lines}"
                       controls:AutoScrollBehavior.Paused="{Binding IsScrollPaused}">
           <ItemsControl ItemsSource="{Binding Buffer.Lines}"
