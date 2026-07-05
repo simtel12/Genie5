@@ -2,6 +2,7 @@
 
 **Prepared:** 2026-05-26
 **Genie 5 version:** v5.0.0-alpha.4
+**Last parity sync:** 2026-07-05 — statuses updated against v5.0.0-alpha.8 "Menu Parity" (`497c30f`)
 **Genie 4 reference:** local clone at `_refs/Genie4/` (143 source files, WinForms + .NET 6, GenieClient/Genie4 upstream)
 **Purpose:** Audit feature parity before the alpha ships to select testers. Identify what must change, what should change, and what's safely deferred.
 
@@ -10,7 +11,7 @@
 ## Executive Summary
 
 Genie 5 alpha lands at a high level of feature parity with Genie 4 by surface area, and climbed further after the **plugin host** and the **in-app updater** (both originally deferred) shipped. The remaining gap is intentionally split into three buckets:
-- Features deferred to **beta** that don't block initial value: Auto Log, Themes, Workspace presets, JavaScript scripts.
+- Features deferred to **beta** that don't block initial value: Auto Log *(since shipped — alpha.8)*, Themes, Workspace presets, JavaScript scripts.
 - Features deferred to **v1.0+** as roadmap vision items: AI advisor, plugin marketplace, cloud sync, plugin signing / trust.
 - Features intentionally **forbidden** by DR policy: auto-reconnect, agentive AI, auto-walk-while-away.
 
@@ -73,18 +74,19 @@ Genie 5 alpha lands at a high level of feature parity with Genie 4 by surface ar
 | Connect... | ✅ | ✅ | 🚀 SHIP | Genie 5 unifies "Connect" + "Connect Using Profile" into one dialog with profile picker |
 | Connect Using Profile... | ✅ separate | ✅ merged | 🚀 SHIP | Merged into Connect dialog |
 | Disconnect | ✅ | ✅ | 🚀 SHIP | |
-| Open Directory... → submenu (Genie/Scripts/Maps/Plugins/Logs/Art) | ✅ submenu | ⚠️ partial | 🗓 BETA OK | Genie 5 has Open Maps Folder + Open Recordings Folder; no submenu yet |
-| Auto Log (toggle) | ✅ | 🗓 backlog | 🗓 BETA OK | Backlog entry "Auto Log — text-mode session log"; ~80 LOC. Not blocking alpha. |
-| Open Log In Editor | ✅ | 🗓 backlog | 🗓 BETA OK | Depends on Auto Log |
+| Open Directory... → submenu (Genie/Scripts/Maps/Plugins/Logs/Art) | ✅ submenu | ✅ submenu | 🚀 SHIP | ✅ shipped alpha.8 (`497c30f`) — File ▸ Open Directory: Data Folder / Config / Logs / Maps / Scripts / Plugins (Config entry is profile-aware, resolved at click time) |
+| Auto Log (toggle) | ✅ | ✅ | 🚀 SHIP | ✅ shipped alpha.8 — File ▸ Auto Log checkbox over `autolog`, applied live mid-session (starts/stops the rendered-text logger) |
+| Open Log In Editor | ✅ | 🗓 backlog | 🗓 BETA OK | Auto Log has since shipped (alpha.8); the editor-open menu item itself is still pending |
 | Auto Reconnect (toggle) | ✅ default ON | 🛑 not shipped | 🛑 NEVER | Forbidden by DR policy. Config key exists but not wired (see #2 in headline calls). |
 | Classic Connect Window (toggle) | ✅ | n/a | 🚀 SHIP | We don't have a legacy dialog to fall back to |
-| Ignores/Gags Enabled (master toggle) | ✅ | ❌ | 🗓 BETA OK | Per-rule IsEnabled exists; no master switch |
-| Triggers Enabled (master toggle) | ✅ | ❌ | 🗓 BETA OK | Per-rule IsEnabled exists; no master switch |
+| Ignores/Gags Enabled (master toggle) | ✅ | ✅ File ▸ Master Toggles ▸ Gags | 🚀 SHIP | ✅ shipped alpha.8 — engine gates via an Enabled flag (rules stay loaded and editable while off); live-synced with `#config gags off` |
+| Triggers Enabled (master toggle) | ✅ | ✅ File ▸ Master Toggles ▸ Triggers | 🚀 SHIP | ✅ shipped alpha.8 — same Enabled-flag gating; live-synced with `#config triggers off` |
+| Highlights / Substitutes / Aliases master toggles | ❌ | ✅ File ▸ Master Toggles | 🆕 | Shipped alpha.8 — Genie 5's Master Toggles set extends beyond Genie 4's (Highlights / Triggers / Substitutes / Gags / Aliases / Images), all backed by same-named settings.cfg keys |
 | Plugins Enabled (master toggle) | ✅ | ✅ per-plugin enable/disable (Plugins menu + `#plugin enable`/`disable`) | 🆕 | Toggled individually; no single master switch |
 | AutoMapper Enabled (master toggle) | ✅ | ❌ | 🗓 BETA OK | Mapper is always active; no master off-switch |
-| Images Enabled (toggle) | ✅ | ❌ | 🗓 BETA OK | `ShowImages` setting exists; no `<image>` rendering yet |
+| Images Enabled (toggle) | ✅ | ✅ File ▸ Master Toggles ▸ Images | 🚀 SHIP | ✅ shipped alpha.8 — rides the existing `showimages` key; clears/re-fetches the Portrait art live. Inline `<image>` rendering in game text is still deferred |
 | Mute Sounds (toggle) | ✅ | n/a | 🗓 BETA OK | No audio yet |
-| Show Raw Data (toggle) | ✅ | 🗓 backlog | 🗓 BETA OK | Backlog "Raw XML Window" entry; half-day for v1 |
+| Show Raw Data (toggle) | ✅ | ✅ Window ▸ Raw XML | 🚀 SHIP | ✅ shipped (issue #14) — dockable read-only live view of the raw server stream, hidden by default; its tooltip notes it covers G4's Debug window |
 | Update Maps from Official Repo... | n/a | 🆕 | 🚀 SHIP | Genie 5 addition — pulls from github.com/GenieClient/Maps |
 | Open Maps Folder | ✅ via Open Directory | ✅ direct | 🆕 | Direct menu in Genie 5 |
 | Change Maps Directory... | n/a | 🆕 | 🚀 SHIP | Genie 5 addition for git-clone workflow |
@@ -98,7 +100,7 @@ Genie 5 alpha lands at a high level of feature parity with Genie 4 by surface ar
 
 | Menu Item | Genie 4 | Genie 5 | Status | Notes |
 |---|---|---|---|---|
-| Paste Multi Line | ✅ | ❌ | 🗓 BETA OK | Clipboard-with-newlines as separate commands. Useful but not critical. |
+| Paste Multi Line | ✅ | ✅ | 🚀 SHIP | ✅ shipped alpha.8 — Edit ▸ Paste Multi Line splits clipboard text on the separator char |
 | Configuration... | ✅ tabbed dialog | ✅ tabbed dialog | ⚠️ partial | Genie 5 has tabs but the UX needs a holistic pass per `backlog.md` "Configuration dialog UX pass" |
 | Update Images | ✅ | n/a | 🗓 BETA OK | No image rendering |
 | Display Settings... | n/a | 🆕 | 🚀 SHIP | Genie 5 addition — font, colors, RoundTime position, hands strip position, editor path |
@@ -127,12 +129,12 @@ Genie 5 alpha lands at a high level of feature parity with Genie 4 by surface ar
 | Load Default Layout | ✅ | ⚠️ via Reset Layout | 🚀 SHIP | Equivalent functionality |
 | Save Default Layout / Save Sized Default | ✅ | ❌ | 🗓 BETA OK | Multi-preset story |
 | Basic Layout | ✅ | ❌ | 🗓 BETA OK | |
-| Icon Bar → Dock Top/Bottom | ✅ submenu | ⚠️ via Hands Strip Position | 🚀 SHIP | Genie 5's hands strip serves the same role |
+| Icon Bar → Dock Top/Bottom | ✅ submenu | ✅ Icon Bar | 🚀 SHIP | ✅ shipped alpha.8 — text-chip strip below the vitals bar: posture chip in G4 priority (dead > standing > kneeling > sitting > prone) + STUNNED / BLEEDING / POISONED / DISEASED / HIDDEN / INVISIBLE / WEBBED / JOINED, fed by IndicatorEvent, dimmed while disconnected. Poison/disease chips are new over G4's six slots. Fixed position (no dock top/bottom submenu) |
 | Script Bar → Dock Top/Bottom | ✅ | 🆕 always above command bar | 🚀 SHIP | Genie 5 Script Bar is fixed-position but auto-hides when empty |
 | Health Bar → Dock Top/Bottom | ✅ | ⚠️ via Status Bar toggle | 🚀 SHIP | Genie 5's status bar is fixed at bottom |
-| Magic Panels (toggle) | ✅ | ❌ | 🗓 BETA OK | Spell-list panel; data exists via `percWindow` stream |
-| Align Input to Game Window | ✅ | ❌ | 🗓 BETA OK | Niche |
-| Always On Top | ✅ | ❌ | 🗓 BETA OK | Trivial Avalonia feature (`Topmost=true`); ~5 LOC |
+| Magic Panels (toggle) | ✅ | ✅ | 🚀 SHIP | ✅ shipped alpha.8 — G4 SetMagicPanels parity: mana bar / cast bar / spell labels show-hide with column reflow (`ShowMagicPanels` collapses the mana column) |
+| Align Input to Game Window | ✅ | ✅ | 🚀 SHIP | ✅ shipped alpha.8 — horizontal align: the command bar's side margins track the Game window's dock extent (full-width fallback when floated); finally consumes the orphaned `sizeinputtogame` key |
+| Always On Top | ✅ | ✅ | 🚀 SHIP | ✅ shipped alpha.8 — Layout ▸ Always on Top |
 
 ### Script menu
 
@@ -165,6 +167,7 @@ Genie 5 alpha lands at a high level of feature parity with Genie 4 by surface ar
 | Menu Item | Genie 4 | Genie 5 | Status | Notes |
 |---|---|---|---|---|
 | Check For Updates / AutoUpdate / Force Update | ✅ | ✅ Help → Check for Updates (dialog + ● badge + startup background check) | 🚀 SHIP | In-app updater (Velopack); no silent auto-apply by policy |
+| Update Settings (update policies) | ⚠️ scattered toggles | ✅ Help → Update Settings | 🆕 | ✅ shipped alpha.8 — per-kind Check-on-Startup + Auto-Apply menus over the update policies, plus a dismissible status-bar notice strip ("Updates available: X / Auto-updated: Y", click opens the dialog) |
 | Load Test Client | ✅ | n/a | 🗓 BETA OK | Could use GameCode picker on Connect dialog (already supports Test) |
 | Latest Release Page | ✅ | ❌ | **🔧 FIX BEFORE ALPHA** | Helpful for testers reporting; 10 min to add |
 | Discord / GitHub / Wiki / Play.net / Elanthipedia / Lich Discord links | ✅ | ❌ | **🔧 FIX BEFORE ALPHA** | Tester onboarding; ~30 min for a full Help menu |
@@ -177,7 +180,8 @@ Genie 5 alpha lands at a high level of feature parity with Genie 4 by surface ar
 
 **Menu rollup:**
 - Critical missing: **Help menu** (links). ~30 min — should-add before alpha for tester orientation.
-- Defer to beta: Script menu (functionality exists, discovery doesn't), Auto Log / Open Log In Editor, master toggles for engines.
+- Defer to beta: Script menu (functionality exists, discovery doesn't), Open Log In Editor.
+- ✅ Since shipped in alpha.8 "Menu Parity" (`497c30f`): Open Directory submenu, Auto Log, Master Toggles (Highlights/Triggers/Substitutes/Gags/Aliases/Images), Paste Multi Line, Icon Bar, Magic Panels, Align Input to Game Window, Always On Top, Help ▸ Update Settings, Portrait window rename.
 - Never: Auto Reconnect.
 
 ---
@@ -228,7 +232,7 @@ These are small individual items, mostly UI-toggle wiring. Total estimated: 2-3 
 | `ignorescriptwarnings` | False | Suppress script-engine warnings | 🗓 BETA OK |
 | `parsegameonly` | False | Skip parser on user input | 🗓 BETA OK |
 | `ignoreclosealert` | False | Suppress confirm-on-close | 🗓 BETA OK |
-| `sizeinputtogame` | False | Align input bar to game width | 🗓 BETA OK |
+| `sizeinputtogame` | False | Align input bar to game width | ✅ shipped alpha.8 (Layout ▸ Align Input to Game Window) |
 | `connectscript` | empty | Auto-run a named script on connect | 🗓 BETA OK (per-profile, in backlog) |
 | `connectstring` | `FE:GENIE...` | Client-ID announcement string | ✅ shipped (engine-controlled) |
 | `servertimeout` + `servertimeoutcommand` | 180s / fatigue | Keep-alive verb on idle | 🗓 BETA OK |
@@ -374,11 +378,11 @@ Both clients support a flexible dockable-panel layout, but the implementation te
 | **Familiar** | ✅ | ❌ | 🗓 BETA OK | Backlog item "Familiar / Death / Assess stream windows" |
 | **Death** | ✅ | ❌ | 🗓 BETA OK | Same backlog item |
 | **Log** (system messages) | ✅ | ❌ | 🗓 BETA OK | Routed to Game window's System color in Genie 5 |
-| **Debug** (parser trace) | ✅ | partial | 🗓 BETA OK | Genie 5 has `[dbg:N]` script-level traces |
+| **Debug** (parser trace) | ✅ | ✅ via Raw XML window | 🚀 SHIP | Covered by the Raw XML window (its tooltip notes it covers G4's Debug window — alpha.8); plus `[dbg:N]` script-level traces |
 | **Conversation** (NPC speech) | ✅ | ❌ | 🗓 BETA OK | Niche; few users |
-| **Raw** (raw XML inspector) | ✅ | 🗓 backlog | 🗓 BETA OK | "Raw XML Window" backlog entry, half-day for v1 |
+| **Raw** (raw XML inspector) | ✅ | ✅ RawXmlTool | 🚀 SHIP | ✅ shipped (issue #14) — Window ▸ Raw XML, hidden by default, live read-only server stream |
 | **Active Spells** (`percWindow` stream) | ✅ | ❌ | 🗓 BETA OK | Data flows through parser; just no UI tab |
-| **Portrait** | ✅ | ❌ | 🗓 BETA OK | Niche |
+| **Portrait** | ✅ | ✅ | 🚀 SHIP | ✅ shipped alpha.8 — the room-art panel (was "Scene") takes its Genie 4 name; dock id unchanged so saved layouts keep restoring it |
 | **Room** (room title/description/exits) | n/a as separate | ✅ | 🆕 | Genie 5 splits room from game text into its own panel |
 | **Hands Strip** | ✅ within icon bar | ✅ separate strip | 🆕 | Genie 5 dedicated; toggleable position |
 | **Script Bar** | ✅ | ✅ | both | Genie 5 auto-hides when empty (cleaner than Genie 4's always-visible) |
@@ -457,7 +461,7 @@ Both clients support a flexible dockable-panel layout, but the implementation te
 | **REC indicator in title bar** | ❌ | 🆕 (red 🔴 REC) | 🆕 |
 | **Error log** | ✅ `errors.log` | ✅ `ErrorLog.cs` | 🚀 SHIP |
 | **Debug log** | ✅ via `-d` CLI flag | partial (script-level `[dbg:N]`) | 🗓 BETA OK |
-| **Per-character log files** | ✅ | n/a yet (Auto Log not shipped) | 🗓 BETA OK |
+| **Per-character log files** | ✅ | ✅ via Auto Log (alpha.8 — logger correctly named for the session) | 🚀 SHIP |
 | **Log directory configurable** | ✅ `logdir` config | ✅ resolved via `LocalDirectoryService` | 🚀 SHIP (override UI deferred) |
 
 **Logging rollup:**
@@ -474,7 +478,7 @@ Both clients support a flexible dockable-panel layout, but the implementation te
 |---|---|---|---|
 | Auto-updater | ✅ separate `Lamp.exe` | ✅ in-app (Velopack `UpdateManager`), no separate exe | 🆕 |
 | Check For Updates menu | ✅ | ✅ Help → Check for Updates (Core / Maps / Plugins tabs) + Help-menu ● badge | 🚀 SHIP |
-| Auto-update on startup | ✅ | ⚠️ background **check** + badge on startup; no silent auto-apply (policy choice) | 🆕 |
+| Auto-update on startup | ✅ | ✅ background **check** + badge on startup; alpha.8 adds Help ▸ Update Settings with per-kind Check-on-Startup + Auto-Apply opt-in (no silent apply unless the user opts in) | 🆕 |
 | Update plugins / maps / scripts independently | ✅ | ⚠️ maps + plugins shipped (Updates dialog tabs); scripts not yet | 🆕 (partial) |
 | Update channels (stable/beta/nightly) | ❌ | ✅ stable + beta (no nightly) | 🆕 |
 | Core app self-update | ✅ `autoupdatelamp` | ⚠️ Velopack replaces the app in place; applies only from a Velopack-built install (Windows) — macOS / Linux packaging on the roadmap | 🆕 |
@@ -494,7 +498,7 @@ Both clients support a flexible dockable-panel layout, but the implementation te
 |---|---|---|---|
 | Render `<image>` tags inline in game text | ✅ | ❌ | 🗓 BETA OK |
 | Update Images command | ✅ | ❌ | 🗓 BETA OK |
-| Show Images toggle | ✅ | ✅ config bool exists; no rendering | 🗓 BETA OK |
+| Show Images toggle | ✅ | ✅ File ▸ Master Toggles ▸ Images (alpha.8 — rides `showimages`, clears/re-fetches Portrait art live; inline `<image>` rendering still deferred) | 🚀 SHIP |
 | Art directory | ✅ `Art/` | placeholder | 🗓 BETA OK |
 
 ### Audio
@@ -547,7 +551,7 @@ Both clients support a flexible dockable-panel layout, but the implementation te
 | Spell-cast countdown | ❌ | 🆕 magenta bar with (N) prefix | 🆕 |
 | Posture: STAND/KNEEL/PRONE/SIT | ✅ | ✅ | 🚀 SHIP |
 | Stealth: HIDE | ✅ | ✅ | 🚀 SHIP |
-| Stealth: INVISIBLE | ✅ | ⚠️ verify | TBD |
+| Stealth: INVISIBLE | ✅ | ✅ Icon Bar chip (alpha.8, fed by IndicatorEvent) | 🚀 SHIP |
 | Afflictions: BLEED / POIS / DIS | ✅ | ✅ | 🚀 SHIP |
 | Afflictions: WEB / STUN / JOINED | ✅ | ✅ | 🚀 SHIP |
 | Status: DEAD | ✅ | ✅ | 🚀 SHIP |
@@ -568,7 +572,7 @@ Both clients support a flexible dockable-panel layout, but the implementation te
 | Feature | Genie 4 | Genie 5 | Status |
 |---|---|---|---|
 | Find / search in current buffer | ✅ Ctrl+F | ❌ | 🗓 BETA OK |
-| Paste Multi Line | ✅ | ❌ | 🗓 BETA OK |
+| Paste Multi Line | ✅ | ✅ (alpha.8 — Edit menu, splits on separator char) | 🚀 SHIP |
 | Ctrl+Right-Click selected text → command bar | ❌ | 🆕 (Task #105) | 🆕 |
 | Tab-complete script names | ❌ | 🆕 (Task #187) | 🆕 |
 | Up-arrow command history | ✅ | ✅ (Task #157 — caret position fix) | 🚀 SHIP |
@@ -661,22 +665,22 @@ Items requiring a decision before shipping the alpha to testers. Ordered by seve
 
 6. **Reduce verbose ALPHA-README "What's NOT working yet" section to match this audit.** Currently lists "No plugin host", "No auto-update", "No JavaScript script support", "No themes", "No workspace presets", "Configuration dialog rough edges." Could add: "No Find/Search (Ctrl+F)", "No Paste Multi-Line", "No master toggle for trigger/highlight/etc. engines", "No Auto Log".
 
-7. **Stub out the missing master toggles** (Triggers Enabled, Gags/Ignores Enabled, AutoMapper Enabled, Images Enabled). Even non-functional, having them in the File menu sets expectations correctly. Cost: 30 min.
+7. **Stub out the missing master toggles** (Triggers Enabled, Gags/Ignores Enabled, AutoMapper Enabled, Images Enabled). Even non-functional, having them in the File menu sets expectations correctly. Cost: 30 min. *(Superseded — fully functional File ▸ Master Toggles shipped in alpha.8; AutoMapper master toggle remains the one without an off-switch.)*
 
 ### Defer to beta (no changes needed before alpha)
 
 These are documented gaps that testers will encounter and report on, which is fine for an alpha:
-- Auto Log (text logging) — ~80 LOC, backlog
-- Raw XML Window — half-day, backlog
+- Auto Log (text logging) — ~80 LOC, backlog *(has since shipped — alpha.8)*
+- Raw XML Window — half-day, backlog *(has since shipped — issue #14)*
 - Layout save/load (workspace presets) — 1-2 days, backlog
 - Configuration dialog UX pass — half-day, backlog
 - UI Themes (Light/Dark) — day+, backlog
 - Familiar/Death/Active Spells stream tabs — small per tab, backlog
-- Per-tag visibility on rule engines (master toggle Triggers/Gags/Highlights) — half-day total
+- Per-tag visibility on rule engines (master toggle Triggers/Gags/Highlights) — half-day total *(has since shipped — alpha.8 File ▸ Master Toggles)*
 - Mapper auto-walk (any approach) — see Option B/C above
 - Audio support + image rendering — multi-day each
-- `Always On Top` window option — 5 LOC, trivial
-- Find / Paste Multi-Line — small Avalonia features
+- `Always On Top` window option — 5 LOC, trivial *(has since shipped — alpha.8)*
+- Find / Paste Multi-Line — small Avalonia features *(Paste Multi-Line has since shipped — alpha.8; Find still open)*
 
 ### Defer to v1.0+ (vision items)
 
