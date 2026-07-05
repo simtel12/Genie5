@@ -5,23 +5,54 @@ namespace Genie.Core.Update;
 /// <c>{ConfigDir}/update-feeds.json</c> via <see cref="FeedConfigStore"/>;
 /// missing files are seeded with <see cref="CreateDefault"/>.
 ///
-/// Three sections — Core, Maps, Plugins — match the three update kinds.
+/// Four sections — Core, Maps, Plugins, Scripts — match the four update kinds.
 /// Core is a single feed (you can only run one Genie 5 install at a time);
-/// Maps and Plugins are lists so users can subscribe to multiple sources.
+/// Maps, Plugins, and Scripts are lists so users can subscribe to multiple
+/// sources.
 /// </summary>
 public sealed class FeedConfig
 {
     public CoreFeed         Core    { get; set; } = CoreFeed.Default();
     public List<FeedEntry>  Maps    { get; set; } = new();
     public List<FeedEntry>  Plugins { get; set; } = new();
+    public List<FeedEntry>  Scripts { get; set; } = new();
 
-    /// <summary>Out-of-the-box defaults: official Genie5 core, official Maps repo, official Experience plugin.</summary>
+    // ── Per-kind update policies (Help ▸ Update Settings) ───────────────────
+    // One policy per update kind: whether the startup background check covers
+    // it, and whether a found update is auto-applied. Old update-feeds.json
+    // files without these properties deserialize to the defaults (check ON,
+    // auto-apply OFF) — same behavior those files had before policies existed.
+    public UpdatePolicy CorePolicy    { get; set; } = new();
+    public UpdatePolicy MapsPolicy    { get; set; } = new();
+    public UpdatePolicy PluginsPolicy { get; set; } = new();
+    public UpdatePolicy ScriptsPolicy { get; set; } = new();
+
+    /// <summary>Out-of-the-box defaults: official Genie5 core, official Maps repo,
+    /// official Experience plugin, and the community scripts repo (disabled —
+    /// scripts act as your character, so pulling them is opt-in).</summary>
     public static FeedConfig CreateDefault() => new()
     {
         Core    = CoreFeed.Default(),
         Maps    = new() { FeedEntry.OfficialMaps()       },
         Plugins = new() { FeedEntry.OfficialExpTracker() },
+        Scripts = new() { FeedEntry.CommunityScripts()   },
     };
+}
+
+/// <summary>
+/// Per-update-kind behavior toggles, driven by the Help ▸ Update Settings
+/// menu. <see cref="CheckOnStartup"/> gates the silent background check that
+/// runs at app start (drives the Help ● badge + status-bar notice);
+/// <see cref="AutoApply"/> additionally applies what that check finds —
+/// Maps / Plugins / Scripts install immediately, Core downloads and stages
+/// via Velopack to apply when the app exits (never a surprise mid-session
+/// restart). Auto-apply defaults OFF for every kind: pulling code or a new
+/// client build without a click is strictly opt-in.
+/// </summary>
+public sealed class UpdatePolicy
+{
+    public bool CheckOnStartup { get; set; } = true;
+    public bool AutoApply      { get; set; }
 }
 
 /// <summary>
@@ -47,6 +78,9 @@ public sealed class CoreFeed
     ///   in from the runtime before matching against release assets.</summary>
     public string AssetPattern { get; set; } = "Genie5-{os}-{arch}.zip";
 
+    /// <summary>Superseded by <see cref="FeedConfig.CorePolicy"/>.CheckOnStartup —
+    /// kept only so pre-policy JSON round-trips without a schema error. Never
+    /// consulted.</summary>
     public bool CheckOnStartup { get; set; } = true;
 
     public static CoreFeed Default() => new();
@@ -64,8 +98,9 @@ public sealed class FeedEntry
     /// <summary>
     ///   Source kind — drives how the entry is materialised into an
     ///   <see cref="Sources.IFileListSource"/> or future IReleaseSource.
-    ///   Today: <c>"github-contents"</c> (Maps), <c>"github-releases"</c>
-    ///   (Plugins, Phase 2), <c>"http-manifest"</c> (Phase 2).</summary>
+    ///   Today: <c>"github-contents"</c> (Maps — single flat folder),
+    ///   <c>"github-tree"</c> (Scripts — whole repo tree, recursive),
+    ///   <c>"github-releases"</c> (Plugins), <c>"http-manifest"</c> (Phase 2).</summary>
     public string Kind          { get; set; } = "";
 
     // ── github-* common fields ───────────────────────────────────────────
@@ -75,7 +110,8 @@ public sealed class FeedEntry
     /// <summary>Optional subdirectory for github-contents sources; root if blank.</summary>
     public string Path          { get; set; } = "";
 
-    /// <summary>Optional file extension filter for github-contents sources (e.g. <c>".xml"</c>).</summary>
+    /// <summary>Optional file extension filter (e.g. <c>".xml"</c>). For
+    /// github-tree sources a comma-separated list is accepted (<c>".cmd,.js,.inc"</c>).</summary>
     public string Extension     { get; set; } = "";
 
     /// <summary>Asset filename pattern for github-releases sources; supports same placeholders as <see cref="CoreFeed.AssetPattern"/>.</summary>
@@ -98,6 +134,23 @@ public sealed class FeedEntry
         Repo      = "Maps",
         Extension = ".xml",
         Enabled   = true,
+    };
+
+    /// <summary>
+    /// The community DR scripts repo (~55 <c>.cmd</c> scripts incl. the
+    /// GenieHunter suite). Ships DISABLED: scripts send commands as the
+    /// player's character, so the user flips the row on (or just clicks its
+    /// Update button) once they've decided they want them.
+    /// </summary>
+    public static FeedEntry CommunityScripts() => new()
+    {
+        Id        = "tirost-dr-genie-scripts",
+        Name      = "Tirost/DR-Genie-Scripts (community)",
+        Kind      = "github-tree",
+        Owner     = "Tirost",
+        Repo      = "DR-Genie-Scripts",
+        Extension = ".cmd,.js,.inc",
+        Enabled   = false,
     };
 
     /// <summary>The default Plugin_EXPTrackerV5 release feed (single DLL asset).</summary>

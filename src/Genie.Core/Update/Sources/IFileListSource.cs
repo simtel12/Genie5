@@ -41,7 +41,12 @@ public sealed record FileListInfo(
     IReadOnlyList<FileEntry>  Files);
 
 /// <summary>One downloadable file in a file-list source.</summary>
-/// <param name="Name">Filename (no path components — files live in a single logical folder per source).</param>
+/// <param name="Name">
+///   Source-relative name. Flat sources (<see cref="GithubContentsSource"/>)
+///   emit a bare filename; recursive sources (<see cref="GithubTreeSource"/>)
+///   emit a forward-slash relative path (e.g. <c>GenieHunter/hunt.cmd</c>).
+///   Consumers that write to disk must treat the name as untrusted and keep
+///   it inside their target folder.</param>
 /// <param name="DownloadUrl">Direct URL to the raw bytes.</param>
 /// <param name="Sha">
 ///   Optional integrity / change-detection hash. For GitHub Contents this is

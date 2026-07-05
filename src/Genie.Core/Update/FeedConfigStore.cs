@@ -45,7 +45,17 @@ public sealed class FeedConfigStore
         {
             var json = File.ReadAllText(path);
             var cfg  = JsonSerializer.Deserialize<FeedConfig>(json, JsonOpts);
-            return cfg ?? FeedConfig.CreateDefault();
+            if (cfg is null) return FeedConfig.CreateDefault();
+
+            // Migration: configs written before the Scripts section existed
+            // have no "scripts" property at all — seed the same default a
+            // fresh install gets (disabled community repo). A user who
+            // removed every scripts row has an explicit "scripts": [] in the
+            // file, which this deliberately leaves empty.
+            if (cfg.Scripts.Count == 0 && !json.Contains("\"scripts\"", StringComparison.OrdinalIgnoreCase))
+                cfg.Scripts.Add(FeedEntry.CommunityScripts());
+
+            return cfg;
         }
         catch
         {

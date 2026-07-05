@@ -24,7 +24,8 @@
              FontSize="13"
              Margin="0,0,0,12"/>
 
-    <!-- Third-party-code acknowledgment (Plugins tab only — hidden for Maps) -->
+    <!-- Third-party-code acknowledgment (Plugins + Scripts — hidden for Maps).
+         WarningText is swapped per mode from code-behind. -->
     <Border Grid.Row="3" x:Name="WarningPanel"
             BorderBrush="#8a6a2a" BorderThickness="1"
             Background="#3a2a14" CornerRadius="3"
@@ -33,7 +34,7 @@
       <StackPanel Spacing="6">
         <TextBlock Text="⚠ Third-party code"
                    Foreground="#fdb" FontWeight="SemiBold" FontSize="12"/>
-        <TextBlock Foreground="#ddc" FontSize="11" TextWrapping="Wrap">
+        <TextBlock x:Name="WarningText" Foreground="#ddc" FontSize="11" TextWrapping="Wrap">
           Plugin DLLs run inside Genie 5 with full access to your input, character data, and machine. Only add sources from authors you trust. The plugin runs as soon as you Update it the first time.
         </TextBlock>
         <CheckBox x:Name="AcknowledgeBox" Margin="0,4,0,0">

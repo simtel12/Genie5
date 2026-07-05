@@ -166,6 +166,51 @@ public sealed class CoreAppUpdater : IUpdater
         }
     }
 
+    /// <summary>
+    /// Auto-update path (Help ▸ Update Settings ▸ Auto-Apply ▸ Core): download
+    /// the pending update and hand it to Velopack's <c>WaitExitThenApplyUpdates</c>
+    /// so it installs when the app closes — unlike <see cref="ApplyAsync"/>,
+    /// this never restarts the running session. Safe to call when already
+    /// up to date (quiet no-op result).
+    /// </summary>
+    public async Task<UpdateApplyResult> StageOnExitAsync(CancellationToken ct = default)
+    {
+        if (!_mgr.IsInstalled)
+        {
+            return new UpdateApplyResult(
+                Succeeded: false,
+                Summary:   "Cannot stage update — running from source (no Velopack install).",
+                Errors:    new[] { "UpdateManager.IsInstalled is false." });
+        }
+
+        try
+        {
+            _pendingUpdate ??= await _mgr.CheckForUpdatesAsync();
+            if (_pendingUpdate is null)
+            {
+                return new UpdateApplyResult(
+                    Succeeded: true,
+                    Summary:   "Already up to date.",
+                    Errors:    Array.Empty<string>());
+            }
+
+            await _mgr.DownloadUpdatesAsync(_pendingUpdate, cancelToken: ct);
+            _mgr.WaitExitThenApplyUpdates(_pendingUpdate, silent: true, restart: false);
+
+            return new UpdateApplyResult(
+                Succeeded: true,
+                Summary:   $"v{_pendingUpdate.TargetFullRelease.Version} downloaded — installs when Genie closes.",
+                Errors:    Array.Empty<string>());
+        }
+        catch (Exception ex)
+        {
+            return new UpdateApplyResult(
+                Succeeded: false,
+                Summary:   $"Update staging failed: {ex.Message}",
+                Errors:    new[] { ex.Message });
+        }
+    }
+
     public async Task<UpdateApplyResult> ApplyAsync(
         IProgress<UpdateProgress>? progress = null,
         CancellationToken          ct       = default)

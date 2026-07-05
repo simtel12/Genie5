@@ -8,7 +8,7 @@
         WindowStartupLocation="CenterOwner">
 
   <Window.Resources>
-    <!-- Shared DataTemplate for one feed row in the Maps and Plugins lists.
+    <!-- Shared DataTemplate for one feed row in the Maps, Plugins, and Scripts lists.
          The grid columns lay out: enable checkbox | name + source | per-row
          status text | the three action buttons | remove button. Buttons are
          narrow on purpose — wide enough to read, narrow enough that 5+ rows
@@ -197,6 +197,36 @@
         </Grid>
       </TabItem>
 
+      <!-- ── Scripts ───────────────────────────────────────────────────── -->
+      <TabItem Header="Scripts">
+        <Grid Margin="12" RowDefinitions="Auto,*,Auto">
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+            <TextBlock Grid.Column="0" VerticalAlignment="Center" TextWrapping="Wrap"
+                       Text="Script repositories. Each row is a GitHub repo of .cmd / .js scripts; Update pulls new and changed files (subfolders included) into your Scripts folder — like a git pull. Files the repo doesn't know about are never touched."
+                       Foreground="#cdd" FontSize="12"/>
+            <Button    Grid.Column="1" Content="Add Source…"
+                       Command="{Binding AddScriptsSourceCommand}"
+                       MinWidth="100" Margin="8,0,0,0"/>
+          </Grid>
+
+          <ItemsControl Grid.Row="1"
+                        ItemsSource="{Binding ScriptsFeeds}"
+                        ItemTemplate="{StaticResource FeedRowTemplate}">
+            <ItemsControl.Template>
+              <ControlTemplate>
+                <ScrollViewer>
+                  <ItemsPresenter/>
+                </ScrollViewer>
+              </ControlTemplate>
+            </ItemsControl.Template>
+          </ItemsControl>
+
+          <TextBlock Grid.Row="2"
+                     Text="Tip: there is no merge — a locally-edited script with the same name as a repo file is overwritten on Update. Rename scripts you customize."
+                     Foreground="#9aa" FontSize="11" Margin="0,8,0,0"/>
+        </Grid>
+      </TabItem>
+
     </TabControl>
 
     <!-- ── Footer ─────────────────────────────────────────────────────── -->
@@ -204,7 +234,7 @@
       <Button     Grid.Column="0" Content="Check All"
                   Command="{Binding CheckAllCommand}"
                   MinWidth="100"
-                  ToolTip.Tip="Run a check against every enabled Maps and Plugins source."/>
+                  ToolTip.Tip="Run a check against every enabled Maps, Plugins, and Scripts source."/>
       <TextBlock  Grid.Column="1" Text="{Binding Status}"
                   VerticalAlignment="Center" Foreground="#9c9"
                   FontSize="11" Margin="12,0"

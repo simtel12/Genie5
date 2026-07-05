@@ -14,7 +14,14 @@ using ReactiveUI.Fody.Helpers;
 namespace Genie.App.ViewModels;
 
 /// <summary>
-/// Backs the Updates dialog. Three tabs:
+/// Which tab an Add Source request came from. Drives the Add Source dialog's
+/// title/header and whether the third-party-code acknowledgment is required
+/// (Plugins and Scripts — both are executable content; Maps is pure data).
+/// </summary>
+public enum AddSourceKind { Maps, Plugins, Scripts }
+
+/// <summary>
+/// Backs the Updates dialog. Four tabs:
 ///
 ///   - <b>Core</b>: placeholder for Phase 4. Shows the installed Genie.App
 ///     assembly version + the selected channel; no live update path yet
@@ -27,6 +34,9 @@ namespace Genie.App.ViewModels;
 ///   - <b>Plugins</b>: one row per github-releases feed. Per-row Check
 ///     and Update use <see cref="PluginUpdater"/> wired against the live
 ///     <see cref="PluginManager"/> so installs hot-swap without restart.
+///   - <b>Scripts</b>: one row per github-tree feed. Per-row Check and
+///     Update use <see cref="ScriptsUpdater"/> — git-pull semantics into
+///     the Scripts directory, mirroring the repo's subfolders.
 ///
 /// All persistence goes through <see cref="FeedConfigStore"/> at
 /// <c>{ConfigDir}/update-feeds.json</c>.
@@ -36,6 +46,7 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
     private readonly FeedConfigStore     _store;
     private readonly string              _mapsDir;
     private readonly string              _pluginsDir;
+    private readonly string              _scriptsDir;
     private readonly MapZoneRepository   _zoneRepo;
     private readonly PluginManager?      _pluginManager;
     private          FeedConfig          _config;
@@ -99,10 +110,11 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
 
     private CoreAppUpdater _coreUpdater = null!;
 
-    // ── Maps + Plugins tabs ────────────────────────────────────────────────
+    // ── Maps + Plugins + Scripts tabs ──────────────────────────────────────
 
     public ObservableCollection<UpdateFeedRow> MapsFeeds    { get; } = new();
     public ObservableCollection<UpdateFeedRow> PluginsFeeds { get; } = new();
+    public ObservableCollection<UpdateFeedRow> ScriptsFeeds { get; } = new();
 
     // ── Global / footer ────────────────────────────────────────────────────
 
@@ -112,17 +124,19 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
     public ReactiveCommand<Unit, Unit>                       CheckAllCommand           { get; }
     public ReactiveCommand<Unit, Unit>                       AddMapsSourceCommand      { get; }
     public ReactiveCommand<Unit, Unit>                       AddPluginsSourceCommand   { get; }
+    public ReactiveCommand<Unit, Unit>                       AddScriptsSourceCommand   { get; }
 
     /// <summary>
-    /// Code-behind handler shows the Add Source dialog. The bool tells the
-    /// dialog whether to display the third-party-code acknowledgment
-    /// (true = plugin source, false = map source).
+    /// Code-behind handler shows the Add Source dialog. The kind selects the
+    /// dialog's title/header and whether the third-party-code acknowledgment
+    /// appears (Plugins and Scripts — both are executable content).
     /// </summary>
-    public Interaction<bool, FeedEntry?>                     ShowAddSourceDialog       { get; } = new();
+    public Interaction<AddSourceKind, FeedEntry?>            ShowAddSourceDialog       { get; } = new();
 
     /// <summary>Designer ctor.</summary>
     public UpdatesDialogViewModel() : this(
         new FeedConfigStore(Path.GetTempPath()),
+        Path.GetTempPath(),
         Path.GetTempPath(),
         Path.GetTempPath(),
         new MapZoneRepository(),
@@ -132,12 +146,14 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
         FeedConfigStore      store,
         string               mapsDir,
         string               pluginsDir,
+        string               scriptsDir,
         MapZoneRepository    zoneRepo,
         PluginManager?       pluginManager)
     {
         _store         = store;
         _mapsDir       = mapsDir;
         _pluginsDir    = pluginsDir;
+        _scriptsDir    = scriptsDir;
         _zoneRepo      = zoneRepo;
         _pluginManager = pluginManager;
 
@@ -175,6 +191,7 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
         CheckAllCommand         = ReactiveCommand.CreateFromTask(CheckAllAsync,    notBusy);
         AddMapsSourceCommand    = ReactiveCommand.CreateFromTask(AddMapsAsync,     notBusy);
         AddPluginsSourceCommand = ReactiveCommand.CreateFromTask(AddPluginsAsync,  notBusy);
+        AddScriptsSourceCommand = ReactiveCommand.CreateFromTask(AddScriptsAsync,  notBusy);
         CheckCoreCommand        = ReactiveCommand.CreateFromTask(CheckCoreAsync,   coreNotBusy);
         UpdateCoreCommand       = ReactiveCommand.CreateFromTask(UpdateCoreAsync,  canUpdate);
     }
@@ -246,6 +263,10 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
         PluginsFeeds.Clear();
         foreach (var f in _config.Plugins)
             PluginsFeeds.Add(BuildPluginsRow(f));
+
+        ScriptsFeeds.Clear();
+        foreach (var f in _config.Scripts)
+            ScriptsFeeds.Add(BuildScriptsRow(f));
     }
 
     private UpdateFeedRow BuildMapsRow(FeedEntry feed) =>
@@ -262,9 +283,16 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
             toggle: (f, on)         => ToggleFeed(f, on),
             remove: f               => RemoveFeed(f, Kind.Plugins));
 
+    private UpdateFeedRow BuildScriptsRow(FeedEntry feed) =>
+        new(feed,
+            check:  (f, ct)         => CheckOneAsync(f,  Kind.Scripts, ct),
+            apply:  (f, prog, ct)   => ApplyOneAsync(f,  Kind.Scripts, prog, ct),
+            toggle: (f, on)         => ToggleFeed(f, on),
+            remove: f               => RemoveFeed(f, Kind.Scripts));
+
     // ── Per-feed Check / Apply (dispatched by Kind) ────────────────────────
 
-    private enum Kind { Maps, Plugins }
+    private enum Kind { Maps, Plugins, Scripts }
 
     private async Task<string> CheckOneAsync(FeedEntry feed, Kind kind, CancellationToken ct)
     {
@@ -315,6 +343,14 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
                 _zoneRepo, _mapsDir,
                 new[] { (IFileListSource)MakeFileListSource(feed) });
         }
+        else if (kind == Kind.Scripts)
+        {
+            // Same single-source-per-row shape as Maps; the tree source sees
+            // the whole repo (subfolders included) in one API call.
+            return new ScriptsUpdater(
+                _scriptsDir,
+                new[] { MakeScriptsSource(feed) });
+        }
         else
         {
             return new PluginUpdater(
@@ -330,6 +366,19 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
         feed.Kind.Equals("github-contents", StringComparison.OrdinalIgnoreCase)
             ? new GithubContentsSource(feed.Owner, feed.Repo, feed.Path, feed.Extension)
             : throw new NotSupportedException($"Maps source kind '{feed.Kind}' is not supported yet.");
+
+    /// <summary>
+    /// Scripts sources are github-tree (recursive) by default; a hand-edited
+    /// github-contents entry still works for flat single-folder repos.
+    /// </summary>
+    internal static IFileListSource MakeScriptsSource(FeedEntry feed) =>
+        feed.Kind.ToLowerInvariant() switch
+        {
+            "github-tree"     => new GithubTreeSource(feed.Owner, feed.Repo, feed.Path, feed.Extension),
+            "github-contents" => new GithubContentsSource(feed.Owner, feed.Repo, feed.Path,
+                                     string.IsNullOrEmpty(feed.Extension) ? null : feed.Extension),
+            _ => throw new NotSupportedException($"Scripts source kind '{feed.Kind}' is not supported yet."),
+        };
 
     private static IReleaseSource MakeReleaseSource(FeedEntry feed) =>
         feed.Kind.Equals("github-releases", StringComparison.OrdinalIgnoreCase)
@@ -347,7 +396,12 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
 
     private void RemoveFeed(FeedEntry feed, Kind kind)
     {
-        var list = kind == Kind.Maps ? _config.Maps : _config.Plugins;
+        var list = kind switch
+        {
+            Kind.Maps    => _config.Maps,
+            Kind.Scripts => _config.Scripts,
+            _            => _config.Plugins,
+        };
         list.Remove(feed);
         _store.Save(_config);
         RefreshRows();
@@ -358,7 +412,7 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
 
     private async Task AddMapsAsync()
     {
-        var entry = await ShowAddSourceDialog.Handle(false);
+        var entry = await ShowAddSourceDialog.Handle(AddSourceKind.Maps);
         if (entry is null) return;
         // Re-tag the parsed entry as a maps-kind contents source. The
         // PluginSourceParser produces a github-releases plugin entry by
@@ -374,12 +428,28 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
 
     private async Task AddPluginsAsync()
     {
-        var entry = await ShowAddSourceDialog.Handle(true);
+        var entry = await ShowAddSourceDialog.Handle(AddSourceKind.Plugins);
         if (entry is null) return;
         DedupeAdd(_config.Plugins, entry);
         _store.Save(_config);
         RefreshRows();
         Status = $"Added plugin source '{entry.Name}' ({entry.Owner}/{entry.Repo}). Use Update to install.";
+    }
+
+    private async Task AddScriptsAsync()
+    {
+        var entry = await ShowAddSourceDialog.Handle(AddSourceKind.Scripts);
+        if (entry is null) return;
+        // Re-tag the parsed entry as a scripts-kind tree source. The
+        // PluginSourceParser produces a github-releases plugin entry by
+        // default — flip to github-tree + the script extensions.
+        entry.Kind         = "github-tree";
+        entry.Extension    = ".cmd,.js,.inc";
+        entry.AssetPattern = "";
+        DedupeAdd(_config.Scripts, entry);
+        _store.Save(_config);
+        RefreshRows();
+        Status = $"Added scripts source '{entry.Name}' ({entry.Owner}/{entry.Repo}). Use Update to pull.";
     }
 
     private static void DedupeAdd(List<FeedEntry> list, FeedEntry entry)
@@ -397,7 +467,7 @@ public sealed class UpdatesDialogViewModel : ReactiveObject
         IsBusy = true;
         try
         {
-            var rows = MapsFeeds.Concat(PluginsFeeds).Where(r => r.Enabled).ToList();
+            var rows = MapsFeeds.Concat(PluginsFeeds).Concat(ScriptsFeeds).Where(r => r.Enabled).ToList();
             int   done   = 0;
             foreach (var row in rows)
             {
