@@ -95,25 +95,25 @@
               <!-- Layer 1: 9-slice skin images positioned via alignment/margins -->
               <Panel>
                 <!-- Top-left corner (18x18, natural size) -->
-                <Image Source="avares://Genie/Assets/skin_topleft.png"
+                <Image Source="avares://Genie5/Assets/skin_topleft.png"
                        Stretch="None"
                        HorizontalAlignment="Left" VerticalAlignment="Top" />
                 <!-- Top edge (stretches between corners) -->
-                <Image Source="avares://Genie/Assets/skin_top.bmp"
+                <Image Source="avares://Genie5/Assets/skin_top.bmp"
                        Stretch="Fill" Height="18"
                        VerticalAlignment="Top"
                        Margin="18,0,18,0" />
                 <!-- Top-right corner (18x18, natural size) -->
-                <Image Source="avares://Genie/Assets/skin_topright.png"
+                <Image Source="avares://Genie5/Assets/skin_topright.png"
                        Stretch="None"
                        HorizontalAlignment="Right" VerticalAlignment="Top" />
                 <!-- Left edge (4px wide, stretches between top corner and bottom corner) -->
-                <Image Source="avares://Genie/Assets/skin_left.bmp"
+                <Image Source="avares://Genie5/Assets/skin_left.bmp"
                        Stretch="Fill" Width="4"
                        HorizontalAlignment="Left"
                        Margin="0,18,0,4" />
                 <!-- Right edge -->
-                <Image Source="avares://Genie/Assets/skin_right.bmp"
+                <Image Source="avares://Genie5/Assets/skin_right.bmp"
                        Stretch="Fill" Width="4"
                        HorizontalAlignment="Right"
                        Margin="0,18,0,4" />
@@ -121,16 +121,16 @@
                 <Rectangle Fill="{TemplateBinding Background}"
                            Margin="4,18,4,4" />
                 <!-- Bottom-left corner (4x4, natural size) -->
-                <Image Source="avares://Genie/Assets/skin_bottomleft.bmp"
+                <Image Source="avares://Genie5/Assets/skin_bottomleft.bmp"
                        Stretch="None"
                        HorizontalAlignment="Left" VerticalAlignment="Bottom" />
                 <!-- Bottom edge -->
-                <Image Source="avares://Genie/Assets/skin_bottom.bmp"
+                <Image Source="avares://Genie5/Assets/skin_bottom.bmp"
                        Stretch="Fill" Height="4"
                        VerticalAlignment="Bottom"
                        Margin="4,0,4,0" />
                 <!-- Bottom-right corner (4x4, natural size) -->
-                <Image Source="avares://Genie/Assets/skin_bottomright.bmp"
+                <Image Source="avares://Genie5/Assets/skin_bottomright.bmp"
                        Stretch="None"
                        HorizontalAlignment="Right" VerticalAlignment="Bottom" />
               </Panel>

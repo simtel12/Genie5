@@ -128,15 +128,15 @@ jobs:
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -o publish/win-x64
 
-      - name: Confirm Genie.exe produced
+      - name: Confirm Genie5.exe produced
         shell: bash
         run: |
-          if [ ! -f "publish/win-x64/Genie.exe" ]; then
-            echo "::error::Genie.exe not produced — publish failed silently"
+          if [ ! -f "publish/win-x64/Genie5.exe" ]; then
+            echo "::error::Genie5.exe not produced — publish failed silently"
             exit 1
           fi
-          size_mb=$(du -m publish/win-x64/Genie.exe | cut -f1)
-          echo "Genie.exe: ${size_mb} MB"
+          size_mb=$(du -m publish/win-x64/Genie5.exe | cut -f1)
+          echo "Genie5.exe: ${size_mb} MB"
           if [ "$size_mb" -gt 80 ]; then
-            echo "::warning::Genie.exe is ${size_mb} MB — drift from the ~45 MB baseline. Check for accidentally-bundled debug symbols or extra runtimes."
+            echo "::warning::Genie5.exe is ${size_mb} MB — drift from the ~45 MB baseline. Check for accidentally-bundled debug symbols or extra runtimes."
           fi

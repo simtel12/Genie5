@@ -8,7 +8,7 @@ Your first five minutes with Genie 5 — from launching the client to playing Dr
 
 If you installed a pre-built build, launch it the normal way for your OS:
 
-- **Windows** — from the Start menu (Setup install) or run `Genie.exe` from the portable folder.
+- **Windows** — from the Start menu (Setup install) or run `Genie5.exe` from the portable folder.
 - **macOS** — open **Genie5** from Applications (first time: **right-click → Open** to clear Gatekeeper).
 - **Linux** — `./Genie5.AppImage` (make it executable first with `chmod +x`).
 

@@ -25,7 +25,7 @@ normal PR. This is for the maintainer cutting a release.
   been baked in at build time:
   ```
   dotnet publish -c Release -r win-x64 -o publish/win-x64
-  strings publish/win-x64/Genie.exe | grep -iE "<your-username>|<your-repo-name>"
+  strings publish/win-x64/Genie5.exe | grep -iE "<your-username>|<your-repo-name>"
   ```
 
 ## 2. AI surface gates
@@ -63,7 +63,7 @@ See [docs/POLICY.md](docs/POLICY.md) for the full review. Spot-check:
   route; alt-tab to another app; wait 60 seconds; confirm the walk has
   paused. (Also test: Esc during walk cancels; typing any command cancels.)
 - [ ] **No `--headless` / `--service` / `--daemon` CLI flag.** Run
-  `Genie.exe --help`; confirm there's no flag that bypasses GUI startup.
+  `Genie5.exe --help`; confirm there's no flag that bypasses GUI startup.
 
 ## 4. Privacy and credentials
 
@@ -114,7 +114,7 @@ See [docs/POLICY.md](docs/POLICY.md) for the full review. Spot-check:
   ```
   dotnet publish src/Genie.App/Genie.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64
   ```
-- [ ] **App launches.** Double-click `Genie.exe` from the publish folder.
+- [ ] **App launches.** Double-click `Genie5.exe` from the publish folder.
   No "missing .NET runtime" prompt; main window appears.
 - [ ] **Smoke connect.** File → Connect → walk through SGE auth on a
   real account. Confirm character list populates, character connects,

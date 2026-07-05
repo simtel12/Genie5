@@ -93,7 +93,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: genie-win-x64-unsigned
-          path: publish/win-x64/Genie.exe
+          path: publish/win-x64/Genie5.exe
           if-no-files-found: error
 
   velopack:
@@ -146,7 +146,7 @@ jobs:
             --packId Genie5 `
             --packVersion ${{ steps.ver.outputs.version }} `
             --packDir publish/win-x64 `
-            --mainExe Genie.exe `
+            --mainExe Genie5.exe `
             --icon src/Genie.App/Assets/app.ico `
             --outputDir velopack-releases
 
@@ -222,7 +222,7 @@ jobs:
             --packId Genie5 \
             --packVersion ${{ steps.ver.outputs.version }} \
             --packDir publish/linux-x64 \
-            --mainExe Genie \
+            --mainExe Genie5 \
             --icon src/Genie.App/Assets/app.png \
             --outputDir velopack-releases
 
@@ -296,7 +296,7 @@ jobs:
             --packId Genie5 \
             --packVersion ${{ steps.ver.outputs.version }} \
             --packDir publish/osx-arm64 \
-            --mainExe Genie \
+            --mainExe Genie5 \
             --bundleId com.genieclient.genie5 \
             --icon src/Genie.App/Assets/app.icns \
             --outputDir velopack-releases
@@ -395,7 +395,7 @@ jobs:
             --packId Genie5 \
             --packVersion ${{ steps.ver.outputs.version }} \
             --packDir publish/osx-x64 \
-            --mainExe Genie \
+            --mainExe Genie5 \
             --bundleId com.genieclient.genie5 \
             --channel osx-x64 \
             --icon src/Genie.App/Assets/app.icns \
@@ -479,7 +479,7 @@ jobs:
             -F "projectSlug=${{ vars.SIGNPATH_PROJECT_SLUG }}" \
             -F "signingPolicySlug=${{ vars.SIGNPATH_SIGNING_POLICY }}" \
             -F "artifactConfigurationSlug=initial" \
-            -F "artifact=@unsigned/Genie.exe" \
+            -F "artifact=@unsigned/Genie5.exe" \
             -F "description=${{ github.ref_name }} (${{ github.sha }})" \
             -D "$headers" \
             "https://app.signpath.io/API/v1/${{ vars.SIGNPATH_ORGANIZATION_ID }}/SigningRequests/SubmitWithArtifact"
@@ -525,7 +525,7 @@ jobs:
           mkdir -p signed
           curl --fail-with-body -sS \
             -H "Authorization: Bearer $SIGNPATH_API_TOKEN" \
-            -o signed/Genie.exe \
+            -o signed/Genie5.exe \
             "$REQUEST_URL/SignedArtifact"
 
       - name: Upload signed artifact

@@ -6,7 +6,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Genie.App</RootNamespace>
-    <AssemblyName>Genie</AssemblyName>
+    <!-- Genie5 (not Genie): matches the Velopack packId, so the portable
+         launcher stub, the real exe in current\, and the process name all read
+         "Genie5" — shortcuts to either exe survive updates (#137). -->
+    <AssemblyName>Genie5</AssemblyName>
 
     <!-- ── Versioning (shown in File Properties → Details + About box) ── -->
     <Version>5.0.0-alpha.8</Version>

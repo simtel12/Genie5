@@ -17,7 +17,7 @@ internal static class Program
 
         // ── Velopack startup hook ────────────────────────────────────────────
         // MUST be called before any other startup work. Velopack's installer
-        // pipeline spawns the running Genie.exe with --veloapp-* arguments
+        // pipeline spawns the running Genie5.exe with --veloapp-* arguments
         // during install / uninstall / first-run / update; VelopackApp.Run()
         // intercepts those and exits cleanly without ever booting Avalonia.
         // On a normal launch it's a no-op that returns immediately.

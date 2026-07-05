@@ -50,7 +50,7 @@ dotnet publish src/Genie.App -c Release -r osx-x64   -o publish/osx-x64
 dotnet publish src/Genie.App -c Release -r linux-x64 -o publish/linux-x64
 ```
 
-Each produces a single `Genie` / `Genie.exe` that a tester can copy and double-click — no .NET install, no loose DLLs.
+Each produces a single `Genie5` / `Genie5.exe` that a tester can copy and double-click — no .NET install, no loose DLLs.
 
 ### What the publish properties do
 

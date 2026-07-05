@@ -52,7 +52,7 @@ internal static class IconLoader
 
     public static WriteableBitmap LoadAvares(string assetName)
     {
-        var uri = new Uri($"avares://Genie/Assets/Icons/{assetName}");
+        var uri = new Uri($"avares://Genie5/Assets/Icons/{assetName}");
         using var stream = AssetLoader.Open(uri);
         return LoadBlackTransparent(stream);
     }

@@ -15,7 +15,7 @@ From the [latest release](https://github.com/GenieClient/Genie5/releases/latest)
 | Download | When to pick it |
 | --- | --- |
 | **`Genie5-win-Setup.exe`** *(recommended)* | Normal install. Registers the app for **in-app auto-updates**, so future releases arrive via **Help → Check for Updates**. |
-| `Genie5-win-Portable.zip` | No-install / portable. Extract anywhere and run `Genie.exe`. No auto-update — you re-download each release by hand. |
+| `Genie5-win-Portable.zip` | No-install / portable. Extract anywhere and run `Genie5.exe` (point shortcuts at this one — the copy inside `current\` is replaced on every update). In-app auto-update works here too. |
 
 ### 🐧 Linux
 

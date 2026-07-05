@@ -13,12 +13,12 @@
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
-        <ResourceInclude Source="avares://Genie/Themes/MdiDocumentWindowSkin.axaml" />
+        <ResourceInclude Source="avares://Genie5/Themes/MdiDocumentWindowSkin.axaml" />
         <!-- #80: overrides the stock ToolControl theme with a cached, per-dockable
              content host so stacked tool tabs of different types each keep their own
              view instead of all showing the first-built one. Full writeup lives in
              the file header. -->
-        <ResourceInclude Source="avares://Genie/Themes/ToolControlCachedSkin.axaml" />
+        <ResourceInclude Source="avares://Genie5/Themes/ToolControlCachedSkin.axaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>

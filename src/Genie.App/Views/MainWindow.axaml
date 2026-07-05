@@ -6,7 +6,7 @@
         x:Class="Genie.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="{Binding WindowTitle}"
-        Icon="avares://Genie/Assets/app.png"
+        Icon="avares://Genie5/Assets/app.png"
         Topmost="{Binding Display.AlwaysOnTop}"
         Width="1280" Height="800"
         MinWidth="800" MinHeight="500">
