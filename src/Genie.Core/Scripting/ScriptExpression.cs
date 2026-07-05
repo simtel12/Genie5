@@ -289,8 +289,18 @@ internal sealed class ScriptExpression
     private object ParseAtom()
     {
         SkipWs();
-        if (_pos >= _src.Length) throw new Exception("expression: unexpected end");
+        // Genie4 parity (#133): a missing operand is the EMPTY STRING, the way
+        // Genie 4's section evaluator sees an empty token. An unset %var
+        // substitutes to nothing before parsing, so "(%kcast = 1)" arrives as
+        // "( = 1)" — that must compare "" against "1" (false), NOT fail the
+        // whole expression to false, which was eating the defined side of an
+        // `||`. Applies wherever a value slot is empty: before a comparison
+        // operator, before ')' ("(1 = )", "()"), or at end of input. Structural
+        // errors (unbalanced parens, stray tokens) still throw and warn.
+        if (_pos >= _src.Length) return string.Empty;
         char c = _src[_pos];
+        if (c == ')' || c == '=' || c == '<' || c == '>' || c == '!')
+            return string.Empty;
 
         if (c == '(')
         {

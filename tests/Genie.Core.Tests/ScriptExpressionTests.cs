@@ -84,6 +84,23 @@ public class ScriptExpressionTests
         => Assert.Equal(expected, ScriptExpression.Eval(expr, NewInst())?.ToString());
 
     [Theory]
+    // #133: a missing operand (an unset %var substituted to nothing) reads as
+    // the empty string, so the defined side of an || still evaluates. Before
+    // the fix, "( = 1)" was a parse error that failed the WHOLE condition.
+    [InlineData("((1 = 1) || ( = 1))", true)]    // the #133 repro shape
+    [InlineData("(( = 1) || (1 = 1))", true)]    // undefined side first
+    [InlineData("( = 1)",              false)]   // "" = "1"
+    [InlineData("( != 1)",             true)]    // "" != "1"
+    [InlineData("(1 = )",              false)]   // missing right side
+    [InlineData("()",                  false)]   // fully-empty substitution
+    // #135: chained || (3+ clauses) — well-formed form works; the report's
+    // repro had an unbalanced quote, which correctly errors.
+    [InlineData("((\"foo\" = \"foo\") || (\"foo\" = \"bar\") || (\"foo\" = \"baz\"))", true)]
+    [InlineData("((\"zap\" = \"foo\") || (\"zap\" = \"bar\") || (\"zap\" = \"baz\"))", false)]
+    public void EvalBool_missing_operands_and_chained_or(string expr, bool expected)
+        => Assert.Equal(expected, ScriptExpression.EvalBool(expr, NewInst()));
+
+    [Theory]
     // #134: count() counts OCCURRENCES (Genie 4 Eval.cs Count), not elements.
     [InlineData("count(\"barbar\",\"foo\")", "0")]   // the #134 repro: absent ⇒ 0
     [InlineData("count(\"foo\",\"foo\")",    "1")]
