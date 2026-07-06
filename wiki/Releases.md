@@ -4,7 +4,23 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8.1 — Genie5.exe Everywhere
+## Latest: v5.0.0-alpha.8.2 — Themes & Type-Anywhere
+
+Seven built-in UI themes with a live in-app editor, three Genie 3/4 input features straight from community requests, spoken-alert upgrades, and a batch of script-engine fixes.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.2** as a delta.
+
+- **UI Themes ([#20](https://github.com/GenieClient/Genie5/issues/20), first wave)** — Edit → Theme: Dark, Light, Genie 4 Classic, High Contrast, Solarized Dark/Light, Wrayth-style; live repaint, no restart. **Edit Theme…** opens a color-role editor with live preview; custom themes are shareable JSON in `Config/Themes`. Per-window / per-stream color overrides still win.
+- **Type anywhere ([#141](https://github.com/GenieClient/Genie5/issues/141))** — typing with a panel or the game text focused routes into the command bar, Genie 3/4 style.
+- **10-key hotkeys ([#140](https://github.com/GenieClient/Genie5/issues/140))** — numpad `/ * - +` → `assess / health / fatigue / look` by default, rebindable.
+- **`#flash` ([#139](https://github.com/GenieClient/Genie5/issues/139))** — taskbar flash (Windows) / dock bounce (macOS) until refocused.
+- **Time Tracker panel + `#statusbar` slots** — the Elanthian clock as a dockable window; ten positional status-bar slots under the vitals bar.
+- **Spoken alerts** — per-rule Speak on highlights/triggers; `#tts rate` / `#tts volume`.
+- **Fixes** — mm_train script-engine batch (`#clear <name>`, `#script abort`, argument parsing, inline `{#eval}`, quoted `#echo ">window"`, `triggeroninput`), plugin slash-commands reach plugins again, and the phantom "Updates available: Maps" banner is gone.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.2)
+
+## v5.0.0-alpha.8.1 — Genie5.exe Everywhere
 
 A portable-install follow-up: the executable is now **`Genie5.exe`** on every platform, and Genie announces which data folder it is using the moment it starts.
 

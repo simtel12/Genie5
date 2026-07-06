@@ -1,3 +1,58 @@
+# Genie 5 — v5.0.0-alpha.8.2
+
+Themes arrive: seven built-in looks (including Light, High Contrast, and
+Solarized) with a live in-app theme editor — plus three community-requested
+input features from Genie 3/4, spoken-alert upgrades, and a batch of
+script-engine fixes from the mm_train review.
+
+> **Alpha software.** Windows SmartScreen may warn on first launch
+> (More info → Run anyway) while code signing is being rolled out — tracked
+> in #33.
+
+## ✨ New
+
+- **UI Themes (#20, first wave)** — Edit → Theme picks from seven built-in
+  presets: **Dark** (the classic), **Light**, **Genie 4 Classic**,
+  **High Contrast**, **Solarized Dark**, **Solarized Light**, and
+  **Wrayth-style**. The whole app repaints live — no restart.
+- **Theme editor** — Edit → Theme → **Edit Theme…** opens a color-role
+  editor (surfaces, text, accents, vitals bars, game text) with live
+  preview while you drag; save your palette as a custom theme. Custom
+  themes are shareable JSON files in `Config/Themes`. Your per-window and
+  per-stream color overrides always win over the theme.
+- **Type anywhere, it lands in the command bar (#141)** — typing while a
+  panel, button, or the game text has focus routes straight into the input
+  box, Genie 3/4 style. No more clicking back into the command bar.
+- **The rest of the 10-key hotkeys (#140)** — numpad `/` `*` `-` `+` now
+  fire `assess` / `health` / `fatigue` / `look` by default (rebindable in
+  the Macros panel; existing profiles pick them up automatically unless
+  you've bound those keys yourself).
+- **`#flash` (#139)** — flashes the taskbar entry (Windows) or bounces the
+  dock icon (macOS) until you refocus the window; classic trigger fodder
+  for "something needs your eyes." No-op on Linux for now.
+- **Time Tracker window** — the Elanthian clock/calendar is now a proper
+  dockable panel with rebuilt date math.
+- **`#statusbar` slots** — Genie 4 parity: ten positional slots rendered
+  under the vitals status bar (plus `#statusbar clearall`), no longer
+  squatting in the Script Bar.
+- **Spoken alerts** — per-rule **Speak** on highlights and triggers, and
+  `#tts rate` / `#tts volume` controls.
+
+## 🔧 Fixed
+
+- **mm_train-style menu scripts** — a batch of script-engine fixes:
+  `#clear <name>` clears named windows, `#script abort` parity, doubled
+  separators no longer produce phantom empty arguments, bare multi-word
+  operands compare correctly, inline `{#eval …}` works in `#var`/`#tvar`,
+  quoted `#echo ">window text"` routes correctly, and `triggeroninput`
+  sees typed commands.
+- **Plugin slash-commands** — plugin input dispatch is wired back into the
+  command pipeline (`/iv` and friends reach plugins again).
+- **Maps updater** — no more phantom "Updates available: Maps" every
+  launch; applied zone versions are now tracked, so the banner only
+  appears for genuinely new map data. (Existing installs will see one
+  last update pass that records versions, then it goes quiet.)
+
 # Genie 5 — v5.0.0-alpha.8.1
 
 A portable-install follow-up driven by community reports: the executable is
