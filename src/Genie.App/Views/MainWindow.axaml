@@ -96,6 +96,12 @@
         <MenuItem Header="_Configuration..."    Command="{Binding ConfigurationCommand}"/>
         <Separator/>
         <MenuItem Header="_Display Settings..." Command="{Binding DisplaySettingsCommand}"/>
+        <!-- #20: theme presets + customs, rebuilt on open (code-behind — the
+             submenu mixes dynamic radio entries with static Save/Reset items,
+             which a single ItemsSource can't express). -->
+        <MenuItem x:Name="ThemeMenu" Header="_Theme" SubmenuOpened="OnThemeMenuOpened">
+          <MenuItem Header="(loading…)"/>
+        </MenuItem>
       </MenuItem>
       <MenuItem Header="_Layout" SubmenuOpened="OnLayoutMenuOpened">
         <MenuItem Header="_Save Layout As..."
@@ -371,6 +377,11 @@
                   IsChecked="{Binding ActiveSpellsVisible, Mode=OneWay}"
                   Command="{Binding ToggleActiveSpellsCommand}"
                   ToolTip.Tip="Active spell durations, tracked by the Spell Timer. Populates when you have spells running."/>
+        <MenuItem Header="Time Trac_ker"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding TimeTrackerVisible, Mode=OneWay}"
+                  Command="{Binding ToggleTimeTrackerCommand}"
+                  ToolTip.Tip="Elanthian date, moon/sun rise-set countdowns and observed sky, tracked by the built-in Time Tracker (/tt help)."/>
         <MenuItem Header="Scr_ipts"
                   ToggleType="CheckBox"
                   IsChecked="{Binding ScriptsVisible, Mode=OneWay}"
@@ -688,8 +699,8 @@
     <!-- duplicate keeps the file self-contained and easy to read.)              -->
     <Border DockPanel.Dock="Top"
             IsVisible="{Binding Display.ShowHandsTop}"
-            Background="#1c1c1c"
-            BorderBrush="#3a3a3a" BorderThickness="0,0,0,1"
+            Background="{DynamicResource Theme.StripBg}"
+            BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,0,0,1"
             Padding="10,5">
       <StackPanel Orientation="Horizontal" Spacing="24">
 
@@ -732,19 +743,19 @@
 
         <StackPanel Orientation="Horizontal" Spacing="6">
           <Border Background="#2a2a2a" CornerRadius="2" Padding="6,1">
-            <TextBlock Text="L" Foreground="#aaa" FontWeight="SemiBold" FontSize="11"/>
+            <TextBlock Text="L" Foreground="{DynamicResource Theme.TextSecondary}" FontWeight="SemiBold" FontSize="11"/>
           </Border>
           <TextBlock Text="{Binding Vitals.LeftHand, FallbackValue=Empty}"
-                     Foreground="#ddd" FontSize="12" MinWidth="140"
+                     Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12" MinWidth="140"
                      VerticalAlignment="Center"/>
         </StackPanel>
 
         <StackPanel Orientation="Horizontal" Spacing="6">
           <Border Background="#2a2a2a" CornerRadius="2" Padding="6,1">
-            <TextBlock Text="R" Foreground="#aaa" FontWeight="SemiBold" FontSize="11"/>
+            <TextBlock Text="R" Foreground="{DynamicResource Theme.TextSecondary}" FontWeight="SemiBold" FontSize="11"/>
           </Border>
           <TextBlock Text="{Binding Vitals.RightHand, FallbackValue=Empty}"
-                     Foreground="#ddd" FontSize="12" MinWidth="140"
+                     Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12" MinWidth="140"
                      VerticalAlignment="Center"/>
         </StackPanel>
 
@@ -798,7 +809,7 @@
             </MultiBinding>
           </StackPanel.IsVisible>
           <Border Background="#2a2a2a" CornerRadius="2" Padding="6,1">
-            <TextBlock Text="S" Foreground="#aaa" FontWeight="SemiBold" FontSize="11"
+            <TextBlock Text="S" Foreground="{DynamicResource Theme.TextSecondary}" FontWeight="SemiBold" FontSize="11"
                        ToolTip.Tip="Prepared spell. (N) is seconds since prep started."/>
           </Border>
           <!-- The label is "(N) Spell Name" while a spell is held, or empty
@@ -942,7 +953,7 @@
     <!-- Dims while disconnected (G4 grayed icons). Layout ▸ Icon Bar.        -->
     <Border DockPanel.Dock="Bottom"
             IsVisible="{Binding Display.ShowIconBar}"
-            Background="#161a1d" BorderBrush="#3a4148" BorderThickness="0,1,0,0"
+            Background="{DynamicResource Theme.StripBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
             Padding="6,2"
             Classes.offline="{Binding !IsConnected}">
       <Border.Styles>
@@ -994,7 +1005,7 @@
                 ToolTip.Tip="Invisible.">
           <TextBlock Text="INVISIBLE" Foreground="#d0b0ff"/>
         </Border>
-        <Border Classes="chip" Background="#2e2e2e" BorderBrush="#777777"
+        <Border Classes="chip" Background="#2e2e2e" BorderBrush="{DynamicResource Theme.TextMuted}"
                 IsVisible="{Binding IconBar.Webbed}"
                 ToolTip.Tip="Webbed / immobilized — you can't move until you break free.">
           <TextBlock Text="WEBBED" Foreground="#d8d8d8"/>
@@ -1005,6 +1016,41 @@
           <TextBlock Text="JOINED" Foreground="#a8e0a8"/>
         </Border>
       </StackPanel>
+    </Border>
+
+    <!-- ── #statusbar slot row (Genie 4 StatusStrip parity, #111) ────────── -->
+    <!-- Ten positional cells fed by #statusbar / #status [N] {text} via      -->
+    <!-- StatusSlotsViewModel — slot N stays in cell N so scripts that use    -->
+    <!-- the slots as columns keep their columns (Genie 4 semantics). Text    -->
+    <!-- persists until overwritten or cleared (bare #statusbar N); it is NOT -->
+    <!-- dropped when scripts finish. Declared AFTER the Icon Bar and BEFORE  -->
+    <!-- the vitals grid so DockPanel stacks it between them. Collapses when  -->
+    <!-- every slot is empty; part of the Status Bar toggle.                  -->
+    <Border DockPanel.Dock="Bottom"
+            Background="{DynamicResource Theme.StripBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
+            ToolTip.Tip="Script status slots — written with #statusbar [N] text; a bare #statusbar N clears slot N, #statusbar clearall empties all ten.">
+      <Border.IsVisible>
+        <MultiBinding Converter="{x:Static BoolConverters.And}">
+          <Binding Path="Display.ShowStatusBar"/>
+          <Binding Path="StatusSlots.HasAny"/>
+        </MultiBinding>
+      </Border.IsVisible>
+      <ItemsControl ItemsSource="{Binding StatusSlots.Slots}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <UniformGrid Columns="10" Rows="1"/>
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:StatusSlot">
+            <Border BorderBrush="#2f363d" BorderThickness="0,0,1,0" Padding="6,2"
+                    ToolTip.Tip="{Binding Number, StringFormat='#statusbar slot {0}'}">
+              <TextBlock Text="{Binding Text}" FontSize="11" Foreground="{DynamicResource Theme.TextPrimary}"
+                         TextTrimming="CharacterEllipsis"/>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
     </Border>
 
     <!-- ── Status bar (Wrayth-style, docks below the command bar) ───────── -->
@@ -1073,11 +1119,11 @@
     <!-- Declared AFTER the vitals strip so DockPanel stacks it just ABOVE it.   -->
     <Border DockPanel.Dock="Bottom"
             IsVisible="{Binding Display.ShowZoneRoomId}"
-            Background="#1b2024" BorderBrush="#3a4148" BorderThickness="0,1,0,0"
+            Background="{DynamicResource Theme.StripBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
             Padding="6,2">
       <TextBlock Text="{Binding Mapper.LocationDisplay}"
                  FontFamily="Consolas,Courier New,monospace" FontSize="11"
-                 Foreground="#8aa3b5" VerticalAlignment="Center"
+                 Foreground="{DynamicResource Theme.SectionHeader}" VerticalAlignment="Center"
                  ToolTip.Tip="Current mapper zone and DR server room id (#66)"/>
     </Border>
 
@@ -1087,18 +1133,18 @@
     <!-- a hidden status bar. Click opens the Updates dialog; × dismisses.     -->
     <Border DockPanel.Dock="Bottom"
             IsVisible="{Binding UpdateNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-            Background="#1b2024" BorderBrush="#3a4148" BorderThickness="0,1,0,0"
+            Background="{DynamicResource Theme.StripBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
             Padding="6,1">
       <DockPanel>
         <Button DockPanel.Dock="Right" Content="✕"
                 Command="{Binding DismissUpdateNoticeCommand}"
                 Background="Transparent" BorderThickness="0" Padding="4,0"
-                FontSize="10" Foreground="#8aa3b5"
+                FontSize="10" Foreground="{DynamicResource Theme.SectionHeader}"
                 ToolTip.Tip="Dismiss this notice (it returns if the next check still finds updates)"/>
         <Button Content="{Binding UpdateNotice}"
                 Command="{Binding ShowUpdatesCommand}"
                 Background="Transparent" BorderThickness="0" Padding="2,0"
-                HorizontalAlignment="Left" FontSize="11" Foreground="#8aa3b5"
+                HorizontalAlignment="Left" FontSize="11" Foreground="{DynamicResource Theme.SectionHeader}"
                 ToolTip.Tip="Click to open the Updates dialog"/>
       </DockPanel>
     </Border>
@@ -1110,8 +1156,8 @@
     <!-- DockPanel handles the inverse position.                               -->
     <Border DockPanel.Dock="Bottom"
             IsVisible="{Binding Display.ShowHandsBottom}"
-            Background="#1c1c1c"
-            BorderBrush="#3a3a3a" BorderThickness="0,1,0,0"
+            Background="{DynamicResource Theme.StripBg}"
+            BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
             Padding="10,5">
       <StackPanel Orientation="Horizontal" Spacing="24">
 
@@ -1154,19 +1200,19 @@
 
         <StackPanel Orientation="Horizontal" Spacing="6">
           <Border Background="#2a2a2a" CornerRadius="2" Padding="6,1">
-            <TextBlock Text="L" Foreground="#aaa" FontWeight="SemiBold" FontSize="11"/>
+            <TextBlock Text="L" Foreground="{DynamicResource Theme.TextSecondary}" FontWeight="SemiBold" FontSize="11"/>
           </Border>
           <TextBlock Text="{Binding Vitals.LeftHand, FallbackValue=Empty}"
-                     Foreground="#ddd" FontSize="12" MinWidth="140"
+                     Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12" MinWidth="140"
                      VerticalAlignment="Center"/>
         </StackPanel>
 
         <StackPanel Orientation="Horizontal" Spacing="6">
           <Border Background="#2a2a2a" CornerRadius="2" Padding="6,1">
-            <TextBlock Text="R" Foreground="#aaa" FontWeight="SemiBold" FontSize="11"/>
+            <TextBlock Text="R" Foreground="{DynamicResource Theme.TextSecondary}" FontWeight="SemiBold" FontSize="11"/>
           </Border>
           <TextBlock Text="{Binding Vitals.RightHand, FallbackValue=Empty}"
-                     Foreground="#ddd" FontSize="12" MinWidth="140"
+                     Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12" MinWidth="140"
                      VerticalAlignment="Center"/>
         </StackPanel>
 
@@ -1220,7 +1266,7 @@
             </MultiBinding>
           </StackPanel.IsVisible>
           <Border Background="#2a2a2a" CornerRadius="2" Padding="6,1">
-            <TextBlock Text="S" Foreground="#aaa" FontWeight="SemiBold" FontSize="11"
+            <TextBlock Text="S" Foreground="{DynamicResource Theme.TextSecondary}" FontWeight="SemiBold" FontSize="11"
                        ToolTip.Tip="Prepared spell. (N) is seconds since prep started."/>
           </Border>
           <!-- The label is "(N) Spell Name" while a spell is held, or empty
@@ -1360,23 +1406,16 @@
     <!-- Genie 4 muscle memory — shows what scripts are running with a tiny
          × per item so the user can stop them in-place. Hidden when empty
          so the strip costs zero vertical space during ordinary play.
-         Declared AFTER the command bar so it sits ABOVE the command bar
-         in DockPanel terms (DockPanel allocates bottom-docked items in
-         reverse declaration order, working from the bottom up). -->
+         Declared AFTER the hands strip and BEFORE the command bar, so it
+         stacks between them (DockPanel hands the bottom edge to bottom-docked
+         items in declaration order, working upward). The #statusbar text that
+         used to dock right lives under the vitals Status Bar now (#111). -->
     <Border DockPanel.Dock="Bottom"
             IsVisible="{Binding ScriptBar.HasScripts}"
-            Background="#1f2429" BorderBrush="#3a4148" BorderThickness="0,1,0,0"
+            Background="{DynamicResource Theme.ToolbarBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
             Padding="6,3">
       <DockPanel LastChildFill="False">
-        <!-- #statusbar / #status text (Genie 4 parity, #111) — docked right so
-             it stays put as running-script chips come and go on the left. -->
-        <TextBlock DockPanel.Dock="Right"
-                   IsVisible="{Binding ScriptBar.HasStatus}"
-                   Text="{Binding ScriptBar.StatusText}"
-                   Foreground="#cfe0ee" FontSize="11"
-                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                   Margin="12,0,2,0"/>
-        <TextBlock DockPanel.Dock="Left" Text="Scripts:" Foreground="#8aa3b5" FontSize="11"
+        <TextBlock DockPanel.Dock="Left" Text="Scripts:" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="11"
                    FontWeight="SemiBold" VerticalAlignment="Center"
                    Margin="0,0,2,0"/>
         <ItemsControl DockPanel.Dock="Left" ItemsSource="{Binding ScriptBar.RunningScripts}">
@@ -1392,7 +1431,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="4"
                             VerticalAlignment="Center">
                   <TextBlock Text="{Binding Name}" FontSize="11"
-                             Foreground="#cfe0ee" VerticalAlignment="Center"/>
+                             Foreground="{DynamicResource Theme.TextPrimary}" VerticalAlignment="Center"/>
                   <!-- Language tag — only shown for .js scripts. -->
                   <Border Background="#2d3b46" CornerRadius="2" Padding="3,0"
                           VerticalAlignment="Center"
@@ -1489,6 +1528,7 @@
       </Border>
 
       <TextBox Grid.Column="2"
+               x:Name="CommandInput"
                Text="{Binding Command.CommandText}"
                Watermark="Enter command..."
                FontFamily="Consolas,Courier New,monospace"

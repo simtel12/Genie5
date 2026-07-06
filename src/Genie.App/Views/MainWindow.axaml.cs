@@ -54,6 +54,17 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         AddHandler(InputElement.KeyDownEvent, OnGlobalKeyDown,
                    RoutingStrategies.Bubble, handledEventsToo: false);
 
+        // Type-anywhere → command bar (public #141, Genie 3/4 parity): plain
+        // typing that lands on a non-editable control (game text, a panel, a
+        // just-clicked button) is redirected into the command bar, so the
+        // player never has to click back into the input box. Bubble phase
+        // without handledEventsToo: any real text control (command bar,
+        // mapper notes, mob-pattern box, …) handles its own TextInput first
+        // and we never see it. Bound macros swallow their KeyDown before the
+        // platform raises TextInput, so macro keys don't leak here either.
+        AddHandler(InputElement.TextInputEvent, OnGlobalTextInput,
+                   RoutingStrategies.Bubble, handledEventsToo: false);
+
         // AutoWalk attended-detection: when the window loses focus for >60s
         // we pause any in-flight walk per the compliance review's
         // attended-mode requirement. Activated cancels the pending timer
@@ -276,6 +287,43 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 }
             }));
 
+            // #20: "Save Current As…" theme name prompt. Existing custom
+            // theme names show as a click-to-overwrite list, mirroring the
+            // layout save dialog's affordance.
+            d(ViewModel!.ShowThemeNamePrompt.RegisterHandler(async ctx =>
+            {
+                try
+                {
+                    var existing = ViewModel!.Themes.All
+                        .Where(t => !t.IsBuiltIn)
+                        .Select(t => t.Name)
+                        .ToList();
+                    ctx.SetOutput(await NamePromptDialog.Show(
+                        this, "Theme name:", ctx.Input, "Save Theme As", existing));
+                }
+                catch (Exception ex)
+                {
+                    Genie.App.Diagnostics.ErrorLog.Log("ThemeNamePrompt.Show", ex);
+                    ctx.SetOutput(null);
+                }
+            }));
+
+            // #20: Edit Theme… editor. ShowDialog<bool> yields false on ✕ /
+            // Cancel, which the VM's command treats as "restore pre-edit".
+            d(ViewModel!.ShowThemeEditorDialog.RegisterHandler(async ctx =>
+            {
+                try
+                {
+                    var dlg = new ThemeEditorDialog { DataContext = ctx.Input };
+                    ctx.SetOutput(await dlg.ShowDialog<bool>(this));
+                }
+                catch (Exception ex)
+                {
+                    Genie.App.Diagnostics.ErrorLog.Log("ThemeEditorDialog.Show", ex);
+                    ctx.SetOutput(false);
+                }
+            }));
+
             // (#80 content-recycling band-aid removed.) The stacked-tab "wrong
             // view" bug is now fixed at the source: Themes/ToolControlCachedSkin.axaml
             // overrides the stock ToolControl with a cached, per-dockable content
@@ -303,7 +351,21 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         Avalonia.Threading.Dispatcher.UIThread.Post(
             () => ViewModel?.TryFloatPendingMapper(),
             Avalonia.Threading.DispatcherPriority.Background);
+
+        // #flash → taskbar/dock attention flash. Subscribed here (not in the
+        // VM) because the flash needs the Window; may fire from a script
+        // thread, so hop to the UI thread. Core is persistent for the app
+        // lifetime, so a one-time hook is enough.
+        if (!_flashHooked && ViewModel?.Core is { } core)
+        {
+            _flashHooked = true;
+            core.FlashRequested += () =>
+                Avalonia.Threading.Dispatcher.UIThread.Post(
+                    () => Services.WindowFlashService.Flash(this));
+        }
     }
+
+    private bool _flashHooked;
 
     /// <summary>
     /// Pull truth from the dock factory just before the Window menu renders so
@@ -320,6 +382,47 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     // disabled because its ItemsSource has nothing in it.
     private void OnLayoutMenuOpened(object? sender, RoutedEventArgs e)
         => ViewModel?.RefreshLayoutListCommand.Execute().Subscribe();
+
+    // #20: rebuild the Edit → Theme submenu each open. Built in code (not an
+    // ItemsSource) because it mixes per-theme radio items with the static
+    // Save Current As… / Reset entries — a single ItemsSource can't express
+    // that, and SubmenuOpened guarantees fresh radio checks + newly-dropped
+    // Config/Themes files either way.
+    private void OnThemeMenuOpened(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not { } vm) return;
+        vm.RefreshThemeListCommand.Execute().Subscribe();
+
+        ThemeMenu.Items.Clear();
+        foreach (var t in vm.ThemeMenuItems)
+            ThemeMenu.Items.Add(new MenuItem
+            {
+                Header           = t.Display,
+                ToggleType       = MenuItemToggleType.Radio,
+                IsChecked        = t.IsCurrent,
+                Command          = t.Command,
+                CommandParameter = t,
+            });
+        ThemeMenu.Items.Add(new Separator());
+        ThemeMenu.Items.Add(new MenuItem
+        {
+            Header  = "Edit Theme…",
+            Command = vm.EditThemeCommand,
+            [ToolTip.TipProperty] = "Open the theme editor: tweak every colour role with live preview, then save as a custom theme. Editing a built-in saves a copy.",
+        });
+        ThemeMenu.Items.Add(new MenuItem
+        {
+            Header  = "Save Current As…",
+            Command = vm.SaveThemeAsCommand,
+            [ToolTip.TipProperty] = "Snapshot the current colours (including any Display Settings tweaks) as a named custom theme in Config/Themes.",
+        });
+        ThemeMenu.Items.Add(new MenuItem
+        {
+            Header  = "Reset to Dark",
+            Command = vm.ResetThemeCommand,
+            [ToolTip.TipProperty] = "Back to the default Dark theme.",
+        });
+    }
 
     // Rebuild the Plugins-menu list when it opens, so newly-loaded plugins
     // (e.g. after Reload) show up.
@@ -609,6 +712,25 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             }
         }
 
+        // #141: Backspace while no text control has focus → edit the command
+        // bar, same as the TextInput redirect below (Backspace produces no
+        // TextInput, so it needs its own hook). A focused TextBox handles its
+        // own Backspace and marks it handled before this bubble handler runs;
+        // the guard is belt-and-braces.
+        if (e.Key == Key.Back && e.KeyModifiers == KeyModifiers.None &&
+            FocusManager?.GetFocusedElement() is not TextBox &&
+            CommandInput is { } bar)
+        {
+            bar.Focus();
+            if (!string.IsNullOrEmpty(bar.Text))
+            {
+                bar.Text = bar.Text[..^1];
+                bar.CaretIndex = bar.Text.Length;
+            }
+            e.Handled = true;
+            return;
+        }
+
         if (ViewModel?.Core?.Commands?.Macros is not { } macros) return;
 
         var keyString = MacroKeyConverter.ToMacroKey(e.Key, e.KeyModifiers);
@@ -618,6 +740,27 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         if (macro is null) return;
 
         ViewModel.Core.ProcessInput(macro.Action);
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// Type-anywhere capture (public #141): printable text that reached the
+    /// window unhandled (focus was on game text, a panel, a button — anything
+    /// that isn't a text editor) is appended to the command bar, which also
+    /// takes focus so the rest of the phrase types normally. Control
+    /// characters (Enter's \r, Esc) keep their control meaning and are left
+    /// alone.
+    /// </summary>
+    private void OnGlobalTextInput(object? sender, TextInputEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.Text)) return;
+        if (e.Text.All(ch => ch < ' ')) return;                    // control chars only
+        if (FocusManager?.GetFocusedElement() is TextBox) return;  // already typing somewhere real
+        if (CommandInput is not { } bar || !bar.IsEffectivelyVisible) return;
+
+        bar.Focus();
+        bar.Text = (bar.Text ?? string.Empty) + e.Text;
+        bar.CaretIndex = bar.Text?.Length ?? 0;
         e.Handled = true;
     }
 

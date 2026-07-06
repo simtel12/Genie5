@@ -1,0 +1,251 @@
+using static Genie.App.Theming.ThemeKeys;
+
+namespace Genie.App.Theming;
+
+/// <summary>
+/// The built-in theme presets for #20. "Dark" is the reference palette —
+/// its values are the exact colours the app shipped with before theming,
+/// and every other theme (and any hand-written custom file with missing
+/// keys) falls back to it per-key at apply time.
+/// </summary>
+public static class BuiltInThemes
+{
+    /// <summary>The default theme applied on first run / Reset.</summary>
+    public const string DefaultName = "Dark";
+
+    public static Theme Dark { get; } = Make("Dark", "Dark", new()
+    {
+        [WindowBg]      = "#1A1A1A",
+        [PanelBg]       = "#1A1A1A",
+        [PanelBgDeep]   = "#15191D",
+        [ToolbarBg]     = "#252525",
+        [StripBg]       = "#1C1C1C",
+        [Border]        = "#333333",
+        [TextPrimary]   = "#CCCCCC",
+        [TextSecondary] = "#AAAAAA",
+        [TextMuted]     = "#808080",
+        [SectionHeader] = "#7A92A8",
+        [Accent]        = "#8AC0E8",
+        [AccentBg]      = "#1A2838",
+        [AccentBorder]  = "#3A5A7A",
+        [Success]       = "#88DD88",
+        [SuccessBg]     = "#1E3A1E",
+        [Warning]       = "#E0A060",
+        [WarningBg]     = "#3A2818",
+        [Danger]        = "#E06060",
+        [DangerBg]      = "#3A2424",
+        [Selection]     = "#553A6EA5",
+        [HealthBar]     = "#E05050",
+        [ManaBar]       = "#5090E0",
+        [SpiritBar]     = "#50E0A0",
+        [StaminaBar]    = "#E0C050",
+        [ConcBar]       = "#C050E0",
+        [GameText]      = "#CCCCCC",
+        [GameEcho]      = "#88BBCC",
+    });
+
+    public static Theme Light { get; } = Make("Light", "Light", new()
+    {
+        [WindowBg]      = "#F2F2F2",
+        [PanelBg]       = "#FAFAFA",
+        [PanelBgDeep]   = "#ECECEC",
+        [ToolbarBg]     = "#E6E6E6",
+        [StripBg]       = "#EBEBEB",
+        [Border]        = "#C4C4C4",
+        [TextPrimary]   = "#202020",
+        [TextSecondary] = "#454545",
+        [TextMuted]     = "#757575",
+        [SectionHeader] = "#3E6080",
+        [Accent]        = "#1E6AA8",
+        [AccentBg]      = "#DCEAF5",
+        [AccentBorder]  = "#8FB8D8",
+        [Success]       = "#1E7A1E",
+        [SuccessBg]     = "#DFF0DF",
+        [Warning]       = "#9C5F10",
+        [WarningBg]     = "#F5E8D0",
+        [Danger]        = "#B02020",
+        [DangerBg]      = "#F5DCDC",
+        [Selection]     = "#553A6EA5",
+        [HealthBar]     = "#C03030",
+        [ManaBar]       = "#3070C0",
+        [SpiritBar]     = "#2E9A6E",
+        [StaminaBar]    = "#B08A20",
+        [ConcBar]       = "#8F30B0",
+        [GameText]      = "#202020",
+        [GameEcho]      = "#336688",
+    });
+
+    /// <summary>
+    /// Genie 4's look: pure black game surfaces, silver text, yellow echo
+    /// (Genie 4's <c>inputuser</c> preset), and its classic vitals colours
+    /// (red health, aqua mana, purple spirit, green stamina, white conc).
+    /// </summary>
+    public static Theme Genie4Classic { get; } = Make("Genie 4 Classic", "Dark", new()
+    {
+        [WindowBg]      = "#000000",
+        [PanelBg]       = "#000000",
+        [PanelBgDeep]   = "#0A0A0A",
+        [ToolbarBg]     = "#141414",
+        [StripBg]       = "#101010",
+        [Border]        = "#404040",
+        [TextPrimary]   = "#E0E0E0",
+        [TextSecondary] = "#C0C0C0",
+        [TextMuted]     = "#808080",
+        [SectionHeader] = "#A0A0A0",
+        [Accent]        = "#80C0FF",
+        [AccentBg]      = "#101C2C",
+        [AccentBorder]  = "#3A5A7A",
+        [Success]       = "#80E080",
+        [SuccessBg]     = "#0E2A0E",
+        [Warning]       = "#E0B060",
+        [WarningBg]     = "#2E2010",
+        [Danger]        = "#F06060",
+        [DangerBg]      = "#300E0E",
+        [Selection]     = "#553A6EA5",
+        [HealthBar]     = "#FF0000",
+        [ManaBar]       = "#00FFFF",
+        [SpiritBar]     = "#B040B0",
+        [StaminaBar]    = "#00A000",
+        [ConcBar]       = "#E8E8E8",
+        [GameText]      = "#C0C0C0",
+        [GameEcho]      = "#FFFF00",
+    });
+
+    public static Theme HighContrast { get; } = Make("High Contrast", "Dark", new()
+    {
+        [WindowBg]      = "#000000",
+        [PanelBg]       = "#000000",
+        [PanelBgDeep]   = "#000000",
+        [ToolbarBg]     = "#101010",
+        [StripBg]       = "#000000",
+        [Border]        = "#FFFFFF",
+        [TextPrimary]   = "#FFFFFF",
+        [TextSecondary] = "#F0F0F0",
+        [TextMuted]     = "#C0C0C0",
+        [SectionHeader] = "#FFFF00",
+        [Accent]        = "#00FFFF",
+        [AccentBg]      = "#002040",
+        [AccentBorder]  = "#00FFFF",
+        [Success]       = "#00FF00",
+        [SuccessBg]     = "#003000",
+        [Warning]       = "#FFFF00",
+        [WarningBg]     = "#303000",
+        [Danger]        = "#FF5050",
+        [DangerBg]      = "#400000",
+        [Selection]     = "#5500FFFF",
+        [HealthBar]     = "#FF4040",
+        [ManaBar]       = "#4090FF",
+        [SpiritBar]     = "#40FF90",
+        [StaminaBar]    = "#FFE040",
+        [ConcBar]       = "#FF40FF",
+        [GameText]      = "#FFFFFF",
+        [GameEcho]      = "#FFFF00",
+    });
+
+    public static Theme SolarizedDark { get; } = Make("Solarized Dark", "Dark", new()
+    {
+        [WindowBg]      = "#002B36",
+        [PanelBg]       = "#002B36",
+        [PanelBgDeep]   = "#00212B",
+        [ToolbarBg]     = "#073642",
+        [StripBg]       = "#073642",
+        [Border]        = "#0A4552",
+        [TextPrimary]   = "#93A1A1",
+        [TextSecondary] = "#839496",
+        [TextMuted]     = "#586E75",
+        [SectionHeader] = "#268BD2",
+        [Accent]        = "#2AA198",
+        [AccentBg]      = "#073642",
+        [AccentBorder]  = "#268BD2",
+        [Success]       = "#859900",
+        [SuccessBg]     = "#0A3A2A",
+        [Warning]       = "#B58900",
+        [WarningBg]     = "#2E2606",
+        [Danger]        = "#DC322F",
+        [DangerBg]      = "#3B1615",
+        [Selection]     = "#55268BD2",
+        [HealthBar]     = "#DC322F",
+        [ManaBar]       = "#268BD2",
+        [SpiritBar]     = "#2AA198",
+        [StaminaBar]    = "#B58900",
+        [ConcBar]       = "#6C71C4",
+        [GameText]      = "#839496",
+        [GameEcho]      = "#2AA198",
+    });
+
+    public static Theme SolarizedLight { get; } = Make("Solarized Light", "Light", new()
+    {
+        [WindowBg]      = "#FDF6E3",
+        [PanelBg]       = "#FDF6E3",
+        [PanelBgDeep]   = "#F5EED9",
+        [ToolbarBg]     = "#EEE8D5",
+        [StripBg]       = "#EEE8D5",
+        [Border]        = "#D3CBB7",
+        [TextPrimary]   = "#586E75",
+        [TextSecondary] = "#657B83",
+        [TextMuted]     = "#93A1A1",
+        [SectionHeader] = "#268BD2",
+        [Accent]        = "#268BD2",
+        [AccentBg]      = "#DCE8F0",
+        [AccentBorder]  = "#268BD2",
+        [Success]       = "#859900",
+        [SuccessBg]     = "#EDEFD8",
+        [Warning]       = "#B58900",
+        [WarningBg]     = "#F5EBD0",
+        [Danger]        = "#DC322F",
+        [DangerBg]      = "#F8DFDA",
+        [Selection]     = "#55268BD2",
+        [HealthBar]     = "#DC322F",
+        [ManaBar]       = "#268BD2",
+        [SpiritBar]     = "#2AA198",
+        [StaminaBar]    = "#B58900",
+        [ConcBar]       = "#6C71C4",
+        [GameText]      = "#657B83",
+        [GameEcho]      = "#268BD2",
+    });
+
+    /// <summary>
+    /// Wrayth/StormFront-flavoured: near-black blue-tinted surfaces, bright
+    /// white game text, the SF gold/blue accent family.
+    /// </summary>
+    public static Theme WraythStyle { get; } = Make("Wrayth-style", "Dark", new()
+    {
+        [WindowBg]      = "#14141C",
+        [PanelBg]       = "#14141C",
+        [PanelBgDeep]   = "#0E0E14",
+        [ToolbarBg]     = "#1E1E2A",
+        [StripBg]       = "#181820",
+        [Border]        = "#34344A",
+        [TextPrimary]   = "#E8E8F0",
+        [TextSecondary] = "#B8B8C8",
+        [TextMuted]     = "#80808F",
+        [SectionHeader] = "#8890B8",
+        [Accent]        = "#66A8FF",
+        [AccentBg]      = "#182238",
+        [AccentBorder]  = "#3A5A8A",
+        [Success]       = "#7CC87C",
+        [SuccessBg]     = "#16301A",
+        [Warning]       = "#E8B860",
+        [WarningBg]     = "#302810",
+        [Danger]        = "#F07070",
+        [DangerBg]      = "#381C1C",
+        [Selection]     = "#554060A0",
+        [HealthBar]     = "#E03030",
+        [ManaBar]       = "#30A0E0",
+        [SpiritBar]     = "#40D090",
+        [StaminaBar]    = "#E0C040",
+        [ConcBar]       = "#C060E0",
+        [GameText]      = "#F0F0F0",
+        [GameEcho]      = "#C8C864",
+    });
+
+    /// <summary>All built-ins in menu order.</summary>
+    public static IReadOnlyList<Theme> All { get; } = new[]
+    {
+        Dark, Light, Genie4Classic, HighContrast,
+        SolarizedDark, SolarizedLight, WraythStyle,
+    };
+
+    private static Theme Make(string name, string variant, Dictionary<string, string> colors)
+        => new() { Name = name, BaseVariant = variant, Colors = colors, IsBuiltIn = true };
+}

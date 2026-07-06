@@ -32,7 +32,7 @@
     <Setter Property="(DockProperties.DockGroup)" Value="{Binding DockGroup}" />
     <Setter Property="CloseButtonTheme" Value="{DynamicResource ChromeButton}" />
     <Setter Property="DocumentContextMenu" Value="{DynamicResource MdiDocumentWindowContextMenu}" />
-    <Setter Property="Background" Value="#1A1A1A" />
+    <Setter Property="Background" Value="{DynamicResource Theme.WindowBg}" />
     <Setter Property="BorderThickness" Value="0" />
 
     <Setter Property="IconTemplate">
@@ -48,7 +48,7 @@
                    Padding="4,0,0,0"
                    FontSize="11"
                    FontFamily="Verdana,Segoe UI,sans-serif"
-                   Foreground="#E0E0E0"
+                   Foreground="{DynamicResource Theme.TextPrimary}"
                    TextTrimming="CharacterEllipsis"
                    TextWrapping="NoWrap" />
       </DataTemplate>
@@ -58,7 +58,7 @@
       <DataTemplate DataType="core:IDockable">
         <TextBlock VerticalAlignment="Center"
                    Text="*"
-                   Foreground="#E0E0E0"
+                   Foreground="{DynamicResource Theme.TextPrimary}"
                    Margin="2,0,0,0" />
       </DataTemplate>
     </Setter>
@@ -73,10 +73,10 @@
             <Path.Styles>
               <Style Selector="Path">
                 <Setter Property="Stretch" Value="UniformToFill" />
-                <Setter Property="Fill" Value="#AAAAAA" />
+                <Setter Property="Fill" Value="{DynamicResource Theme.TextSecondary}" />
               </Style>
               <Style Selector="Path.active">
-                <Setter Property="Fill" Value="#E0E0E0" />
+                <Setter Property="Fill" Value="{DynamicResource Theme.TextPrimary}" />
               </Style>
             </Path.Styles>
           </Path>
@@ -177,7 +177,7 @@
                                        VerticalAlignment="Center"
                                        Padding="4,0,0,0"
                                        FontSize="11"
-                                       Foreground="#E0E0E0"
+                                       Foreground="{DynamicResource Theme.TextPrimary}"
                                        TextTrimming="CharacterEllipsis"
                                        TextWrapping="NoWrap" />
                           </DockPanel>
@@ -372,7 +372,7 @@
 
     <Style Selector="^/template/ Path">
       <Setter Property="Stretch" Value="UniformToFill" />
-      <Setter Property="Fill" Value="#AAAAAA" />
+      <Setter Property="Fill" Value="{DynamicResource Theme.TextSecondary}" />
     </Style>
 
     <Style Selector="^/template/ Path#PART_MinimizePath">
@@ -392,7 +392,7 @@
     </Style>
 
     <Style Selector="^:active /template/ Path">
-      <Setter Property="Fill" Value="#E0E0E0" />
+      <Setter Property="Fill" Value="{DynamicResource Theme.TextPrimary}" />
     </Style>
 
     <Style Selector="^:minimized /template/ Border#PART_ContentBorder">

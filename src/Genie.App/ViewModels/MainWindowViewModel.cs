@@ -38,6 +38,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public StreamTabsViewModel StreamTabs { get; } = new();
     public ExperienceViewModel Experience { get; } = new();
     public ActiveSpellsViewModel ActiveSpells { get; } = new();
+    public TimeTrackerViewModel TimeTracker { get; } = new();
     public ScriptBarViewModel  ScriptBar  { get; } = new();
 
     /// <summary>Backs the dockable Scripts panel (running list with per-script
@@ -138,6 +139,24 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit>                    RefreshLayoutListCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ManageLayoutsCommand     { get; }
     public Interaction<ManageLayoutsViewModel, Unit>      ShowManageLayoutsDialog  { get; } = new();
+
+    // ── Edit → Theme (#20) ──────────────────────────────────────────────────
+    /// <summary>Theme presets + custom themes; rebuilt on menu open so radio
+    /// checks and newly-dropped Config/Themes files stay fresh.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<ThemeMenuItem> ThemeMenuItems { get; }
+        = new();
+    public ReactiveCommand<ThemeMenuItem, Unit>           ApplyThemeCommand        { get; }
+    public ReactiveCommand<Unit, Unit>                    SaveThemeAsCommand       { get; }
+    public ReactiveCommand<Unit, Unit>                    EditThemeCommand         { get; }
+    public ReactiveCommand<Unit, Unit>                    ResetThemeCommand        { get; }
+    public ReactiveCommand<Unit, Unit>                    RefreshThemeListCommand  { get; }
+    /// <summary>Input = suggested name; output = chosen name or null (cancel).</summary>
+    public Interaction<string, string?>                   ShowThemeNamePrompt      { get; } = new();
+    /// <summary>Theme editor dialog; output = true when the user saved.</summary>
+    public Interaction<ThemeEditorViewModel, bool>        ShowThemeEditorDialog    { get; } = new();
+    /// <summary>Theme registry + apply pipeline. Created right after
+    /// <see cref="Display"/> loads; startup-applies the persisted theme.</summary>
+    public Theming.ThemeService Themes { get; }
 
     // ── Help menu (Updates) ─────────────────────────────────────────────────
     public ReactiveCommand<Unit, Unit>                    ShowUpdatesCommand       { get; }
@@ -324,6 +343,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
     /// <summary>Backs the Icon Bar status-chip strip (Genie 4 parity, #26).</summary>
     public IconBarViewModel IconBar { get; } = new();
+
+    /// <summary>Backs the ten positional <c>#statusbar</c> slots rendered under
+    /// the vitals Status Bar (Genie 4 StatusStrip parity, #111).</summary>
+    public StatusSlotsViewModel StatusSlots { get; } = new();
     public ReactiveCommand<Unit, Unit>                    ToggleMagicPanelsCommand { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleZoneRoomIdCommand  { get; }
     public ReactiveCommand<Unit, Unit>                    ToggleZoneRoomNumberCommand { get; }
@@ -480,6 +503,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     [Reactive] public bool MapperVisible   { get; private set; } = true;
     [Reactive] public bool ExperienceVisible { get; private set; }   // hidden by default (opt-in)
     [Reactive] public bool ActiveSpellsVisible { get; private set; } // hidden by default (opt-in)
+    [Reactive] public bool TimeTrackerVisible { get; private set; }  // hidden by default (opt-in)
     [Reactive] public bool LogonsVisible   { get; private set; } = true;
     [Reactive] public bool TalkVisible     { get; private set; } = true;
     [Reactive] public bool WhispersVisible { get; private set; } = true;
@@ -506,6 +530,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> ToggleMapperCommand   { get; }
     public ReactiveCommand<Unit, Unit> ToggleExperienceCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleActiveSpellsCommand { get; }
+    public ReactiveCommand<Unit, Unit> ToggleTimeTrackerCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleLogonsCommand   { get; }
     public ReactiveCommand<Unit, Unit> ToggleTalkCommand     { get; }
     public ReactiveCommand<Unit, Unit> ToggleWhispersCommand { get; }
@@ -1034,6 +1059,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Display.Apply();  // push values into Application.Resources
         Mapper.AttachDisplay(Display, _displayPath);
 
+        // ── Themes (#20) ──────────────────────────────────────────────────
+        // Re-apply the persisted theme's chrome + Fluent variant on top of
+        // the design-time Dark defaults. Chrome only: game-text colours come
+        // from display.json (Display.Apply() above), so user tweaks survive.
+        Themes = new Theming.ThemeService(Path.Combine(_configDir, "Themes"), Display);
+        Themes.ApplyStartup();
+
         // Register every known dockable with the window-settings store so the
         // Layout tab in Configuration sees the full list. Genie 4 standard ids
         // (talk, whispers, …) inherit IfClosed defaults from the store's
@@ -1056,6 +1088,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         WindowSettings.Register("mapper",    "Mapper");
         WindowSettings.Register("experience", "Experience");
         WindowSettings.Register("active-spells", "Active Spells");
+        WindowSettings.Register("time-tracker", "Time Tracker");
         WindowSettings.Register("scripts",   "Scripts");
         WindowSettings.Register("scene",     "Portrait");   // Genie 4's Portrait window (room/scene art); id predates the rename
         WindowSettings.Register("mobs",      "Mobs");
@@ -1224,6 +1257,86 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             GameText.AddSystemLine(
                 $"[layout] saved '{layout.Name}' ({(ReferenceEquals(store, _profileLayouts) ? "profile" : "global")})");
         });
+
+        // ── Edit → Theme commands (#20) ───────────────────────────────────
+        // Apply is instant + persisted; the whole UI repaints live via the
+        // DynamicResource palette (no restart). Applying a theme also seeds
+        // the game-text/echo colours — later Display Settings tweaks and
+        // per-stream preset colours always win over the theme.
+        ApplyThemeCommand = ReactiveCommand.Create<ThemeMenuItem>(item =>
+        {
+            if (item is null) return;
+            var theme = Themes.Find(item.Name);
+            if (theme is null)
+            {
+                GameText.AddSystemLine($"[theme] unknown theme '{item.Name}'");
+                return;
+            }
+            Themes.Apply(theme);
+            Display.Save(_displayPath);
+            RefreshThemeList();
+            GameText.AddSystemLine($"[theme] applied '{theme.Name}'");
+        });
+
+        // Snapshot the live palette (incl. any tweaked game/echo colours)
+        // into Config/Themes/{name}.json and make it the active theme.
+        SaveThemeAsCommand = ReactiveCommand.CreateFromTask(async () =>
+        {
+            var name = await ShowThemeNamePrompt.Handle("My Theme");
+            if (string.IsNullOrWhiteSpace(name)) return;
+            var saved = Themes.SaveCurrentAs(name);
+            if (saved is null)
+            {
+                GameText.AddSystemLine(
+                    $"[theme] can't save as '{name}' — that name is reserved by a built-in theme");
+                return;
+            }
+            Display.Save(_displayPath);
+            RefreshThemeList();
+            GameText.AddSystemLine(
+                $"[theme] saved current colours as '{saved.Name}' → {Path.Combine(_configDir, "Themes")}");
+        });
+
+        // Edit Theme… — full colour-role editor with live preview. The VM
+        // previews every change through ThemeService.Preview, so by the time
+        // the dialog closes the app is painted with the edited palette:
+        // Save persists + activates it; Cancel/✕ restores the pre-edit state.
+        EditThemeCommand = ReactiveCommand.CreateFromTask(async () =>
+        {
+            var editor = new ThemeEditorViewModel(Themes, Display);
+            var saved  = await ShowThemeEditorDialog.Handle(editor);
+            if (!saved)
+            {
+                editor.RestoreOriginal();
+                return;
+            }
+
+            var theme = editor.BuildTheme();
+            if (!Themes.SaveOrUpdateCustom(theme))
+            {
+                // CanSave gating makes this near-impossible; belt & braces.
+                editor.RestoreOriginal();
+                GameText.AddSystemLine(
+                    $"[theme] can't save '{theme.Name}' — that name is reserved by a built-in theme");
+                return;
+            }
+            Themes.Apply(theme);
+            Display.Save(_displayPath);
+            RefreshThemeList();
+            GameText.AddSystemLine(
+                $"[theme] saved and applied '{theme.Name}' → {Path.Combine(_configDir, "Themes")}");
+        });
+
+        ResetThemeCommand = ReactiveCommand.Create(() =>
+        {
+            Themes.Apply(Theming.BuiltInThemes.Dark);
+            Display.Save(_displayPath);
+            RefreshThemeList();
+            GameText.AddSystemLine("[theme] reset to Dark");
+        });
+
+        RefreshThemeListCommand = ReactiveCommand.Create(RefreshThemeList);
+        RefreshThemeList();
 
         // Load: parameter is the menu item, which carries the layout's scope so
         // we read from the right store. Applies the saved state to the live VM.
@@ -1672,6 +1785,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         });
         ToggleExperienceCommand = MakeToggleCommand("experience", v => ExperienceVisible = v);
         ToggleActiveSpellsCommand = MakeToggleCommand("active-spells", v => ActiveSpellsVisible = v);
+        ToggleTimeTrackerCommand = MakeToggleCommand("time-tracker", v => TimeTrackerVisible = v);
         ToggleLogonsCommand   = MakeToggleCommand("logons",    v => LogonsVisible   = v);
         ToggleTalkCommand     = MakeToggleCommand("talk",      v => TalkVisible     = v);
         ToggleWhispersCommand = MakeToggleCommand("whispers",  v => WhispersVisible = v);
@@ -2578,6 +2692,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         SetVisibilityBool("backpack",  factory.IsToolVisible("backpack"));
         SetVisibilityBool("mapper",    factory.IsToolVisible("mapper"));
         SetVisibilityBool("experience", factory.IsToolVisible("experience"));
+        SetVisibilityBool("active-spells", factory.IsToolVisible("active-spells"));
+        SetVisibilityBool("time-tracker", factory.IsToolVisible("time-tracker"));
         SetVisibilityBool("logons",    factory.IsToolVisible("logons"));
         SetVisibilityBool("talk",      factory.IsToolVisible("talk"));
         SetVisibilityBool("whispers",  factory.IsToolVisible("whispers"));
@@ -2614,7 +2730,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     private static readonly HashSet<string> ReservedWindowNames =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            "experience", "active spells", "main", "game", "game-text", "room", "vitals",
+            "experience", "active spells", "time tracker", "main", "game", "game-text", "room", "vitals",
             "backpack", "mapper", "scripts", "scene",
             "logons", "talk", "whispers", "thoughts", "combat",
             "log", "itemlog",
@@ -2928,6 +3044,17 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 foreach (var m in p.LoadMacros(path))
                     core.Macros.Add(m.Key, m.Action);
             });
+
+            // #140 migration: profiles seeded before the numpad OPERATOR
+            // hotkeys existed get just those four filled in — but only when
+            // NONE of them are bound. A profile with even one operator
+            // binding has seen the feature, so a deliberately-deleted key
+            // stays deleted; rebinds always win because the seeder never
+            // touches a bound key.
+            // Save back to the file we loaded (profile OR global) so the
+            // migration doesn't fork a profile-local copy of global macros.
+            if (SeedOperatorHotkeys(core.Macros))
+                try { p.SaveMacros(macrosPath, core.Macros.Rules); } catch { /* best-effort */ }
         }
         else
         {
@@ -2967,9 +3094,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// rebind or delete any of these from the Macros panel. Requires NumLock
     /// on (so the OS reports NumPadN rather than the navigation keys).
     /// <code>
-    ///   7 nw   8 n    9 ne
-    ///   4 w    5 out  6 e
-    ///   1 sw   2 s    3 se
+    ///   / assess  * health  - fatigue  + look
+    ///   7 nw      8 n       9 ne
+    ///   4 w       5 out     6 e
+    ///   1 sw      2 s       3 se
     ///   0 down
     /// </code>
     /// </summary>
@@ -2987,6 +3115,27 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Bind("num9", "ne"); Bind("num7", "nw");
         Bind("num3", "se"); Bind("num1", "sw");
         Bind("num5", "out"); Bind("num0", "down");
+        SeedOperatorHotkeys(macros);
+    }
+
+    /// <summary>
+    /// Genie 3/4's non-movement 10-key hotkeys (public #140): numpad
+    /// <c>/ * - +</c> → <c>assess / health / fatigue / look</c>. Seeded only
+    /// when NONE of the four is currently bound — first run gets them via
+    /// <see cref="SeedDefaultMovementMacros"/>, pre-#140 profiles get them
+    /// once via the connect-time migration, and a user who deleted them all
+    /// stays clean after re-save. Returns true when anything was added.
+    /// </summary>
+    private static bool SeedOperatorHotkeys(Genie.Core.Macros.MacroEngine macros)
+    {
+        var keys = new[] { "num/", "num*", "num-", "num+" };
+        if (keys.Any(k => macros.Get(k) is not null)) return false;
+
+        macros.Add("num/", "assess");
+        macros.Add("num*", "health");
+        macros.Add("num-", "fatigue");
+        macros.Add("num+", "look");
+        return true;
     }
 
     /// <summary>
@@ -3026,6 +3175,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             case "mapper":    ForceSet(visible, v => MapperVisible   = v, () => MapperVisible);   break;
             case "experience": ForceSet(visible, v => ExperienceVisible = v, () => ExperienceVisible); break;
             case "active-spells": ForceSet(visible, v => ActiveSpellsVisible = v, () => ActiveSpellsVisible); break;
+            case "time-tracker": ForceSet(visible, v => TimeTrackerVisible = v, () => TimeTrackerVisible); break;
             case "logons":    ForceSet(visible, v => LogonsVisible   = v, () => LogonsVisible);   break;
             case "talk":      ForceSet(visible, v => TalkVisible     = v, () => TalkVisible);     break;
             case "whispers":  ForceSet(visible, v => WhispersVisible = v, () => WhispersVisible); break;
@@ -3688,6 +3838,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         StreamTabs.Attach(_core, GameText);
         Experience.Attach(_core);
         ActiveSpells.Attach(_core);
+        TimeTracker.Attach(_core);
         Scripts.Attach(_core);
         Scene.Attach(_core);
         IconBar.Attach(_core);
@@ -3734,11 +3885,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _core.EditScriptRequested     += name =>
             Avalonia.Threading.Dispatcher.UIThread.Post(() => OpenScriptInEditor(name));
 
-        // #statusbar / #status [N] {text} — scripts write progress to the strip
-        // shown to the right of the Script Bar (#111). Raised on the engine
-        // thread; marshal to the UI thread before touching reactive state.
+        // #statusbar / #status [N] {text} — scripts write progress to the ten
+        // positional slots under the vitals Status Bar (#111; moved off the
+        // Script Bar so the text survives with no script running). Raised on
+        // the engine thread; marshal to the UI thread before touching
+        // reactive state.
         _core.StatusBarRequested      += (text, index) =>
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => ScriptBar.SetStatus(index, text));
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => StatusSlots.SetStatus(index, text));
 
         // (The script tick pump — #61 — is wired at the end of WireCore so it runs
         // for the core's whole life, including while disconnected, for offline
@@ -4376,6 +4529,21 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
         foreach (var name in _globalLayouts.List())
             SavedLayouts.Add(new LayoutMenuItem($"{name} (Global)", name, LayoutScope.Global, LoadLayoutCommand));
+    }
+
+    /// <summary>Rebuild <see cref="ThemeMenuItems"/> for the Edit → Theme
+    /// submenu (#20): re-scan Config/Themes for hand-dropped files and
+    /// refresh which entry carries the radio check.</summary>
+    private void RefreshThemeList()
+    {
+        Themes.ReloadCustomThemes();
+        ThemeMenuItems.Clear();
+        foreach (var t in Themes.All)
+            ThemeMenuItems.Add(new ThemeMenuItem(
+                t.IsBuiltIn ? t.Name : $"{t.Name} (Custom)",
+                t.Name,
+                t.Name.Equals(Themes.CurrentName, StringComparison.OrdinalIgnoreCase),
+                ApplyThemeCommand));
     }
 
     // ── #config command bar handler ─────────────────────────────────────────

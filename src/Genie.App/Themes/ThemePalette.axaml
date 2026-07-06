@@ -1,0 +1,42 @@
+<!-- Design-time / pre-apply defaults for the Theme.* palette (#20).
+     These are the built-in Dark values, duplicated from
+     Theming/BuiltInThemes.cs so DynamicResource lookups resolve before
+     ThemeService.ApplyStartup() runs (and in the previewer). At runtime
+     ThemeService writes the same keys directly into
+     Application.Resources, which shadows this merged dictionary — this
+     file is the fallback, never the live palette. -->
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <SolidColorBrush x:Key="Theme.WindowBg"      Color="#1A1A1A"/>
+  <SolidColorBrush x:Key="Theme.PanelBg"       Color="#1A1A1A"/>
+  <SolidColorBrush x:Key="Theme.PanelBgDeep"   Color="#15191D"/>
+  <SolidColorBrush x:Key="Theme.ToolbarBg"     Color="#252525"/>
+  <SolidColorBrush x:Key="Theme.StripBg"       Color="#1C1C1C"/>
+
+  <SolidColorBrush x:Key="Theme.Border"        Color="#333333"/>
+
+  <SolidColorBrush x:Key="Theme.TextPrimary"   Color="#CCCCCC"/>
+  <SolidColorBrush x:Key="Theme.TextSecondary" Color="#AAAAAA"/>
+  <SolidColorBrush x:Key="Theme.TextMuted"     Color="#808080"/>
+  <SolidColorBrush x:Key="Theme.SectionHeader" Color="#7A92A8"/>
+
+  <SolidColorBrush x:Key="Theme.Accent"        Color="#8AC0E8"/>
+  <SolidColorBrush x:Key="Theme.AccentBg"      Color="#1A2838"/>
+  <SolidColorBrush x:Key="Theme.AccentBorder"  Color="#3A5A7A"/>
+  <SolidColorBrush x:Key="Theme.Success"       Color="#88DD88"/>
+  <SolidColorBrush x:Key="Theme.SuccessBg"     Color="#1E3A1E"/>
+  <SolidColorBrush x:Key="Theme.Warning"       Color="#E0A060"/>
+  <SolidColorBrush x:Key="Theme.WarningBg"     Color="#3A2818"/>
+  <SolidColorBrush x:Key="Theme.Danger"        Color="#E06060"/>
+  <SolidColorBrush x:Key="Theme.DangerBg"      Color="#3A2424"/>
+
+  <SolidColorBrush x:Key="Theme.Selection"     Color="#553A6EA5"/>
+
+  <SolidColorBrush x:Key="Theme.HealthBar"     Color="#E05050"/>
+  <SolidColorBrush x:Key="Theme.ManaBar"       Color="#5090E0"/>
+  <SolidColorBrush x:Key="Theme.SpiritBar"     Color="#50E0A0"/>
+  <SolidColorBrush x:Key="Theme.StaminaBar"    Color="#E0C050"/>
+  <SolidColorBrush x:Key="Theme.ConcBar"       Color="#C050E0"/>
+
+</ResourceDictionary>

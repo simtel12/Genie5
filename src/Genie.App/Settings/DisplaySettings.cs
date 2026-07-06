@@ -29,6 +29,16 @@ public sealed class DisplaySettings : ReactiveObject
     // ── Persisted properties (stored as hex strings / primitives) ─────────────
 
     [Reactive] public string GameColorHex  { get; set; } = "#CCCCCC";
+
+    /// <summary>
+    /// Name of the active UI theme (#20) — a built-in preset ("Dark",
+    /// "Light", "Solarized Dark", …) or a custom theme from
+    /// <c>Config/Themes/*.json</c>. Applied at startup by
+    /// <c>Theming.ThemeService.ApplyStartup()</c> (chrome + Fluent variant
+    /// only — game-text colours below stay authoritative so user tweaks
+    /// survive relaunches). Empty/unknown falls back to "Dark".
+    /// </summary>
+    [Reactive] public string ThemeName { get; set; } = "Dark";
     [Reactive] public string EchoColorHex  { get; set; } = "#88BBCC";
     [Reactive] public bool   EchoItalic    { get; set; } = true;
     [Reactive] public string FontFamily    { get; set; } = "Consolas,Courier New,monospace";

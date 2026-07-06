@@ -52,6 +52,20 @@ public static class MacroKeyConverter
         if (key >= Key.NumPad0 && key <= Key.NumPad9)
             return BuildKeyName("num" + key.ToString()[6..], mods);
 
+        // Numpad operators — same fire-with-or-without-modifier rule as the
+        // digits (public #140): Genie 3/4 shipped the remaining 10-key
+        // hotkeys on these (num/ assess, num* health, num- fatigue,
+        // num+ look). Avalonia reports the numpad operators as their own
+        // Key values (the main-row equivalents are Oem* keys), so this
+        // never captures ordinary typing.
+        switch (key)
+        {
+            case Key.Divide:   return BuildKeyName("num/", mods);
+            case Key.Multiply: return BuildKeyName("num*", mods);
+            case Key.Subtract: return BuildKeyName("num-", mods);
+            case Key.Add:      return BuildKeyName("num+", mods);
+        }
+
         return null;
     }
 

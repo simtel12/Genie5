@@ -13,6 +13,9 @@
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
+        <!-- #20: design-time defaults for the Theme.* palette; ThemeService
+             overwrites the same keys in Application.Resources at runtime. -->
+        <ResourceInclude Source="avares://Genie5/Themes/ThemePalette.axaml" />
         <ResourceInclude Source="avares://Genie5/Themes/MdiDocumentWindowSkin.axaml" />
         <!-- #80: overrides the stock ToolControl theme with a cached, per-dockable
              content host so stacked tool tabs of different types each keep their own
@@ -160,7 +163,7 @@
                 <SelectableTextBlock TextWrapping="Wrap"
                                      ContextFlyout="{x:Null}"
                                      Classes.echo="{Binding IsEcho}"
-                                     SelectionBrush="#553A6EA5"
+                                     SelectionBrush="{DynamicResource Theme.Selection}"
                                      controls:InlinesBehavior.Source="{Binding Inlines}"/>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -180,25 +183,25 @@
       <ScrollViewer>
         <StackPanel Spacing="6" Margin="8">
           <Grid ColumnDefinitions="55,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="Health"  Foreground="#aaa" FontSize="11" VerticalAlignment="Center"/>
-            <ProgressBar Grid.Row="0" Grid.Column="1" Value="{Binding ViewModel.Health}"        Maximum="100" Foreground="#e05050" Height="10"/>
-            <TextBlock Grid.Row="1" Grid.Column="0" Text="Mana"    Foreground="#aaa" FontSize="11" VerticalAlignment="Center"/>
-            <ProgressBar Grid.Row="1" Grid.Column="1" Value="{Binding ViewModel.Mana}"          Maximum="100" Foreground="#5090e0" Height="10"/>
-            <TextBlock Grid.Row="2" Grid.Column="0" Text="Spirit"  Foreground="#aaa" FontSize="11" VerticalAlignment="Center"/>
-            <ProgressBar Grid.Row="2" Grid.Column="1" Value="{Binding ViewModel.Spirit}"        Maximum="100" Foreground="#50e0a0" Height="10"/>
-            <TextBlock Grid.Row="3" Grid.Column="0" Text="Stamina" Foreground="#aaa" FontSize="11" VerticalAlignment="Center"/>
-            <ProgressBar Grid.Row="3" Grid.Column="1" Value="{Binding ViewModel.Stamina}"       Maximum="100" Foreground="#e0c050" Height="10"/>
-            <TextBlock Grid.Row="4" Grid.Column="0" Text="Conc"    Foreground="#aaa" FontSize="11" VerticalAlignment="Center"/>
-            <ProgressBar Grid.Row="4" Grid.Column="1" Value="{Binding ViewModel.Concentration}" Maximum="100" Foreground="#c050e0" Height="10"/>
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Health"  Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
+            <ProgressBar Grid.Row="0" Grid.Column="1" Value="{Binding ViewModel.Health}"        Maximum="100" Foreground="{DynamicResource Theme.HealthBar}" Height="10"/>
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Mana"    Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
+            <ProgressBar Grid.Row="1" Grid.Column="1" Value="{Binding ViewModel.Mana}"          Maximum="100" Foreground="{DynamicResource Theme.ManaBar}" Height="10"/>
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Spirit"  Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
+            <ProgressBar Grid.Row="2" Grid.Column="1" Value="{Binding ViewModel.Spirit}"        Maximum="100" Foreground="{DynamicResource Theme.SpiritBar}" Height="10"/>
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="Stamina" Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
+            <ProgressBar Grid.Row="3" Grid.Column="1" Value="{Binding ViewModel.Stamina}"       Maximum="100" Foreground="{DynamicResource Theme.StaminaBar}" Height="10"/>
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="Conc"    Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
+            <ProgressBar Grid.Row="4" Grid.Column="1" Value="{Binding ViewModel.Concentration}" Maximum="100" Foreground="{DynamicResource Theme.ConcBar}" Height="10"/>
           </Grid>
           <Separator/>
-          <TextBlock Foreground="#aaa" FontSize="11">
+          <TextBlock Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11">
             <Run Text="RT: "/><Run Text="{Binding ViewModel.RoundTimeSeconds, StringFormat={}{0:F1}s}"/>
           </TextBlock>
-          <TextBlock Foreground="#aaa" FontSize="11">
+          <TextBlock Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11">
             <Run Text="Spell: "/><Run Text="{Binding ViewModel.PreparedSpell}"/>
           </TextBlock>
-          <TextBlock Foreground="#aaa" FontSize="11">
+          <TextBlock Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11">
             <Run Text="L: "/><Run Text="{Binding ViewModel.LeftHand}"/>
             <Run Text="   R: "/><Run Text="{Binding ViewModel.RightHand}"/>
           </TextBlock>
@@ -227,17 +230,17 @@
                       Width="{Binding $parent[Grid].Bounds.Width}"
                       Height="{Binding $parent[Grid].Bounds.Height}">
         <StackPanel Spacing="4" Margin="8">
-          <SelectableTextBlock Text="{Binding ViewModel.Title}"       FontWeight="Bold" Foreground="#ccc" TextWrapping="Wrap"/>
-          <SelectableTextBlock Text="{Binding ViewModel.Description}" Foreground="#aaa" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+          <SelectableTextBlock Text="{Binding ViewModel.Title}"       FontWeight="Bold" Foreground="{DynamicResource Theme.TextPrimary}" TextWrapping="Wrap"/>
+          <SelectableTextBlock Text="{Binding ViewModel.Description}" Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
                                IsVisible="{Binding ViewModel.Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-          <SelectableTextBlock Text="{Binding ViewModel.Exits}"   Foreground="#6af" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+          <SelectableTextBlock Text="{Binding ViewModel.Exits}"   Foreground="{DynamicResource Theme.Accent}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
                                IsVisible="{Binding ViewModel.Exits,   Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-          <SelectableTextBlock Text="{Binding ViewModel.Players}" Foreground="#8d8" FontSize="11" TextWrapping="Wrap"
+          <SelectableTextBlock Text="{Binding ViewModel.Players}" Foreground="{DynamicResource Theme.Success}" FontSize="11" TextWrapping="Wrap"
                                IsVisible="{Binding ViewModel.Players, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
           <!-- #131: render room objects as inlines so <pushBold> creatures gold
                via the MonsterBold path; Foreground is the default for the rest. -->
           <SelectableTextBlock controls:InlinesBehavior.Source="{Binding ViewModel.ObjectsInlines}"
-                               Foreground="#aaa" FontSize="11" TextWrapping="Wrap"
+                               Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" TextWrapping="Wrap"
                                IsVisible="{Binding ViewModel.Objects, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         </StackPanel>
         </ScrollViewer>
@@ -257,23 +260,23 @@
       <Grid RowDefinitions="Auto,*,Auto">
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="8,6,8,2">
           <TextBlock Grid.Column="0" FontSize="10" VerticalAlignment="Center"
-                     Foreground="#7a92a8" FontWeight="SemiBold"
+                     Foreground="{DynamicResource Theme.SectionHeader}" FontWeight="SemiBold"
                      Text="{Binding ViewModel.Count, StringFormat='MOBS ({0})'}"/>
           <ToggleButton Grid.Column="1" Content="⚙" FontSize="11"
                         Padding="4,0" MinHeight="0" MinWidth="0"
-                        Background="Transparent" BorderThickness="0" Foreground="#7a92a8"
+                        Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Theme.SectionHeader}"
                         IsChecked="{Binding ViewModel.IsEditingIgnores}"
                         ToolTip.Tip="Edit the ignore list (hide familiars, pets, …)"/>
         </Grid>
         <ScrollViewer Grid.Row="1">
           <StackPanel Margin="8,2,8,8">
-            <TextBlock Text="No creatures here." Foreground="#777" FontSize="11"
+            <TextBlock Text="No creatures here." Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"
                        IsVisible="{Binding ViewModel.IsEmpty}"/>
             <ItemsControl ItemsSource="{Binding ViewModel.Mobs}"
                           IsVisible="{Binding !ViewModel.IsEmpty}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="vm:MobItem">
-                  <SelectableTextBlock Text="{Binding Text}" Foreground="#e0a060"
+                  <SelectableTextBlock Text="{Binding Text}" Foreground="{DynamicResource Theme.Warning}"
                                        FontSize="12" TextWrapping="Wrap" Margin="0,1">
                     <SelectableTextBlock.ContextMenu>
                       <ContextMenu>
@@ -289,23 +292,23 @@
           </StackPanel>
         </ScrollViewer>
         <Border Grid.Row="2" IsVisible="{Binding ViewModel.IsEditingIgnores}"
-                BorderBrush="#333" BorderThickness="0,1,0,0"
-                Background="#1a1a1a" Padding="8,6">
+                BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
+                Background="{DynamicResource Theme.PanelBg}" Padding="8,6">
           <StackPanel Spacing="4">
             <TextBlock Text="IGNORE LIST" FontSize="10"
-                       Foreground="#7a92a8" FontWeight="SemiBold"/>
-            <TextBlock FontSize="10" Foreground="#777" TextWrapping="Wrap"
+                       Foreground="{DynamicResource Theme.SectionHeader}" FontWeight="SemiBold"/>
+            <TextBlock FontSize="10" Foreground="{DynamicResource Theme.TextMuted}" TextWrapping="Wrap"
                        Text="Creatures matching any pattern are hidden here and excluded from $monstercount. Patterns are case-insensitive regexes — right-click a mob above to ignore it exactly."/>
             <ItemsControl ItemsSource="{Binding ViewModel.IgnorePatterns}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="vm:IgnorePatternItem">
                   <Grid ColumnDefinitions="*,Auto" Margin="0,1">
                     <SelectableTextBlock Grid.Column="0" Text="{Binding Pattern}"
-                                         FontSize="11" Foreground="#bbb"
+                                         FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}"
                                          TextWrapping="Wrap" VerticalAlignment="Center"/>
                     <Button Grid.Column="1" Content="✕" FontSize="10"
                             Padding="4,0" MinHeight="0" MinWidth="0"
-                            Background="Transparent" BorderThickness="0" Foreground="#a55"
+                            Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Theme.Danger}"
                             Command="{Binding RemoveCommand}"
                             ToolTip.Tip="Remove this pattern"/>
                   </Grid>
@@ -324,7 +327,7 @@
                       Command="{Binding ViewModel.AddPatternCommand}"/>
             </Grid>
             <TextBlock Text="{Binding ViewModel.EditorError}" FontSize="10"
-                       Foreground="#e06060" TextWrapping="Wrap"
+                       Foreground="{DynamicResource Theme.Danger}" TextWrapping="Wrap"
                        IsVisible="{Binding ViewModel.EditorError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
             <Button Content="Restore defaults" FontSize="10" MinHeight="0" Padding="6,2"
                     HorizontalAlignment="Left"
@@ -341,17 +344,17 @@
     <DataTemplate DataType="docking:PlayersTool">
       <Grid RowDefinitions="Auto,*">
         <TextBlock Grid.Row="0" Margin="8,6,8,2" FontSize="10"
-                   Foreground="#7a92a8" FontWeight="SemiBold"
+                   Foreground="{DynamicResource Theme.SectionHeader}" FontWeight="SemiBold"
                    Text="{Binding ViewModel.Count, StringFormat='PLAYERS ({0})'}"/>
         <ScrollViewer Grid.Row="1">
           <StackPanel Margin="8,2,8,8">
-            <TextBlock Text="No other players here." Foreground="#777" FontSize="11"
+            <TextBlock Text="No other players here." Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"
                        IsVisible="{Binding ViewModel.IsEmpty}"/>
             <ItemsControl ItemsSource="{Binding ViewModel.Players}"
                           IsVisible="{Binding !ViewModel.IsEmpty}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="x:String">
-                  <SelectableTextBlock Text="{Binding}" Foreground="#8d8"
+                  <SelectableTextBlock Text="{Binding}" Foreground="{DynamicResource Theme.Success}"
                                        FontSize="12" TextWrapping="Wrap" Margin="0,1"/>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
@@ -375,7 +378,7 @@
     <DataTemplate DataType="docking:InjuriesTool">
       <ScrollViewer>
         <StackPanel Spacing="6" Margin="8">
-          <TextBlock FontSize="10" Foreground="#7a92a8" FontWeight="SemiBold"
+          <TextBlock FontSize="10" Foreground="{DynamicResource Theme.SectionHeader}" FontWeight="SemiBold"
                      Text="{Binding ViewModel.Count, StringFormat='INJURIES ({0})'}"/>
           <Viewbox MaxWidth="170" MaxHeight="270" Stretch="Uniform" HorizontalAlignment="Left">
             <Canvas Width="140" Height="214">
@@ -437,12 +440,12 @@
                only way to tell nerve wound from nerve scar. Off by default. -->
           <StackPanel Orientation="Horizontal" Spacing="6"
                       ToolTip.Tip="Silently sends 'health' on this cadence to refine the nerve reading (wound vs scar) — the injuries dialog alone can't tell. Off by default; the response never shows in the game window, and polling pauses whenever this panel is closed. Same setting as #config injuriespoll.">
-            <TextBlock Text="Auto-refresh" FontSize="10" Foreground="#aaa" VerticalAlignment="Center"/>
+            <TextBlock Text="Auto-refresh" FontSize="10" Foreground="{DynamicResource Theme.TextSecondary}" VerticalAlignment="Center"/>
             <ComboBox ItemsSource="{Binding ViewModel.RefreshOptions}"
                       SelectedIndex="{Binding ViewModel.RefreshIndex}"
                       FontSize="10" MinWidth="72" Padding="6,2"/>
           </StackPanel>
-          <TextBlock Text="No injuries." Foreground="#777" FontSize="11"
+          <TextBlock Text="No injuries." Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"
                      IsVisible="{Binding ViewModel.IsEmpty}"/>
           <ItemsControl ItemsSource="{Binding ViewModel.Injured}"
                         IsVisible="{Binding !ViewModel.IsEmpty}">
@@ -463,7 +466,7 @@
     <DataTemplate DataType="docking:SceneTool">
       <Grid Margin="6">
         <TextBlock Text="No scene image for this room."
-                   Foreground="#777" FontSize="11" TextWrapping="Wrap"
+                   Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" TextWrapping="Wrap"
                    HorizontalAlignment="Center" VerticalAlignment="Center"
                    IsVisible="{Binding !ViewModel.HasImage}"/>
         <Image Source="{Binding ViewModel.Image}" Stretch="Uniform"
@@ -488,7 +491,7 @@
         <!-- action (zone / level / zoom). Keeping it in the right-side    -->
         <!-- cluster put it next to "zoom in" which made it easy to click  -->
         <!-- by accident while intending a zoom action.                    -->
-        <Border Grid.Row="0" Background="#252525" BorderBrush="#333" BorderThickness="0,0,0,1" Padding="4,3">
+        <Border Grid.Row="0" Background="{DynamicResource Theme.ToolbarBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,0,0,1" Padding="4,3">
           <StackPanel Spacing="3">
           <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="4">
             <!-- Pop out (window-level action, separated from data-level cluster) -->
@@ -505,7 +508,7 @@
                       ToolTip.Tip="Pick a zone XML from the Maps directory. Auto-detect normally handles this for you when you connect and walk."/>
             <!-- Level -->
             <TextBlock Grid.Column="2" Text="{Binding ViewModel.Level, StringFormat='L{0}'}"
-                       Foreground="#cdd" VerticalAlignment="Center" FontSize="11"/>
+                       Foreground="{DynamicResource Theme.TextPrimary}" VerticalAlignment="Center" FontSize="11"/>
             <Button Grid.Column="3" Content="▲" Padding="6,1" FontSize="10"
                     Command="{Binding ViewModel.LevelUpCommand}"
                     ToolTip.Tip="Z-level up"/>
@@ -539,7 +542,7 @@
                     ToolTip.Tip="Save the active zone to its XML file (Genie 4 compatible).">
               <StackPanel Orientation="Horizontal" Spacing="3">
                 <TextBlock Text="Save"/>
-                <TextBlock Text="●" Foreground="#e0a060"
+                <TextBlock Text="●" Foreground="{DynamicResource Theme.Warning}"
                            IsVisible="{Binding ViewModel.IsZoneDirty}"
                            ToolTip.Tip="Unsaved edits"/>
               </StackPanel>
@@ -552,7 +555,7 @@
             <StackPanel Orientation="Horizontal" Spacing="4"
                         IsVisible="{Binding ViewModel.EditMode}">
               <Button Content="Remove" Command="{Binding ViewModel.RemoveSelectedCommand}"
-                      Padding="6,1" FontSize="11" Background="#3a2424" Foreground="#ffcccc"
+                      Padding="6,1" FontSize="11" Background="{DynamicResource Theme.DangerBg}" Foreground="{DynamicResource Theme.Danger}"
                       ToolTip.Tip="Delete the selected room (or press Delete on the map)."/>
               <Button Content="Reset IDs" Command="{Binding ViewModel.ResetMapIdsCommand}"
                       Padding="6,1" FontSize="11"
@@ -600,20 +603,20 @@
                     Padding="8,5">
               <StackPanel Orientation="Vertical" Spacing="4">
                 <TextBlock Text="ℹ Pathfinding uses your skill ranks"
-                           Foreground="#cdd" FontSize="11" FontWeight="SemiBold"/>
+                           Foreground="{DynamicResource Theme.TextPrimary}" FontSize="11" FontWeight="SemiBold"/>
                 <TextBlock TextWrapping="Wrap"
-                           Foreground="#aab" FontSize="11"
+                           Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11"
                            Text="The mapper filters out climbs/swims/etc you can't take. Genie 5 needs to read your `info` and `exp all` once to know your guild, circle, and skill ranks — otherwise every gated exit is assumed reachable."/>
                 <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,3,0,0">
                   <Button Content="Fetch skills now" FontSize="11" Padding="8,2"
-                          Background="#1e3a1e" Foreground="#cdd"
+                          Background="{DynamicResource Theme.SuccessBg}" Foreground="{DynamicResource Theme.TextPrimary}"
                           Command="{Binding ViewModel.FetchSkillsCommand}"
                           ToolTip.Tip="Sends `info` and `exp all` to the game now. The replies prime the pathfinder's guild, circle, and skill tables."/>
                   <Button Content="Skip" FontSize="11" Padding="8,2"
                           Command="{Binding ViewModel.DismissSkillsPromptCommand}"
                           ToolTip.Tip="Dismiss for this session — will prompt again next launch."/>
                   <Button Content="Don't ask again" FontSize="11" Padding="8,2"
-                          Foreground="#aab"
+                          Foreground="{DynamicResource Theme.TextSecondary}"
                           Command="{Binding ViewModel.DontAskAboutSkillsCommand}"
                           ToolTip.Tip="Hide this prompt permanently. Pathfinder will still work but exits gated by skills you actually lack may not error until you try to walk them."/>
                 </StackPanel>
@@ -638,7 +641,7 @@
                     <TextBlock Text="⚡" Foreground="#8ad8e8" FontSize="13"
                                VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding ViewModel.AutoWalk.CurrentStatus}"
-                               Foreground="#cdd" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource Theme.TextPrimary}" FontSize="11" FontWeight="SemiBold"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"/>
                   </StackPanel>
@@ -648,7 +651,7 @@
                             IsVisible="{Binding ViewModel.AutoWalk.IsCurrentPaused}"
                             Command="{Binding ViewModel.AutoWalk.ResumeCommand}"/>
                     <Button Content="Cancel" FontSize="11" Padding="6,2"
-                            Background="#5a2828" Foreground="#ffcccc"
+                            Background="{DynamicResource Theme.DangerBg}" Foreground="{DynamicResource Theme.Danger}"
                             Command="{Binding ViewModel.AutoWalk.CancelCommand}"
                             ToolTip.Tip="Stop the current walk (Esc also cancels)"/>
                   </StackPanel>
@@ -716,10 +719,10 @@
 
               <!-- Collapsed strip — shown whenever the panel is hidden. -->
               <Border x:Name="DetailsStrip" Width="24"
-                      Background="#1a1a1a" BorderBrush="#333" BorderThickness="1,0,0,0"
+                      Background="{DynamicResource Theme.PanelBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="1,0,0,0"
                       IsVisible="{Binding !#DetailsPanel.IsVisible}"
                       ToolTip.Tip="Hover to open the Details panel; use the pin inside to keep it open.">
-                <TextBlock Text="DETAILS" Foreground="#7a92a8" FontSize="10"
+                <TextBlock Text="DETAILS" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="10"
                            FontWeight="SemiBold"
                            HorizontalAlignment="Center" VerticalAlignment="Center"
                            RenderTransformOrigin="50%,50%">
@@ -733,7 +736,7 @@
               <!-- in a ScrollViewer so the content scrolls if the panel is   -->
               <!-- short / the user adds long Notes text. -->
               <Border x:Name="DetailsPanel" Width="260"
-                      Background="#1a1a1a" BorderBrush="#333" BorderThickness="1,0,0,0">
+                      Background="{DynamicResource Theme.PanelBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="1,0,0,0">
                 <Border.IsVisible>
                   <MultiBinding Converter="{x:Static controls:BoolOrConverter.Instance}">
                     <Binding Path="#DetailsFlyout.IsPointerOver"/>
@@ -746,7 +749,7 @@
               <StackPanel Spacing="10">
 
                 <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Grid.Column="0" Text="DETAILS" Foreground="#cdd" FontSize="11"
+                  <TextBlock Grid.Column="0" Text="DETAILS" Foreground="{DynamicResource Theme.TextPrimary}" FontSize="11"
                              FontWeight="SemiBold" VerticalAlignment="Center"/>
                   <ToggleButton Grid.Column="1" Content="📌"
                                 IsChecked="{Binding ViewModel.DetailsPinned}"
@@ -756,16 +759,16 @@
 
                 <!-- ── Current Room ─────────────────────────────────── -->
                 <StackPanel Spacing="3">
-                  <TextBlock Text="CURRENT ROOM" Foreground="#7a92a8" FontSize="9"
+                  <TextBlock Text="CURRENT ROOM" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="9"
                              FontWeight="SemiBold" Margin="0,0,0,2"/>
                   <Grid ColumnDefinitions="60,*"
                         IsVisible="{Binding ViewModel.CurrentServerId, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                    <TextBlock Grid.Column="0" Text="Server id" Foreground="#888" FontSize="11"/>
+                    <TextBlock Grid.Column="0" Text="Server id" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                     <SelectableTextBlock Grid.Column="1" Text="{Binding ViewModel.CurrentServerId}"
-                                         Foreground="#cdd" FontSize="11" FontFamily="Consolas,monospace"
+                                         Foreground="{DynamicResource Theme.TextPrimary}" FontSize="11" FontFamily="Consolas,monospace"
                                          TextWrapping="Wrap"/>
                   </Grid>
-                  <TextBlock Text="Notes" Foreground="#888" FontSize="11"/>
+                  <TextBlock Text="Notes" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                   <TextBox  Text="{Binding ViewModel.CurrentNotes}"
                             FontSize="11" MinHeight="60" MaxHeight="120"
                             AcceptsReturn="True" TextWrapping="Wrap"
@@ -782,22 +785,22 @@
                 <!-- selected node. Title/server-id feed the lookup index,   -->
                 <!-- so Apply rebuilds it; Color is a hex like #FFAA00.      -->
                 <StackPanel Spacing="3" IsVisible="{Binding ViewModel.EditMode}">
-                  <TextBlock Text="EDIT ROOM" Foreground="#7a92a8" FontSize="9"
+                  <TextBlock Text="EDIT ROOM" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="9"
                              FontWeight="SemiBold" Margin="0,0,0,2"/>
                   <TextBlock Text="Click a room on the map to select it."
-                             Foreground="#888" FontSize="11" TextWrapping="Wrap"
+                             Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" TextWrapping="Wrap"
                              IsVisible="{Binding ViewModel.SelectedNode, Converter={x:Static ObjectConverters.IsNull}}"/>
                   <StackPanel Spacing="3"
                               IsVisible="{Binding ViewModel.SelectedNode, Converter={x:Static ObjectConverters.IsNotNull}}">
-                    <TextBlock Text="Title" Foreground="#888" FontSize="11"/>
+                    <TextBlock Text="Title" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                     <TextBox Text="{Binding ViewModel.SelNodeTitle}" FontSize="11"/>
-                    <TextBlock Text="Notes / label" Foreground="#888" FontSize="11"/>
+                    <TextBlock Text="Notes / label" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                     <TextBox Text="{Binding ViewModel.SelNodeNotes}" FontSize="11"
                              Watermark="e.g. Bank|Teller (| separates #goto labels)"/>
-                    <TextBlock Text="Color (hex)" Foreground="#888" FontSize="11"/>
+                    <TextBlock Text="Color (hex)" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                     <TextBox Text="{Binding ViewModel.SelNodeColor}" FontSize="11"
                              FontFamily="Consolas,monospace" Watermark="#FFAA00"/>
-                    <TextBlock Text="Server id" Foreground="#888" FontSize="11"/>
+                    <TextBlock Text="Server id" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                     <TextBox Text="{Binding ViewModel.SelNodeServerId}" FontSize="11"
                              FontFamily="Consolas,monospace"/>
                     <Button Content="Apply" Padding="8,2" FontSize="11"
@@ -809,50 +812,50 @@
 
                 <!-- ── Zone ─────────────────────────────────────────── -->
                 <StackPanel Spacing="3">
-                  <TextBlock Text="ZONE" Foreground="#7a92a8" FontSize="9"
+                  <TextBlock Text="ZONE" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="9"
                              FontWeight="SemiBold" Margin="0,0,0,2"/>
                   <Grid ColumnDefinitions="60,*">
-                    <TextBlock Grid.Column="0" Text="Rooms"      Foreground="#888" FontSize="11"/>
-                    <TextBlock Grid.Column="1" Text="{Binding ViewModel.RoomCount}" Foreground="#cdd" FontSize="11"/>
+                    <TextBlock Grid.Column="0" Text="Rooms"      Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
+                    <TextBlock Grid.Column="1" Text="{Binding ViewModel.RoomCount}" Foreground="{DynamicResource Theme.TextPrimary}" FontSize="11"/>
                   </Grid>
                   <Grid ColumnDefinitions="60,*"
                         IsVisible="{Binding ViewModel.ZoneAgeDisplay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                    <TextBlock Grid.Column="0" Text="Updated" Foreground="#888" FontSize="11"/>
+                    <TextBlock Grid.Column="0" Text="Updated" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
                       <TextBlock Text="{Binding ViewModel.ZoneAgeDisplay}"
-                                 Foreground="#cdd" FontSize="11" VerticalAlignment="Center"/>
-                      <Border Background="#3a2818" CornerRadius="2" Padding="4,1"
+                                 Foreground="{DynamicResource Theme.TextPrimary}" FontSize="11" VerticalAlignment="Center"/>
+                      <Border Background="{DynamicResource Theme.WarningBg}" CornerRadius="2" Padding="4,1"
                               VerticalAlignment="Center"
                               IsVisible="{Binding ViewModel.IsZoneStale}"
                               ToolTip.Tip="This zone hasn't been updated in over a month. The community Maps repo may have newer data — try File → Update Maps from Official Repo.">
-                        <TextBlock Text="may be stale" Foreground="#e0a060" FontSize="9" FontWeight="SemiBold"/>
+                        <TextBlock Text="may be stale" Foreground="{DynamicResource Theme.Warning}" FontSize="9" FontWeight="SemiBold"/>
                       </Border>
                     </StackPanel>
                   </Grid>
                   <TextBlock Text="{Binding ViewModel.MapsDirectory, StringFormat='Maps: {0}'}"
-                             Foreground="#668" FontSize="10" TextWrapping="Wrap"/>
-                  <Border Background="#1e3a1e" CornerRadius="2" Padding="4,1"
+                             Foreground="{DynamicResource Theme.TextMuted}" FontSize="10" TextWrapping="Wrap"/>
+                  <Border Background="{DynamicResource Theme.SuccessBg}" CornerRadius="2" Padding="4,1"
                           HorizontalAlignment="Left"
                           IsVisible="{Binding ViewModel.IsGitManaged}"
                           ToolTip.Tip="This directory is a git working copy. Use your preferred git client to pull / commit / push / open pull requests — Genie does not run git itself.">
-                    <TextBlock Text="git-managed" Foreground="#a0e0a0" FontSize="9" FontWeight="SemiBold"/>
+                    <TextBlock Text="git-managed" Foreground="{DynamicResource Theme.Success}" FontSize="9" FontWeight="SemiBold"/>
                   </Border>
                 </StackPanel>
 
                 <!-- ── Behavior + Appearance ────────────────────────── -->
                 <StackPanel Spacing="3">
-                  <TextBlock Text="BEHAVIOR" Foreground="#7a92a8" FontSize="9"
+                  <TextBlock Text="BEHAVIOR" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="9"
                              FontWeight="SemiBold" Margin="0,0,0,2"/>
                   <CheckBox Content="Auto-create new rooms"
                             IsChecked="{Binding ViewModel.AutoCreateEnabled}"
                             FontSize="11"
                             ToolTip.Tip="When ON, walking into an unmapped room adds a new node to the active zone. When OFF, the mapper only matches against existing zone data."/>
-                  <TextBlock Text="Map background:" Foreground="#888" FontSize="11"/>
+                  <TextBlock Text="Map background:" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                   <ColorPicker Color="{Binding ViewModel.MapBackground, Mode=TwoWay}"
                                IsAlphaEnabled="False"
                                HorizontalAlignment="Left"
                                ToolTip.Tip="Pick any colour for the map canvas. Cream/tan (e.g. #F5EFD8) matches the Genie 4 AutoMapper look."/>
-                  <TextBlock Text="Map text:" Foreground="#888" FontSize="11"/>
+                  <TextBlock Text="Map text:" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
                   <ColorPicker Color="{Binding ViewModel.MapTextColor, Mode=TwoWay}"
                                IsAlphaEnabled="False"
                                HorizontalAlignment="Left"
@@ -860,7 +863,7 @@
                 </StackPanel>
 
                 <TextBlock Text="Tip: hover a room for details, right-click for a context menu, mouse-wheel to zoom."
-                           Foreground="#668" FontSize="10" TextWrapping="Wrap"/>
+                           Foreground="{DynamicResource Theme.TextMuted}" FontSize="10" TextWrapping="Wrap"/>
               </StackPanel>
                 </ScrollViewer>
               </Border>
@@ -869,16 +872,16 @@
         </Grid>
 
         <!-- ── ROW 2: compact status strip — current room + exits + diag ─ -->
-        <Border Grid.Row="2" Background="#1e1e1e" BorderBrush="#333" BorderThickness="0,1,0,0" Padding="6,3">
+        <Border Grid.Row="2" Background="{DynamicResource Theme.StripBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0" Padding="6,3">
           <StackPanel Spacing="2">
             <Grid ColumnDefinitions="*,Auto">
               <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6">
-                <TextBlock Foreground="#888" FontSize="11" VerticalAlignment="Center" Text="◉"/>
+                <TextBlock Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" VerticalAlignment="Center" Text="◉"/>
                 <SelectableTextBlock Text="{Binding ViewModel.CurrentTitle}"
-                                     Foreground="#cdd" FontSize="11" FontWeight="SemiBold"
+                                     Foreground="{DynamicResource Theme.TextPrimary}" FontSize="11" FontWeight="SemiBold"
                                      VerticalAlignment="Center"
                                      TextTrimming="CharacterEllipsis"/>
-                <TextBlock Foreground="#666" FontSize="11" VerticalAlignment="Center"
+                <TextBlock Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" VerticalAlignment="Center"
                            Text="·" Margin="4,0,0,0"/>
                 <!-- Obvious exits — clickable compass-direction buttons. Same
                      pattern and command wiring as the Less Obvious Paths strip
@@ -897,8 +900,8 @@
                     <DataTemplate DataType="x:String">
                       <Button Content="{Binding}"
                               Padding="6,1" Margin="0,1,3,1" FontSize="11"
-                              Background="#1a2838" Foreground="#8ac0e8"
-                              BorderBrush="#3a5a7a" BorderThickness="1"
+                              Background="{DynamicResource Theme.AccentBg}" Foreground="{DynamicResource Theme.Accent}"
+                              BorderBrush="{DynamicResource Theme.AccentBorder}" BorderThickness="1"
                               Command="{Binding $parent[ItemsControl].DataContext.ViewModel.WalkCompassCommand}"
                               CommandParameter="{Binding}"/>
                     </DataTemplate>
@@ -907,7 +910,7 @@
               </StackPanel>
               <TextBlock Grid.Column="1"
                          Text="{Binding ViewModel.ZoneName}"
-                         Foreground="#888" FontSize="11"
+                         Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"
                          VerticalAlignment="Center" Margin="8,0,0,0"/>
             </Grid>
             <!-- Less Obvious Paths — clickable buttons for non-compass arcs
@@ -1047,13 +1050,28 @@
       </ScrollViewer>
     </DataTemplate>
 
+    <DataTemplate DataType="docking:TimeTrackerTool">
+      <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                    VerticalScrollBarVisibility="Auto">
+        <SelectableTextBlock Text="{Binding ViewModel.Content}"
+                             FontFamily="{Binding ToolFontFamily}"
+                             FontSize="{Binding ToolFontSize}"
+                             Margin="8"
+                             Foreground="{DynamicResource GameBrush}"/>
+      </ScrollViewer>
+    </DataTemplate>
+
     <!-- ── Plugin-created windows (generic) ───────────────────────────────── -->
     <!-- One template serves EVERY plugin window. A plugin calls               -->
     <!-- IPluginHost.SetWindow("My Panel", text) and the dock factory spins up -->
     <!-- a PluginWindowTool bound here. Monospaced for column-aligned plugin   -->
     <!-- output (inventory trees, tables).                                      -->
     <DataTemplate DataType="docking:PluginWindowTool">
-      <ScrollViewer HorizontalScrollBarVisibility="Auto"
+      <!-- Horizontal scrolling must stay DISABLED: an Auto h-scrollbar hands
+           the lines unbounded width, so their TextWrapping="Wrap" never kicks
+           in and long menu-script text runs off the edge (same trap as the
+           stream panels, documented above). Genie 4 named windows word-wrap. -->
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled"
                     VerticalScrollBarVisibility="Auto"
                     controls:AutoScrollBehavior.ItemsSource="{Binding ViewModel.Lines}">
         <ItemsControl ItemsSource="{Binding ViewModel.Lines}"
@@ -1092,12 +1110,12 @@
           <Button Content="Clear" Command="{Binding ViewModel.ClearOutputCommand}"
                   FontSize="11" Padding="8,2"
                   ToolTip.Tip="Clear the output log below"/>
-          <TextBlock Text="{Binding ViewModel.StatusText}" Foreground="#8aa3b5"
+          <TextBlock Text="{Binding ViewModel.StatusText}" Foreground="{DynamicResource Theme.SectionHeader}"
                      FontSize="11" VerticalAlignment="Center"/>
         </StackPanel>
 
         <!-- Running scripts -->
-        <Border Grid.Row="1" Background="#1f2429" BorderBrush="#3a4148"
+        <Border Grid.Row="1" Background="{DynamicResource Theme.ToolbarBg}" BorderBrush="{DynamicResource Theme.Border}"
                 BorderThickness="1" CornerRadius="3" Padding="4" MaxHeight="160">
           <ScrollViewer VerticalScrollBarVisibility="Auto">
             <ItemsControl ItemsSource="{Binding ViewModel.RunningScripts}">
@@ -1105,7 +1123,7 @@
                 <DataTemplate DataType="vm:RunningScriptRow">
                   <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,1">
                     <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12"
-                               Foreground="#cfe0ee" VerticalAlignment="Center"/>
+                               Foreground="{DynamicResource Theme.TextPrimary}" VerticalAlignment="Center"/>
                     <!-- Language tag — only shown for .js scripts. -->
                     <Border Grid.Column="1" Background="#2d3b46" CornerRadius="2"
                             Padding="3,0" Margin="4,0" VerticalAlignment="Center"
@@ -1122,14 +1140,14 @@
         </Border>
 
         <!-- Output log -->
-        <Border Grid.Row="2" Background="#15191d" BorderBrush="#3a4148"
+        <Border Grid.Row="2" Background="{DynamicResource Theme.PanelBgDeep}" BorderBrush="{DynamicResource Theme.Border}"
                 BorderThickness="1" CornerRadius="3" Margin="0,4,0,0">
           <ScrollViewer VerticalScrollBarVisibility="Auto"
                         HorizontalScrollBarVisibility="Disabled"
                         controls:AutoScrollBehavior.ItemsSource="{Binding ViewModel.Output}">
             <ItemsControl ItemsSource="{Binding ViewModel.Output}"
                           FontFamily="Consolas,Menlo,monospace" FontSize="11"
-                          Foreground="#9fb4c4" Margin="4">
+                          Foreground="{DynamicResource Theme.TextSecondary}" Margin="4">
               <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="vm:TextLine">
                   <SelectableTextBlock TextWrapping="Wrap"
@@ -1155,10 +1173,10 @@
                   FontSize="11" Padding="8,2"
                   ToolTip.Tip="Clear the buffer"/>
           <TextBlock Text="Live raw server XML — local view only."
-                     Foreground="#8aa3b5" FontSize="11" VerticalAlignment="Center"/>
+                     Foreground="{DynamicResource Theme.SectionHeader}" FontSize="11" VerticalAlignment="Center"/>
         </StackPanel>
 
-        <Border Grid.Row="1" Background="#15191d" BorderBrush="#3a4148"
+        <Border Grid.Row="1" Background="{DynamicResource Theme.PanelBgDeep}" BorderBrush="{DynamicResource Theme.Border}"
                 BorderThickness="1" CornerRadius="3">
           <ScrollViewer VerticalScrollBarVisibility="Auto"
                         HorizontalScrollBarVisibility="Auto"
