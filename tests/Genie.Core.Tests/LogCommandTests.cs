@@ -127,6 +127,8 @@ public class LogCommandTests : IDisposable
         public void RunScript(string text) { }
         public void InjectParsedLine(string line) { }
         public void StopScript(string? name) { }
+        public void PauseScript(string? name) { }
+        public void ResumeScript(string? name) { }
         public void StopAllScripts() { }
         public void PauseAllScripts() { }
         public void ResumeAllScripts() { }
@@ -144,6 +146,7 @@ public class LogCommandTests : IDisposable
         public void PlaySound(string soundName) { }
         public void Speak(string text, bool urgent = false) { }
         public void TtsCommand(string args) { }
+        public void FlashWindow() { }
         public void Connect(ConnectRequest request) { }
     }
 }

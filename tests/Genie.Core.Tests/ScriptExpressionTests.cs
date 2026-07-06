@@ -62,6 +62,20 @@ public class ScriptExpressionTests
     [InlineData("!indexof(\"longsword\",\"$\")", true)]    // no $  ⇒ absent ⇒ fires
     [InlineData("!indexof(\"a$b\",\"$\")",       false)]   // $ present ⇒ doesn't fire
     [InlineData("indexof(\"Hello\",\"h\")",      false)]   // case-sensitive miss ⇒ 0 ⇒ falsy
+    // Bare MULTI-WORD operands (Genie 4 splits on operators, so spaces are
+    // legal inside unquoted text). mm_train: `if (%guild = Moon Mage)`,
+    // `if $selection = DIVINATION TOOL`, and Menu.Build's `!($5 = "")` where
+    // $5 substitutes to "Moonmage Training Menu". Before the fix these threw
+    // (bad condition ⇒ silently false).
+    [InlineData("Moon Mage = Moon Mage",                     true)]
+    [InlineData("(Moonmage Training Menu = \"\")",           false)]
+    [InlineData("!(Moonmage Training Menu = \"\")",          true)]
+    [InlineData("DIVINATION TOOL = DIVINATION TOOL",         true)]
+    [InlineData("Moon Mage = Warrior Mage",                  false)]
+    // ...and the word operators still terminate a bare operand:
+    [InlineData("Moon Mage eq Moon Mage",                    true)]
+    [InlineData("Moon Mage = Moon Mage and 1 = 1",           true)]
+    [InlineData("Moon Mage = Barbarian or 2 = 2",            true)]
     public void EvalBool_matches_Genie4(string expr, bool expected)
         => Assert.Equal(expected, ScriptExpression.EvalBool(expr, NewInst()));
 

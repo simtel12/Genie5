@@ -393,7 +393,36 @@ internal sealed class ScriptExpression
 
         if (name.Equals("true",  StringComparison.OrdinalIgnoreCase)) return true;
         if (name.Equals("false", StringComparison.OrdinalIgnoreCase)) return false;
-        return name; // bare identifier → literal text
+
+        // Genie 4 parity: a bare string operand may contain SPACES — Genie 4's
+        // evaluator splits the expression on operators, so
+        // `(%guild = Moon Mage)` and `$selection = DIVINATION TOOL` compare
+        // multi-word text (mm_train does both, and its Menu.Build tests
+        // `!($5 = "")` where $5 substitutes to "Moonmage Training Menu").
+        // Absorb following bare words into one literal; the logical word
+        // operators (and/or/not/eq) and any symbol end the operand.
+        while (true)
+        {
+            int save = _pos;
+            SkipWs();
+            if (_pos >= _src.Length || (!char.IsLetter(_src[_pos]) && _src[_pos] != '_'))
+            { _pos = save; break; }
+            int ws = _pos;
+            // Apostrophes are common in absorbed DR text ("Peri'el",
+            // "'visions'.") and are not an operator anywhere in the grammar.
+            while (_pos < _src.Length &&
+                   (char.IsLetterOrDigit(_src[_pos]) || _src[_pos] == '_' ||
+                    _src[_pos] == '.' || _src[_pos] == '\''))
+                _pos++;
+            var word = _src[ws.._pos];
+            if (word.Equals("and", StringComparison.OrdinalIgnoreCase) ||
+                word.Equals("or",  StringComparison.OrdinalIgnoreCase) ||
+                word.Equals("not", StringComparison.OrdinalIgnoreCase) ||
+                word.Equals("eq",  StringComparison.OrdinalIgnoreCase))
+            { _pos = save; break; }
+            name += " " + word;
+        }
+        return name; // bare identifier / multi-word text → literal string
     }
 
     private object CallFunc(string name, List<object> args)

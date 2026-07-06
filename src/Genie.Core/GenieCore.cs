@@ -877,9 +877,10 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
     /// <summary>
     /// Raised by <c>#statusbar</c> / <c>#status</c>. Carries the text and the
-    /// 1-10 slot index. The App routes it to the Script Bar's status strip
-    /// (#111); Console / headless builds with no subscriber drop it (Genie 4
-    /// parity — a status write with no bar is a silent no-op).
+    /// 1-10 slot index. The App routes it to the ten positional slots under
+    /// the vitals Status Bar (#111); Console / headless builds with no
+    /// subscriber drop it (Genie 4 parity — a status write with no bar is a
+    /// silent no-op).
     /// </summary>
     public event Action<string, int>? StatusBarRequested;
 
@@ -893,20 +894,57 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         if (userInput)
             EchoLine?.Invoke(echoOverride ?? text);
 
-        // Let the mapper observe the outgoing command — it parses movement
-        // directions ("n", "go bridge", etc.) so it can correlate the
-        // subsequent room change with the direction we just moved.
-        AutoMapper.OnCommandSent(text);
+        // Genie 4 mycommandchar (Game.cs SendText: `!sText.StartsWith(
+        // cMyCommandChar)` gates the socket write, lastcommand, and activity
+        // stamp): a line starting with the char is echoed and fed to triggers
+        // (below) but NEVER reaches the game — "for trigger systems and such".
+        // Pairs with mm_train-style typed-reply capture: `#config
+        // mycommandchar ~` keeps a "~armband" reply out of DR (no "Please
+        // rephrase that command.").
+        var localOnly = text.Length > 0 && Config is not null && text[0] == Config.MyCommandChar;
 
-        // Genie 4 reserved $lastcommand — the last line sent to the game.
-        Scripts.Globals["lastcommand"] = text;
+        if (!localOnly)
+        {
+            // Let the mapper observe the outgoing command — it parses movement
+            // directions ("n", "go bridge", etc.) so it can correlate the
+            // subsequent room change with the direction we just moved.
+            AutoMapper.OnCommandSent(text);
 
-        _typeAhead.NotifySent();
-        // Offline (no live connection) the send is dropped — user input is still
-        // echoed and observed by the mapper above, so the command bar stays usable
-        // while disconnected (issue #88).
-        _ = _connection?.SendCommandAsync(text);
+            // Genie 4 reserved $lastcommand — the last line sent to the game.
+            Scripts.Globals["lastcommand"] = text;
+
+            _typeAhead.NotifySent();
+            // Offline (no live connection) the send is dropped — user input is
+            // still echoed and observed by the mapper above, so the command bar
+            // stays usable while disconnected (issue #88).
+            _ = _connection?.SendCommandAsync(text);
+        }
+
+        // Genie 4 triggeroninput (Config.cs:19 default TRUE; FormMain:4127):
+        // SENT text also runs through the trigger/action pipeline, so menu
+        // scripts can capture typed input — mm_train's
+        // `action (input) var input $1;… when ~(.*)` fires on a typed "~500".
+        // Scripts + global triggers only (Genie 4's ParseTriggers): plugins
+        // already receive typed input via Plugins.DispatchInput in
+        // ProcessInput. Guarded like Genie 4's m_bParseTriggers so a trigger
+        // action that sends text can't re-fire triggers for its own send.
+        if ((Config?.TriggerOnInput ?? true) && !_triggerOnInputActive)
+        {
+            _triggerOnInputActive = true;
+            try
+            {
+                Scripts.OnGameLine(text);
+                if (!(Config?.ParseGameOnly ?? false))
+                    Triggers.ProcessLine(text);
+            }
+            finally { _triggerOnInputActive = false; }
+        }
     }
+
+    /// <summary>Re-entrancy guard for the triggeroninput feed above — a
+    /// trigger/action that sends text must not re-fire triggers for that
+    /// same sent text (Genie 4 FormMain.m_bParseTriggers).</summary>
+    private bool _triggerOnInputActive;
 
     void ICommandHost.RunScript(string text)
     {
@@ -1067,6 +1105,18 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     void ICommandHost.PauseAllScripts() => Scripts.PauseAll();
 
     void ICommandHost.ResumeAllScripts() => Scripts.ResumeAll();
+
+    void ICommandHost.PauseScript(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) Scripts.PauseAll();
+        else                                 Scripts.PauseScript(name);
+    }
+
+    void ICommandHost.ResumeScript(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) Scripts.ResumeAll();
+        else                                 Scripts.ResumeScript(name);
+    }
 
     void ICommandHost.SetTraceLevelAll(int level)
     {
@@ -1287,6 +1337,15 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// Console build with no handler is a silent no-op.</summary>
     public event Action<string>? TtsCommandRequested;
 
+    void ICommandHost.FlashWindow() => FlashRequested?.Invoke();
+
+    /// <summary>Raised when <c>#flash</c> wants the main window's taskbar /
+    /// dock entry flashed for attention. The App subscribes and calls the
+    /// platform attention API; a Console build with no handler is a silent
+    /// no-op. May fire from a script thread — subscribers marshal to the UI
+    /// thread themselves.</summary>
+    public event Action? FlashRequested;
+
     void ICommandHost.Connect(ConnectRequest request)
     {
         // The connection lifecycle, saved profiles, and the Connect dialog all
@@ -1466,6 +1525,20 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         if (!string.IsNullOrEmpty(input) && input.TrimStart().StartsWith('/')
             && Scripts.Extensions.DispatchSlashCommand(input))
             return;
+
+        // External plugins see the typed line next (IGeniePlugin.OnInput) — each
+        // may transform it or swallow it entirely (null), the Genie 4 ParseInput
+        // contract. Command-driven plugins (e.g. InventoryView's /iv) depend on
+        // this to keep their commands off the wire. Same genuine-user-input
+        // boundary as the slash dispatch above — programmatic sends (scripts,
+        // aliases, mapper) bypass it, so a plugin's own SendCommand can't loop
+        // back into its OnInput.
+        if (!string.IsNullOrEmpty(input))
+        {
+            var fromPlugins = Plugins.DispatchInput(input);
+            if (fromPlugins is null) return;   // swallowed — no triggers, no game send
+            input = fromPlugins;
+        }
 
         // TriggerOnInput (Genie 4 parity): evaluate triggers against the user's
         // typed line itself, not just game output, when enabled. Fired here at

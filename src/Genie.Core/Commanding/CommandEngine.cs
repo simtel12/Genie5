@@ -259,14 +259,21 @@ public sealed class CommandEngine
             }
             case "clear":
             {
-                // #clear [>window] — wipe a window's contents (Genie 4). No
-                // target clears the main game window; ">name" clears that
-                // side / plugin / menu window. Menu scripts (mm_train) use
-                // "#clear >Menu" to redraw their menu in place before rebuilding
-                // it with #echo / #link.
+                // #clear [window] — wipe a window's contents. Genie 4
+                // (Command.cs: ClearWindow(ParseAllArgs(oArgs, 1))) takes the
+                // whole remainder as the window name with NO ">" prefix, and
+                // never clears main when a name is given — menu scripts
+                // (mm_train) redraw with `#clear "Moonmage Training Menu"`.
+                // Accept the redirect-style ">name" too, but only a bare
+                // #clear may clear the main game window.
                 string? clearWindow = null;
-                if (parts.Count > 1 && parts[1].StartsWith(">", StringComparison.Ordinal))
-                    clearWindow = parts[1][1..];
+                if (parts.Count > 1)
+                {
+                    var target = string.Join(" ", parts.Skip(1)).Trim();
+                    if (target.StartsWith(">", StringComparison.Ordinal))
+                        target = target[1..].Trim();
+                    if (target.Length > 0) clearWindow = target;
+                }
                 _host.EchoClear(clearWindow);
                 break;
             }
@@ -286,11 +293,21 @@ public sealed class CommandEngine
             case "status":
             case "statusbar":
                 // Genie 4 #statusbar [N] {text} — write text to one of ten status
-                // slots (N = 1-10, default 1). The App renders the slots to the
-                // right of the Script Bar (#111). With no args it's a no-op; a
-                // bare `#statusbar N` (no text) clears slot N.
+                // slots (N = 1-10, default 1). The App renders the slots as a
+                // positional row under the vitals Status Bar (#111). With no args
+                // it's a no-op; a bare `#statusbar N` (no text) clears slot N, and
+                // `#statusbar clearall` (Genie 5 extension — G4 had no bulk clear)
+                // empties all ten slots. clearall must be the sole argument so
+                // "clearall done" can still be displayed as slot-1 text.
                 if (parts.Count > 1)
                 {
+                    if (parts.Count == 2 &&
+                        parts[1].Equals("clearall", StringComparison.OrdinalIgnoreCase))
+                    {
+                        for (var i = 1; i <= 10; i++)
+                            _host.SetStatusBar(string.Empty, i);
+                        break;
+                    }
                     var slot = 1;
                     var textFrom = 1;
                     if (int.TryParse(parts[1], out var n) && n is >= 1 and <= 10)
@@ -318,8 +335,62 @@ public sealed class CommandEngine
                     _eventQueue.Add(evDelay, string.Join(" ", parts.Skip(2)));
                 break;
             case "script":
-                if (parts.Count > 1) _host.RunScript(string.Join(" ", parts.Skip(1)));
+            {
+                // Genie 4 #script <sub> [name|all] — script lifecycle dispatcher
+                // (Core/Command.cs:2188). It NEVER starts a script (scripts start
+                // with ".name"); mm_train's wait mode relies on
+                // "#script abort <name>". Before this matched Genie 4, the whole
+                // remainder was passed to RunScript, so "#script abort foo" tried
+                // to start a script named "abort". Genie 4's "except" clause on
+                // the all-form is not supported yet; "all except x" acts on all.
+                // Bare #script and unknown sub-commands list what's running,
+                // like #scripts (Genie 4 EventListScripts).
+                var scriptSub  = parts.Count > 1 ? parts[1].ToLowerInvariant() : string.Empty;
+                var scriptName = parts.Count > 2 ? string.Join(" ", parts.Skip(2)).Trim() : string.Empty;
+                var scriptAll  = scriptName.Length == 0 ||
+                                 scriptName.Equals("all", StringComparison.OrdinalIgnoreCase) ||
+                                 scriptName.StartsWith("all ", StringComparison.OrdinalIgnoreCase);
+                switch (scriptSub)
+                {
+                    case "abort":
+                        if (scriptAll) _host.StopAllScripts();
+                        else           _host.StopScript(scriptName);
+                        break;
+                    case "pause":
+                        _host.PauseScript(scriptAll ? null : scriptName);
+                        break;
+                    case "resume":
+                        _host.ResumeScript(scriptAll ? null : scriptName);
+                        break;
+                    case "pauseorresume":
+                    case "reload":
+                    case "trace":
+                    case "vars":
+                    case "variables":
+                    case "debug":
+                    case "debuglevel":
+                    case "explorer":
+                        _host.Echo($"#script {scriptSub} is not yet implemented.");
+                        break;
+                    default:
+                    {
+                        // Same listing as #scripts (Genie 4's default is
+                        // EventListScripts).
+                        var scriptList = _host.RunningScripts();
+                        if (scriptList.Count == 0)
+                        {
+                            _host.Echo("No scripts running.");
+                        }
+                        else
+                        {
+                            _host.Echo("Running scripts:");
+                            foreach (var n in scriptList) _host.Echo($"  {n}");
+                        }
+                        break;
+                    }
+                }
                 break;
+            }
             case "stop":
             case "kill":
                 // #stop [name] — stop the named script, or the most recent one
@@ -438,6 +509,13 @@ public sealed class CommandEngine
                 // manage TTS. Forwarded whole (minus the verb) to the App host.
                 _host.TtsCommand(string.Join(" ", parts.Skip(1)));
                 break;
+            case "flash":
+                // #flash — flash the taskbar / dock entry (Genie 4 parity).
+                // Takes no arguments; useful as a trigger action so a whisper
+                // or script alert grabs attention while the window is in the
+                // background.
+                _host.FlashWindow();
+                break;
             case "goto":
             case "go2":
                 // #goto <room> — start a mapper walk to a room identified by
@@ -536,6 +614,21 @@ public sealed class CommandEngine
             case "variable":
                 HandleVar(parts);
                 break;
+            case "eval":
+            case "evalmath":
+            {
+                // Genie 4 #eval / #evalmath (Core/Command.cs:1037) — evaluate an
+                // expression. In Genie 4 the result feeds ParseAllArgs, which is
+                // how `#var x {#eval expr}` stores a computed value (that path is
+                // ResolveValueCommand here); typed standalone, echo the result.
+                if (parts.Count > 1)
+                {
+                    var evalResult = ResolveValueCommand(
+                        "#" + parts[0].ToLowerInvariant() + " " + string.Join(" ", parts.Skip(1)));
+                    _host.Echo(evalResult);
+                }
+                break;
+            }
             case "unvar":
             case "unsetvariable":
                 if (parts.Count > 1 && Variables is not null)
@@ -552,7 +645,7 @@ public sealed class CommandEngine
                 if (parts.Count >= 3)
                 {
                     var tname  = parts[1];
-                    var tvalue = string.Join(" ", parts.Skip(2));
+                    var tvalue = ResolveValueCommand(string.Join(" ", parts.Skip(2)));
                     _host.SetGlobalVariable(tname, tvalue);
                     if (_processInputDepth == 1 && _interactive)
                         _host.Echo($"Global variable set: {tname}={tvalue}");
@@ -992,7 +1085,7 @@ public sealed class CommandEngine
         {
             if (parts.Count < 4) { _host.Echo("Usage: #var set <name> <value>"); return; }
             var setName  = parts[2];
-            var setValue = string.Join(" ", parts.Skip(3));
+            var setValue = ResolveValueCommand(string.Join(" ", parts.Skip(3)));
             Variables.Store.Set(setName, setValue);
             if (_processInputDepth == 1 && _interactive)
                 _host.Echo($"Variable set: {setName}={setValue}");
@@ -1023,7 +1116,7 @@ public sealed class CommandEngine
         if (sub == "add" && parts.Count >= 4)
         {
             var name  = parts[2];
-            var value = string.Join(" ", parts.Skip(3));
+            var value = ResolveValueCommand(string.Join(" ", parts.Skip(3)));
             Variables.Store.Set(name, value);
             if (_processInputDepth == 1 && _interactive)
                 _host.Echo($"Variable set: {name}={value}");
@@ -1031,10 +1124,48 @@ public sealed class CommandEngine
         }
 
         var implicitName  = parts[1];
-        var implicitValue = string.Join(" ", parts.Skip(2));
+        var implicitValue = ResolveValueCommand(string.Join(" ", parts.Skip(2)));
         Variables.Store.Set(implicitName, implicitValue);
         if (_processInputDepth == 1 && _interactive)
             _host.Echo($"Variable set: {implicitName}={implicitValue}");
+    }
+
+    /// <summary>
+    /// Genie 4 <c>ParseAllArgs</c> parity (Core/Command.cs:2883): a command's
+    /// VALUE text is routed back through the command processor, so a value
+    /// that is itself a result-returning <c>#</c>-command becomes that
+    /// command's RESULT — the menu-script idiom
+    /// <c>#var selection {#eval toupper("$selection")}</c> (mm_train) must
+    /// store <c>MAGIC</c>, not the literal <c>#eval toupper(...)</c> text.
+    /// Genie 5 supports the two result-returning commands the script corpus
+    /// actually uses in value position (<c>#eval</c> / <c>#evalmath</c>);
+    /// anything else passes through unchanged. Variables are already expanded
+    /// upstream, so the expression sees resolved text. A malformed expression
+    /// falls back to storing the raw text (better diagnosable than "").
+    /// </summary>
+    private string ResolveValueCommand(string value)
+    {
+        var t = value.TrimStart();
+        if (t.Length < 2 || t[0] != '#') return value;
+
+        string expr;
+        bool   numeric;
+        if      (t.StartsWith("#eval ",     StringComparison.OrdinalIgnoreCase)) { expr = t[6..];  numeric = false; }
+        else if (t.StartsWith("#evalmath ", StringComparison.OrdinalIgnoreCase)) { expr = t[10..]; numeric = true;  }
+        else return value;
+
+        try
+        {
+            var inst   = new Scripting.ScriptInstance();
+            var result = Scripting.ScriptExpression.Eval(expr.Trim(), inst);
+            return numeric
+                ? Scripting.ScriptExpression.ToStr(Scripting.ScriptExpression.ToNum(result))
+                : Scripting.ScriptExpression.ToStr(result);
+        }
+        catch
+        {
+            return value;
+        }
     }
 
     private void ListVars(string? filter)

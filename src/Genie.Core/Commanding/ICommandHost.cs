@@ -101,6 +101,19 @@ public interface ICommandHost
     void ResumeAllScripts();
 
     /// <summary>
+    /// Pause one running script by name (sets <c>UserPaused</c>); null/empty
+    /// pauses every script. Used by <c>#script pause [name|all]</c> (Genie 4
+    /// Core/Command.cs script dispatcher).
+    /// </summary>
+    void PauseScript(string? name);
+
+    /// <summary>
+    /// Resume one paused script by name; null/empty resumes every script.
+    /// Used by <c>#script resume [name|all]</c>.
+    /// </summary>
+    void ResumeScript(string? name);
+
+    /// <summary>
     /// Apply a debug / tracing level to every running script. Mirrors Genie 4's
     /// Scripts → Trace All Scripts menu. Level 0 = no traces; higher values
     /// surface more script-internal echoes. Used by <c>#traceall &lt;level&gt;</c>.
@@ -258,6 +271,15 @@ public interface ICommandHost
     /// the Console build with no handler is a no-op.
     /// </summary>
     void TtsCommand(string args);
+
+    /// <summary>
+    /// Flash the main window's taskbar / dock entry to pull the player's eye
+    /// back to the client (Genie 4 <c>#flash</c> — its classic use is a trigger
+    /// action on whispers or a hunting-script alert while the window is in the
+    /// background). The window + platform attention API live in the App layer;
+    /// Console / headless builds drop it silently.
+    /// </summary>
+    void FlashWindow();
 
     /// <summary>
     /// Handle a <c>#connect</c> / <c>#reconnect</c> / <c>#lichconnect</c> command

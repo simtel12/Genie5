@@ -88,6 +88,32 @@ public class ScriptEngineArgTests
     }
 
     [Fact]
+    public void Gosub_empty_quoted_arg_holds_its_position()
+    {
+        // Genie 4 parity: an explicitly quoted EMPTY arg ("") is a real
+        // placeholder arg, not whitespace. mm_train's menu builder calls
+        //   gosub Menu.Build "%array" "var" "trigger" "" "%MENU_WINDOW"
+        // with $4 (exceptions) intentionally empty. When ParseArgs dropped the
+        // "" token, every later arg shifted left: the window name landed in $4,
+        // $5 came up empty, and Menu.Build's `else var this.window Game`
+        // fallback made every menu redraw #clear the main Game window.
+        const string body =
+            "gosub sub \"a|b\" \"target\" \"trigger\" \"\" \"Moonmage Training Menu\"\n" +
+            "exit\n" +
+            "sub:\n" +
+            "echo E3=[$3]\n" +
+            "echo E4=[$4]\n" +
+            "echo E5=[$5]\n" +
+            "return\n";
+
+        var o = RunFixture(body, new List<string>());
+
+        Assert.Contains("E3=[trigger]",                o);
+        Assert.Contains("E4=[]",                       o);  // "" survives as an empty arg
+        Assert.Contains("E5=[Moonmage Training Menu]", o);  // window name stays in $5
+    }
+
+    [Fact]
     public void Do_command_is_guarded_and_not_sent_to_game()
     {
         // Group D is deferred (zero corpus usage); the no-op guard must consume a

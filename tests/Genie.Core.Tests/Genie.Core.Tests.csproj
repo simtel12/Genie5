@@ -30,6 +30,12 @@
       <HintPath>$(CoreOutDir)Genie.Core.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- The public plugin contract (IGeniePlugin / IPluginHost) ships beside
+         Core; resolved at runtime from the same dir via ModuleInit.cs. -->
+    <Reference Include="Genie.Plugins.Abstractions">
+      <HintPath>$(CoreOutDir)Genie.Plugins.Abstractions.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <!-- Surface the Core output dir to the runtime resolver in ModuleInit.cs. -->

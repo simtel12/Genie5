@@ -48,6 +48,31 @@ public class EchoWindowTokenTests
     }
 
     [Fact]
+    public void Quoted_multiword_window_token_routes_to_that_window()
+    {
+        // The classic menu-script form (mm_train GlobalSet):
+        //   send #echo ">Moonmage Training Menu" cyan Enter value for CHARGE:
+        // The quoted multi-word target must parse as the window token; before
+        // this was quote-aware the token started with '"', fell out of the
+        // option loop, and the whole line (quotes and all) dumped to main.
+        var calls = RunFixture(
+            "var w Moonmage Training Menu\n" +
+            "put #echo \">$w\" cyan Enter value for CHARGE:\n");
+
+        Assert.Contains(("Enter value for CHARGE:", "Moonmage Training Menu"), calls);
+    }
+
+    [Fact]
+    public void Quoted_window_with_no_message_echoes_a_blank_line_there()
+    {
+        // mm_train separates menu sections with `send #echo ">%this.window"`.
+        var calls = RunFixture(
+            "put #echo \">Moonmage Training Menu\"\n");
+
+        Assert.Contains(("", "Moonmage Training Menu"), calls);
+    }
+
+    [Fact]
     public void Chevron_inside_the_variable_value_degrades_gracefully()
     {
         // var value already carries '>': the token expands to ">>Log"; all

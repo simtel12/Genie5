@@ -1795,13 +1795,30 @@ public sealed class ScriptEngine
                 // #echo [>Window] [#RRGGBB | ColorName] message
                 // Mirrors Genie4: foreground may be a hex code or a KnownColor name
                 // (e.g. Crimson, DodgerBlue) — the downstream Brush.Parse handles both.
+                // The option tokens are QUOTE-aware: the classic menu-script form is
+                //   send #echo ">Moonmage Training Menu" cyan text
+                // where the multi-word window target rides inside quotes. A plain
+                // space split saw a token starting with '"' (not '>'), fell out of
+                // the option loop, and dumped the whole line to the main window.
+                // The MESSAGE remainder is left verbatim (quotes and all).
                 string? window = null;
                 string? color  = null;
                 bool    mono   = false;
                 var msg = rest;
                 while (msg.Length > 0)
                 {
-                    var (tok, after) = SplitCmd(msg);
+                    string tok, after;
+                    var t = msg.TrimStart();
+                    if (t.Length > 1 && t[0] == '"' && t.IndexOf('"', 1) > 0)
+                    {
+                        var close = t.IndexOf('"', 1);
+                        tok   = t[1..close];
+                        after = t[(close + 1)..].TrimStart();
+                    }
+                    else
+                    {
+                        (tok, after) = SplitCmd(t);
+                    }
                     // TrimStart, not [1..]: a target variable whose value
                     // already carries the chevron ("var w >Log" + "#echo >$w")
                     // expands to ">>Log" — degrade to "Log" rather than
@@ -1812,6 +1829,7 @@ public sealed class ScriptEngine
                     { mono = true; msg = after; continue; }
                     if (IsEchoColor(tok))
                     { color = tok; msg = after; continue; }
+                    msg = t;   // non-option token starts the message — keep it verbatim
                     break;
                 }
                 if (window != null && EchoTo != null)

@@ -25,6 +25,13 @@ public static class ArgumentParser
         var current   = new System.Text.StringBuilder();
         var inQuotes  = false;
         var braceDepth = 0;
+        // True once the current token opened a quote/brace group — an
+        // explicitly grouped EMPTY token ("" or {}) must survive as an empty
+        // arg (Genie 4 parity). mm_train passes "" as a placeholder gosub arg
+        // (`gosub Menu.Build … "" "Moonmage Training Menu"`); dropping it
+        // shifted every later $-arg left, so $5 (the window name) came up
+        // empty and the menu redraw cleared the main Game window.
+        var grouped   = false;
 
         for (int i = 0; i < text.Length; i++)
         {
@@ -56,17 +63,22 @@ public static class ArgumentParser
             }
 
             // Outside any group: handle openers, separators, and literals.
-            if (ch == '"') { inQuotes = true; continue; }
-            if (ch == '{') { braceDepth = 1; continue; }   // strip outermost
+            if (ch == '"') { inQuotes = true; grouped = true; continue; }
+            if (ch == '{') { braceDepth = 1; grouped = true; continue; }   // strip outermost
             if (ch == ' ' || ch == '\t')
             {
-                if (current.Length > 0) { results.Add(current.ToString()); current.Clear(); }
+                if (current.Length > 0 || grouped)
+                {
+                    results.Add(current.ToString());
+                    current.Clear();
+                    grouped = false;
+                }
                 continue;
             }
             current.Append(ch);
         }
 
-        if (current.Length > 0) results.Add(current.ToString());
+        if (current.Length > 0 || grouped) results.Add(current.ToString());
         return results;
     }
 

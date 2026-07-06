@@ -20,6 +20,15 @@ public sealed class GenieConfig
     public char CommandChar { get; set; } = '#';
     public bool TriggerOnInput { get; set; } = true;
 
+    /// <summary>Genie 4 <c>mycommandchar</c> (Config.cs:17, default '/'):
+    /// input starting with this char is echoed and run through the
+    /// trigger/action pipeline (see <see cref="TriggerOnInput"/>) but NEVER
+    /// sent to the game — "for trigger systems and such". Menu scripts that
+    /// capture typed replies (mm_train's <c>~value</c> convention) pair with
+    /// <c>#config mycommandchar ~</c> so the reply doesn't reach DR and draw
+    /// a "Please rephrase that command."</summary>
+    public char MyCommandChar { get; set; } = '/';
+
     /// <summary>Master enables for the five user rule engines (File ▸ Master
     /// Toggles / <c>#config triggers off</c> …). Rule sets stay loaded and
     /// editable while off — the engines just skip applying them. All default ON
@@ -353,6 +362,7 @@ public sealed class GenieConfig
         ("scriptchar", ScriptChar.ToString()),
         ("separatorchar", SeparatorChar.ToString()),
         ("commandchar", CommandChar.ToString()),
+        ("mycommandchar", MyCommandChar.ToString()),
         ("triggeroninput", TriggerOnInput.ToString()),
         ("highlights", EnableHighlights.ToString()),
         ("triggers", EnableTriggers.ToString()),
@@ -455,7 +465,7 @@ public sealed class GenieConfig
         ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines" }),
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
-        ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "triggeroninput", "scripttimeout", "maxgosubdepth", "abortdupescript", "scriptextension", "editor" }),
+        ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "scripttimeout", "maxgosubdepth", "abortdupescript", "scriptextension", "editor" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "updatemapperscripts" }),
         ("Auto-Walk",        new[] { "autowalkpauseonunfocus", "autowalkunfocusseconds" }),
         ("Sound / TTS",      new[] { "muted", "ttsvoice", "ttsvoicedir", "ttsread", "ttsreadstreams", "ttsrate", "ttsvolume" }),
@@ -487,6 +497,7 @@ public sealed class GenieConfig
                 case "scriptchar": ScriptChar = FirstCharOrDefault(value, ScriptChar); break;
                 case "separatorchar": SeparatorChar = FirstCharOrDefault(value, SeparatorChar); break;
                 case "commandchar": CommandChar = FirstCharOrDefault(value, CommandChar); break;
+                case "mycommandchar": MyCommandChar = FirstCharOrDefault(value, MyCommandChar); break;
                 case "triggeroninput": TriggerOnInput = ToBool(value); break;
                 case "highlights": EnableHighlights = ToBool(value); Notify(ConfigFieldUpdated.MasterToggles); break;
                 case "triggers": EnableTriggers = ToBool(value); Notify(ConfigFieldUpdated.MasterToggles); break;

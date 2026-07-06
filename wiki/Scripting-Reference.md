@@ -88,12 +88,15 @@ Regex captures from `matchre` / `waitforre` / actions land in the current `$0..$
 | `action body when eval expr` | Fires on the rising edge of `expr` becoming true. |
 | `action (label) on` / `off` / `remove`; `action on` / `off` / `clear` | Enable/disable/drop actions by label or globally. |
 
+Text you **send to the game** (typed or scripted) also runs through actions and triggers, Genie 4 style (`#config triggeroninput`, default on) — this is how menu scripts capture typed input with a pattern like `when ~(.*)` and a `~value` convention. Pair it with `#config mycommandchar ~` (Genie 4's parse-but-don't-send prefix, default `/`) and the `~value` reply fires the action **without reaching the game**, so the server never answers "Please rephrase that command."
+
 ### Other
 
 | Statement | Notes |
 | --- | --- |
 | `echo text` | Print to the echo channel (main window + Scripts panel). |
-| `#statusbar [N] text` | Show `text` in the strip to the right of the Script Bar (`#status` is a synonym). `N` (1–10, default 1) picks one of Genie 4's status slots; the non-empty slots are shown together and clear when the last script ends. An empty `text` clears slot `N`. |
+| `#statusbar [N] text` | Show `text` in one of ten positional slots just below the vitals Status Bar (`#status` is a synonym). `N` (1–10, default 1) picks the slot, and the slot keeps its position — like Genie 4's status strip, so scripts can use slots as columns. Text persists until overwritten; an empty `text` clears slot `N`, `#statusbar clearall` empties all ten, and the row hides itself when every slot is empty. |
+| `#flash` | Flash the Genie entry in the taskbar (Windows) or bounce the dock icon (macOS) until you bring the window back to the front — Genie 4 style. Classic use is a trigger action so a whisper or a hunting-script alert grabs your attention while Genie is in the background. Does nothing when the window is already focused. |
 | `debug N` | Per-script trace verbosity (1 = goto/gosub/return … 10 = every line). |
 | `include <file>.js` | Load a JavaScript function library for this script run — see [JavaScript Scripting](JavaScript-Scripting). |
 | `js <expr>` / `jscall <var> <expr>` | Call a JS library function; `jscall` stores the result in `%var`. |
@@ -108,7 +111,8 @@ The Genie 4 **menu-script toolkit** — the commands classic scripts like `mm_tr
 | `#window add\|open\|show\|close\|hide\|remove\|clear "Name"` | Create, show, hide, or destroy a named dock window. `add`/`open`/`show` bring it up (creating it if needed); `clear` wipes its text in place. |
 | `#link [>window] {text} {command}` | Print a clickable line — clicking it runs `command` through the normal input pipeline (it does **not** run at `#link` time). |
 | `#echo [>window] [color] text` | Directed echo. Targets **Main**/**Game**, any built-in stream window (`>Combat`, `>Talk`, `>Thoughts`, …), or a named window; colours are honoured. Non-text panels (`>Mapper`, `>Vitals`, …) fall back to Main. |
-| `#clear [>window]` | Wipe a window's scrollback in place. |
+| `#clear [window]` | Wipe a window's scrollback in place. The name works with or without the `>` prefix (`#clear "Moonmage Training Menu"`, Genie 4 style); a bare `#clear` wipes the main Game window. |
+| `#script abort\|pause\|resume [name\|all]` | Script lifecycle control, Genie 4 style. Acts on the named script, or every script for `all` (or no name). `#script` never *starts* a script — use `.name` for that; bare `#script` lists what's running, like `#scripts`. |
 | `#log [>file] text` | Append to a log file under your Logs folder. The `>filename` form writes verbatim; the bare form appends to the per-character daily log (with the Genie 4 `LOG CREATED` banner). Writes are serialized across scripts. |
 
 Windows created this way render full text lines — clickable links and your highlight rules both apply.
@@ -124,6 +128,8 @@ Two namespaces, distinguished by prefix:
 | `$0..$9` | the top `$`-frame | a `gosub` call or the latest regex match | `gosub args`, `matchre`, `waitforre`, action firing |
 
 `%` reads locals only. `$` reads the top frame for `$0..$9`, then falls back to globals. Name resolution, `%%name` / `$$name` double-evaluation, and `%name(N)` pipe-array indexing all follow Genie 4 rules.
+
+A `#var` / `#tvar` **value** that is itself `#eval` or `#evalmath` stores the expression's *result*, Genie 4 style — the classic menu-script idiom `put #var selection {#eval toupper("$selection")}` stores `MAGIC`, not the literal `#eval …` text. Typed standalone, `#eval <expr>` echoes the result.
 
 ### Engine-set globals
 
