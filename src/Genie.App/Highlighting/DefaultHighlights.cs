@@ -96,8 +96,8 @@ public static class DefaultHighlights
         // Bracketed room titles on their own line — e.g. [Garden Rooftop, Medical Pavilion]
         (new Regex(@"^\s*\[[^\]]+\]\s*$", Opts), RoomTitleBrush),
 
-        // "Roundtime: 3 sec." — combat readiness signal
-        (new Regex(@"\bRoundtime:\s*\d+\s*sec\.?", Opts), RoundTimeBrush),
+        // "Roundtime: 3 sec." / "Roundtime: 3 seconds." — combat readiness signal
+        (new Regex(@"\bRoundtime:\s*\d+\s*sec(?:ond)?s?\.?", Opts), RoundTimeBrush),
 
         // Compass directions when listed as exits or in movement messages
         (new Regex(@"\b(?:north|south|east|west|northeast|northwest|southeast|southwest|up|down|out)\b",
