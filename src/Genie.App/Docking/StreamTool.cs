@@ -7,9 +7,12 @@ using Genie.Core.Layout;
 
 namespace Genie.App.Docking;
 
-public class StreamTool : Tool, IWindowMenuHost
+public class StreamTool : Tool, IWindowMenuHost, IFindHost
 {
     public StreamBuffer Buffer { get; }
+
+    /// <summary>In-window Find bar state (#120).</summary>
+    public FindInWindowModel Find { get; }
 
     /// <summary>Right-click window menu (Clear / Time Stamp / Name List Only /
     /// Close), built by <see cref="GenieDockFactory"/>.</summary>
@@ -29,6 +32,15 @@ public class StreamTool : Tool, IWindowMenuHost
     private double     _toolFontSize = 11;
     public  double     ToolFontSize { get => _toolFontSize; private set => SetProperty(ref _toolFontSize, value); }
 
+    // Word Wrap (#120) — see GameTextDocument for the semantics.
+    private TextWrapping _toolTextWrapping = TextWrapping.Wrap;
+    public  TextWrapping ToolTextWrapping { get => _toolTextWrapping; private set => SetProperty(ref _toolTextWrapping, value); }
+
+    private Avalonia.Controls.Primitives.ScrollBarVisibility _toolHScroll
+        = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
+    public  Avalonia.Controls.Primitives.ScrollBarVisibility ToolHScroll
+    { get => _toolHScroll; private set => SetProperty(ref _toolHScroll, value); }
+
     /// <summary>"Pause Scrolling" window-menu state. Bound to the stream
     /// ScrollViewer's <c>AutoScrollBehavior.Paused</c>; the window menu toggles
     /// it. Transient (not persisted).</summary>
@@ -38,6 +50,7 @@ public class StreamTool : Tool, IWindowMenuHost
     public StreamTool(StreamBuffer buffer, WindowSettings? settings = null)
     {
         Buffer = buffer;
+        Find   = new FindInWindowModel(() => buffer.Lines.Select(l => l.Text).ToArray());
         // Plain lowercased buffer name (e.g. "logons", "talk") matches the
         // Window-menu toggle command ids and the WindowSettingsStore keys.
         Id     = buffer.Name.ToLowerInvariant();
@@ -64,5 +77,9 @@ public class StreamTool : Tool, IWindowMenuHost
         ToolFontSize   = WindowSettingsResolver.ResolveFontSize(s.FontSize);
         ToolForeground = WindowSettingsResolver.ResolveForeground(s.Foreground);
         ToolBackground = WindowSettingsResolver.ResolveBackground(s.Background);
+        ToolTextWrapping = s.WordWrap ? TextWrapping.Wrap : TextWrapping.NoWrap;
+        ToolHScroll      = s.WordWrap
+            ? Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
+            : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
     }
 }

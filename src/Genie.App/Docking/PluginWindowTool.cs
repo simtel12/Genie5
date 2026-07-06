@@ -18,9 +18,12 @@ namespace Genie.App.Docking;
 /// through saved layouts and the Window menu's visibility toggles just like a
 /// built-in tool.</para>
 /// </summary>
-public class PluginWindowTool : Tool, IWindowMenuHost
+public class PluginWindowTool : Tool, IWindowMenuHost, IFindHost
 {
     public PluginWindowViewModel ViewModel { get; }
+
+    /// <summary>In-window Find bar state (#120).</summary>
+    public FindInWindowModel Find { get; }
 
     /// <summary>Right-click window menu (Clear / Close), built by <see cref="GenieDockFactory"/>.</summary>
     public WindowMenuModel? WindowMenu { get; set; }
@@ -32,6 +35,7 @@ public class PluginWindowTool : Tool, IWindowMenuHost
     public PluginWindowTool(PluginWindowViewModel vm, string id, string title)
     {
         ViewModel = vm;
+        Find      = new FindInWindowModel(() => vm.Lines.Select(l => l.Text).ToArray());
         Id        = id;
         Title     = string.IsNullOrWhiteSpace(title) ? vm.Title : title;
 

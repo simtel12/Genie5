@@ -51,8 +51,12 @@ public static class WindowMenuBehavior
         {
             // Re-subscribe defensively so toggling the flag never double-hooks.
             menu.Opening -= OnOpening;
+            menu.Opened  -= OnOpened;
             if (e.NewValue is true)
+            {
                 menu.Opening += OnOpening;
+                menu.Opened  += OnOpened;
+            }
         });
     }
 
@@ -60,7 +64,8 @@ public static class WindowMenuBehavior
     {
         if (sender is not ContextMenu menu) return;
 
-        _currentTarget = menu.PlacementTarget as Control;
+        if (menu.PlacementTarget is Control target)
+            _currentTarget = target;
 
         if (menu.DataContext is IWindowMenuHost host)
             host.WindowMenu?.RefreshFloatState();
@@ -69,27 +74,47 @@ public static class WindowMenuBehavior
         _copy.RaiseCanExecuteChanged();
     }
 
+    private static void OnOpened(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is not ContextMenu menu) return;
+
+        // PlacementTarget is only reliably assigned by the time Opened fires —
+        // Opening can run before the open sequence sets it, and a null target
+        // reads as "no selection anywhere", leaving Copy permanently greyed in
+        // every window menu regardless of the actual selection. Re-resolve and
+        // re-gate now that the target is real; the open menu updates live via
+        // CanExecuteChanged.
+        if (menu.PlacementTarget is Control target)
+            _currentTarget = target;
+        _copy.RaiseCanExecuteChanged();
+    }
+
     // ── Copy current selection ─────────────────────────────────────────────
 
     private static string? CurrentSelection()
     {
-        if (_currentTarget is null) return null;
+        // Primary: the open menu's placement target. Fallback: the last
+        // right-/left-clicked window's ScrollViewer (PageScroll tracks every
+        // press, including the right-click that opened this menu) — covers
+        // any path where PlacementTarget was still null when we looked.
+        var target = _currentTarget ?? PageScroll.CurrentTarget;
+        if (target is null) return null;
 
         // 1) Game window: cross-line selection owned by the LineSelection
         //    behavior (its rendered per-line SelectionStart/End survive a
         //    right-click; the behavior holds the authoritative range).
-        var list = _currentTarget.GetSelfAndVisualDescendants()
-                                 .OfType<ItemsControl>()
-                                 .FirstOrDefault(LineSelection.GetEnabled);
+        var list = target.GetSelfAndVisualDescendants()
+                         .OfType<ItemsControl>()
+                         .FirstOrDefault(LineSelection.GetEnabled);
         if (list is not null && LineSelection.GetSelectedText(list) is { Length: > 0 } cross)
             return cross;
 
         // 2) Streams / other text feeds: the native per-block selection. A
         //    right-click inside the highlight keeps it (Avalonia collapses only
         //    when the click lands outside the selection).
-        var block = _currentTarget.GetSelfAndVisualDescendants()
-                                  .OfType<SelectableTextBlock>()
-                                  .FirstOrDefault(b => b.SelectionStart != b.SelectionEnd);
+        var block = target.GetSelfAndVisualDescendants()
+                          .OfType<SelectableTextBlock>()
+                          .FirstOrDefault(b => b.SelectionStart != b.SelectionEnd);
         return block?.SelectedText;
     }
 

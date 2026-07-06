@@ -97,6 +97,11 @@ public static class PageScroll
         return true;
     }
 
+    /// <summary>The currently-selected target window's ScrollViewer (or the
+    /// default game window). Exposed for features that share the "last-clicked
+    /// window" targeting — e.g. Ctrl+F opens that window's Find bar (#120).</summary>
+    public static ScrollViewer? CurrentTarget => Resolve();
+
     private static ScrollViewer? Resolve()
     {
         if (_current?.TryGetTarget(out var sv) == true && sv.GetVisualRoot() is not null)

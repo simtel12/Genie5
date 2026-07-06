@@ -108,6 +108,13 @@
             <MenuItem Header="Copy All"
                       Command="{Binding WindowMenu.CopyAllCommand}"
                       IsVisible="{Binding WindowMenu.ShowCopyAll}" />
+            <MenuItem Header="Save As…"
+                      Command="{Binding WindowMenu.SaveAsCommand}"
+                      IsVisible="{Binding WindowMenu.ShowSaveAs}" />
+            <MenuItem Header="Find…"
+                      InputGesture="Ctrl+F"
+                      Command="{Binding WindowMenu.FindCommand}"
+                      IsVisible="{Binding WindowMenu.ShowFind}" />
             <MenuItem Header="Clear"
                       Command="{Binding WindowMenu.ClearCommand}"
                       IsVisible="{Binding WindowMenu.ShowClear}" />
@@ -119,6 +126,10 @@
                       ToggleType="CheckBox"
                       IsChecked="{Binding WindowMenu.IsNameListOnlyOn, Mode=TwoWay}"
                       IsVisible="{Binding WindowMenu.ShowNameListOnly}" />
+            <MenuItem Header="Word Wrap"
+                      ToggleType="CheckBox"
+                      IsChecked="{Binding WindowMenu.IsWordWrapOn, Mode=TwoWay}"
+                      IsVisible="{Binding WindowMenu.ShowWordWrap}" />
             <MenuItem Header="Pause Scrolling"
                       ToggleType="CheckBox"
                       IsChecked="{Binding WindowMenu.IsScrollPaused, Mode=TwoWay}"
@@ -129,12 +140,13 @@
              window from the command bar; the main game window is the default
              target before any click. -->
         <ScrollViewer x:Name="gameScroll"
-                      HorizontalScrollBarVisibility="Disabled"
+                      HorizontalScrollBarVisibility="{Binding ToolHScroll}"
                       VerticalScrollBarVisibility="Auto"
                       Width="{Binding $parent[Grid].Bounds.Width}"
                       Height="{Binding $parent[Grid].Bounds.Height}"
                       controls:PageScroll.IsTarget="True"
                       controls:PageScroll.IsDefaultTarget="True"
+                      controls:FindInWindow.ScrollModel="{Binding Find}"
                       controls:AutoScrollBehavior.ItemsSource="{Binding ViewModel.Lines}"
                       controls:AutoScrollBehavior.Paused="{Binding IsScrollPaused}">
           <!-- Plain ItemsControl (keeps its default control-theme so it renders),
@@ -160,7 +172,7 @@
                      so right-clicking text opened a second menu. A local null
                      wins unconditionally; with no flyout the right-click bubbles
                      up to the single window menu above. Ctrl+C still copies. -->
-                <SelectableTextBlock TextWrapping="Wrap"
+                <SelectableTextBlock TextWrapping="{Binding $parent[ItemsControl].DataContext.ToolTextWrapping}"
                                      ContextFlyout="{x:Null}"
                                      Classes.echo="{Binding IsEcho}"
                                      SelectionBrush="{DynamicResource Theme.Selection}"
@@ -175,6 +187,35 @@
                 IsVisible="{Binding #gameScroll.Tag.IsScrolledUp}"
                 Command="{Binding #gameScroll.Tag.JumpToBottomCommand}"
                 Content="↓ Bottom" FontSize="11" Padding="8,4" Opacity="0.85"/>
+
+        <!-- Find bar (#120) — overlays top-right so it never disturbs the
+             MDI-workaround Width/Height pinning on the ScrollViewer. Ctrl+F
+             or the window menu opens it; Enter walks older matches,
+             Shift+Enter newer, Esc closes. -->
+        <Border HorizontalAlignment="Right" VerticalAlignment="Top"
+                Margin="0,4,20,0" Padding="4,2" CornerRadius="3"
+                Background="{DynamicResource Theme.ToolbarBg}"
+                BorderBrush="{DynamicResource Theme.Border}" BorderThickness="1"
+                IsVisible="{Binding Find.IsOpen}">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <TextBox Text="{Binding Find.FindText}" Watermark="Find…"
+                     Width="160" FontSize="11" MinHeight="0" Padding="4,2"
+                     controls:FindInWindow.BoxModel="{Binding Find}"/>
+            <TextBlock Text="{Binding Find.Status}" FontSize="10"
+                       Foreground="{DynamicResource Theme.TextMuted}"
+                       VerticalAlignment="Center"/>
+            <Button Content="▲" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    Command="{Binding Find.OlderCommand}"
+                    ToolTip.Tip="Older match (Enter)"/>
+            <Button Content="▼" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    Command="{Binding Find.NewerCommand}"
+                    ToolTip.Tip="Newer match (Shift+Enter)"/>
+            <Button Content="✕" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    Background="Transparent" BorderThickness="0"
+                    Command="{Binding Find.CloseCommand}"
+                    ToolTip.Tip="Close (Esc)"/>
+          </StackPanel>
+        </Border>
       </Grid>
     </DataTemplate>
 
@@ -955,10 +996,11 @@
     <DataTemplate DataType="docking:BackpackTool">
       <Grid RowDefinitions="*" Background="{Binding ToolBackground}">
         <ScrollViewer x:Name="backpackScroll"
-                      HorizontalScrollBarVisibility="Disabled"
+                      HorizontalScrollBarVisibility="{Binding ToolHScroll}"
                       VerticalScrollBarVisibility="Auto"
                       Width="{Binding $parent[Grid].Bounds.Width}"
-                      Height="{Binding $parent[Grid].Bounds.Height}">
+                      Height="{Binding $parent[Grid].Bounds.Height}"
+                      controls:FindInWindow.ScrollModel="{Binding Find}">
           <ItemsControl ItemsSource="{Binding ViewModel.Items}"
                         FontFamily="{Binding ToolFontFamily}"
                         FontSize="{Binding ToolFontSize}"
@@ -967,12 +1009,39 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="vm:TextLine">
                 <!-- Inherits Foreground from the ItemsControl (tool-scoped). -->
-                <SelectableTextBlock TextWrapping="Wrap" Margin="0,1"
+                <SelectableTextBlock TextWrapping="{Binding $parent[ItemsControl].DataContext.ToolTextWrapping}"
+                                     Margin="0,1"
                                      controls:InlinesBehavior.Source="{Binding Inlines}"/>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
         </ScrollViewer>
+
+        <!-- Find bar (#120) — same overlay as the game window. -->
+        <Border HorizontalAlignment="Right" VerticalAlignment="Top"
+                Margin="0,4,20,0" Padding="4,2" CornerRadius="3"
+                Background="{DynamicResource Theme.ToolbarBg}"
+                BorderBrush="{DynamicResource Theme.Border}" BorderThickness="1"
+                IsVisible="{Binding Find.IsOpen}">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <TextBox Text="{Binding Find.FindText}" Watermark="Find…"
+                     Width="160" FontSize="11" MinHeight="0" Padding="4,2"
+                     controls:FindInWindow.BoxModel="{Binding Find}"/>
+            <TextBlock Text="{Binding Find.Status}" FontSize="10"
+                       Foreground="{DynamicResource Theme.TextMuted}"
+                       VerticalAlignment="Center"/>
+            <Button Content="▲" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    Command="{Binding Find.OlderCommand}"
+                    ToolTip.Tip="Older match (Enter)"/>
+            <Button Content="▼" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    Command="{Binding Find.NewerCommand}"
+                    ToolTip.Tip="Newer match (Shift+Enter)"/>
+            <Button Content="✕" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    Background="Transparent" BorderThickness="0"
+                    Command="{Binding Find.CloseCommand}"
+                    ToolTip.Tip="Close (Esc)"/>
+          </StackPanel>
+        </Border>
       </Grid>
     </DataTemplate>
 
@@ -980,11 +1049,12 @@
     <DataTemplate DataType="docking:StreamTool">
       <Grid Background="{Binding ToolBackground}">
         <ScrollViewer x:Name="streamScroll"
-                      HorizontalScrollBarVisibility="Disabled"
+                      HorizontalScrollBarVisibility="{Binding ToolHScroll}"
                       VerticalScrollBarVisibility="Auto"
                       Width="{Binding $parent[Grid].Bounds.Width}"
                       Height="{Binding $parent[Grid].Bounds.Height}"
                       controls:PageScroll.IsTarget="True"
+                      controls:FindInWindow.ScrollModel="{Binding Find}"
                       controls:AutoScrollBehavior.ItemsSource="{Binding Buffer.Lines}"
                       controls:AutoScrollBehavior.Paused="{Binding IsScrollPaused}">
           <ItemsControl ItemsSource="{Binding Buffer.Lines}"
@@ -996,7 +1066,7 @@
                 <!-- Foreground inherits from the tool-scoped ItemsControl.
                      ContextFlyout nulled locally so the built-in Copy flyout
                      doesn't pre-empt the tool's window menu (see game template). -->
-                <SelectableTextBlock TextWrapping="Wrap"
+                <SelectableTextBlock TextWrapping="{Binding $parent[ItemsControl].DataContext.ToolTextWrapping}"
                                      ContextFlyout="{x:Null}"
                                      controls:InlinesBehavior.Source="{Binding Inlines}"/>
               </DataTemplate>
@@ -1009,6 +1079,32 @@
                 IsVisible="{Binding #streamScroll.Tag.IsScrolledUp}"
                 Command="{Binding #streamScroll.Tag.JumpToBottomCommand}"
                 Content="↓ Bottom" FontSize="11" Padding="8,4" Opacity="0.85"/>
+
+        <!-- Find bar (#120) — same overlay as the game window. -->
+        <Border HorizontalAlignment="Right" VerticalAlignment="Top"
+                Margin="0,4,20,0" Padding="4,2" CornerRadius="3"
+                Background="{DynamicResource Theme.ToolbarBg}"
+                BorderBrush="{DynamicResource Theme.Border}" BorderThickness="1"
+                IsVisible="{Binding Find.IsOpen}">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <TextBox Text="{Binding Find.FindText}" Watermark="Find…"
+                     Width="160" FontSize="11" MinHeight="0" Padding="4,2"
+                     controls:FindInWindow.BoxModel="{Binding Find}"/>
+            <TextBlock Text="{Binding Find.Status}" FontSize="10"
+                       Foreground="{DynamicResource Theme.TextMuted}"
+                       VerticalAlignment="Center"/>
+            <Button Content="▲" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    Command="{Binding Find.OlderCommand}"
+                    ToolTip.Tip="Older match (Enter)"/>
+            <Button Content="▼" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    Command="{Binding Find.NewerCommand}"
+                    ToolTip.Tip="Newer match (Shift+Enter)"/>
+            <Button Content="✕" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    Background="Transparent" BorderThickness="0"
+                    Command="{Binding Find.CloseCommand}"
+                    ToolTip.Tip="Close (Esc)"/>
+          </StackPanel>
+        </Border>
       </Grid>
     </DataTemplate>
 
@@ -1071,25 +1167,54 @@
            the lines unbounded width, so their TextWrapping="Wrap" never kicks
            in and long menu-script text runs off the edge (same trap as the
            stream panels, documented above). Genie 4 named windows word-wrap. -->
-      <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                    VerticalScrollBarVisibility="Auto"
-                    controls:AutoScrollBehavior.ItemsSource="{Binding ViewModel.Lines}">
-        <ItemsControl ItemsSource="{Binding ViewModel.Lines}"
-                      FontFamily="{Binding ToolFontFamily}"
-                      FontSize="{Binding ToolFontSize}"
-                      Margin="8"
-                      Foreground="{DynamicResource GameBrush}">
-          <ItemsControl.ItemTemplate>
-            <!-- Same link-capable line rendering as the stream panels: TextLine
-                 .Inlines carries clickable #link / <d cmd> links + highlights. -->
-            <DataTemplate DataType="vm:TextLine">
-              <SelectableTextBlock TextWrapping="Wrap"
-                                   ContextFlyout="{x:Null}"
-                                   controls:InlinesBehavior.Source="{Binding Inlines}"/>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </ScrollViewer>
+      <Grid>
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      controls:FindInWindow.ScrollModel="{Binding Find}"
+                      controls:AutoScrollBehavior.ItemsSource="{Binding ViewModel.Lines}">
+          <ItemsControl ItemsSource="{Binding ViewModel.Lines}"
+                        FontFamily="{Binding ToolFontFamily}"
+                        FontSize="{Binding ToolFontSize}"
+                        Margin="8"
+                        Foreground="{DynamicResource GameBrush}">
+            <ItemsControl.ItemTemplate>
+              <!-- Same link-capable line rendering as the stream panels: TextLine
+                   .Inlines carries clickable #link / <d cmd> links + highlights. -->
+              <DataTemplate DataType="vm:TextLine">
+                <SelectableTextBlock TextWrapping="Wrap"
+                                     ContextFlyout="{x:Null}"
+                                     controls:InlinesBehavior.Source="{Binding Inlines}"/>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Find bar (#120) — same overlay as the game window. -->
+        <Border HorizontalAlignment="Right" VerticalAlignment="Top"
+                Margin="0,4,20,0" Padding="4,2" CornerRadius="3"
+                Background="{DynamicResource Theme.ToolbarBg}"
+                BorderBrush="{DynamicResource Theme.Border}" BorderThickness="1"
+                IsVisible="{Binding Find.IsOpen}">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <TextBox Text="{Binding Find.FindText}" Watermark="Find…"
+                     Width="160" FontSize="11" MinHeight="0" Padding="4,2"
+                     controls:FindInWindow.BoxModel="{Binding Find}"/>
+            <TextBlock Text="{Binding Find.Status}" FontSize="10"
+                       Foreground="{DynamicResource Theme.TextMuted}"
+                       VerticalAlignment="Center"/>
+            <Button Content="▲" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    Command="{Binding Find.OlderCommand}"
+                    ToolTip.Tip="Older match (Enter)"/>
+            <Button Content="▼" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    Command="{Binding Find.NewerCommand}"
+                    ToolTip.Tip="Newer match (Shift+Enter)"/>
+            <Button Content="✕" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    Background="Transparent" BorderThickness="0"
+                    Command="{Binding Find.CloseCommand}"
+                    ToolTip.Tip="Close (Esc)"/>
+          </StackPanel>
+        </Border>
+      </Grid>
     </DataTemplate>
 
     <!-- ── Scripts panel (running list + Start/Stop + output log) ─────────── -->

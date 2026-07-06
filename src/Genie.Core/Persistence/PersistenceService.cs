@@ -239,6 +239,7 @@ public sealed class PersistenceService
             Timestamp    = s.Timestamp,
             NameListOnly = s.NameListOnly,
             EchoToMain   = s.EchoToMain,
+            WordWrap     = s.WordWrap,
             IfClosed     = s.IfClosed,
             HasIfClosed  = true,    // value above is authoritative
         });

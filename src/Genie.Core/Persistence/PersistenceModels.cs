@@ -161,6 +161,9 @@ public sealed class WindowSettingsPersistenceModel
     public bool    Timestamp    { get; set; }
     public bool    NameListOnly { get; set; }
     public bool    EchoToMain   { get; set; }
+    /// <summary>Defaults true so pre-#120 windows.json files (no field) keep
+    /// the shipped always-wrap behaviour.</summary>
+    public bool    WordWrap     { get; set; } = true;
     public string? IfClosed     { get; set; }
     public bool    HasIfClosed  { get; set; }
 }

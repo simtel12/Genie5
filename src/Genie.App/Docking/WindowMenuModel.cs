@@ -28,10 +28,12 @@ public sealed class WindowMenuModel : ReactiveObject
     private bool _isTimestampOn;
     private bool _isNameListOnlyOn;
     private bool _isScrollPaused;
+    private bool _isWordWrapOn;
     private bool _isFloating;
     private readonly Action<bool>? _onTimestampToggled;
     private readonly Action<bool>? _onNameListOnlyToggled;
     private readonly Action<bool>? _onScrollPauseToggled;
+    private readonly Action<bool>? _onWordWrapToggled;
     private readonly Func<bool>?   _floatStateProbe;
 
     public WindowMenuModel(
@@ -45,17 +47,25 @@ public sealed class WindowMenuModel : ReactiveObject
         bool          scrollPausedOn        = false,
         Action<bool>? onScrollPauseToggled  = null,
         Action?       onToggleFloat         = null,
-        Func<bool>?   floatStateProbe       = null)
+        Func<bool>?   floatStateProbe       = null,
+        ICommand?     saveAs                = null,
+        ICommand?     find                  = null,
+        bool          wordWrapOn            = true,
+        Action<bool>? onWordWrapToggled     = null)
     {
         ClearCommand           = clear;
         CloseCommand           = close;
         CopyAllCommand         = copyAll;
+        SaveAsCommand          = saveAs;
+        FindCommand            = find;
         _isTimestampOn         = timestampOn;
         _onTimestampToggled    = onTimestampToggled;
         _isNameListOnlyOn      = nameListOnlyOn;
         _onNameListOnlyToggled = onNameListOnlyToggled;
         _isScrollPaused        = scrollPausedOn;
         _onScrollPauseToggled  = onScrollPauseToggled;
+        _isWordWrapOn          = wordWrapOn;
+        _onWordWrapToggled     = onWordWrapToggled;
         _floatStateProbe       = floatStateProbe;
 
         if (onToggleFloat is not null)
@@ -73,6 +83,10 @@ public sealed class WindowMenuModel : ReactiveObject
     public ICommand? ClearCommand       { get; }
     public ICommand? CloseCommand       { get; }
     public ICommand? CopyAllCommand     { get; }
+    /// <summary>"Save As…" — export the window buffer to a text file (#120).</summary>
+    public ICommand? SaveAsCommand      { get; }
+    /// <summary>"Find…" — open the window's in-window search bar (#120).</summary>
+    public ICommand? FindCommand        { get; }
     public ICommand? ToggleFloatCommand { get; }
 
     // Capability flags drive each MenuItem's IsVisible — a window only shows the
@@ -82,17 +96,21 @@ public sealed class WindowMenuModel : ReactiveObject
     public bool ShowClear        => ClearCommand          is not null;
     public bool ShowClose        => CloseCommand          is not null;
     public bool ShowCopyAll      => CopyAllCommand        is not null;
+    public bool ShowSaveAs       => SaveAsCommand         is not null;
+    public bool ShowFind         => FindCommand           is not null;
     public bool ShowTimestamp    => _onTimestampToggled   is not null;
     public bool ShowNameListOnly => _onNameListOnlyToggled is not null;
     public bool ShowPauseScroll  => _onScrollPauseToggled is not null;
+    public bool ShowWordWrap     => _onWordWrapToggled    is not null;
     public bool ShowFloat        => ToggleFloatCommand    is not null;
 
     /// <summary>Render the separator above "Close Window" only when Close
     /// coexists with at least one item above it (so a Close-only menu has no
     /// dangling leading separator).</summary>
     public bool ShowCloseSeparator =>
-        ShowClose && (ShowCopyAll || ShowClear || ShowTimestamp
-                      || ShowNameListOnly || ShowPauseScroll || ShowFloat);
+        ShowClose && (ShowCopyAll || ShowClear || ShowSaveAs || ShowFind
+                      || ShowTimestamp || ShowNameListOnly || ShowPauseScroll
+                      || ShowWordWrap || ShowFloat);
 
     /// <summary>Time Stamp checkbox state. Set by the TwoWay menu binding —
     /// flipping it runs the toggle handler (which updates the window's
@@ -135,6 +153,20 @@ public sealed class WindowMenuModel : ReactiveObject
         }
     }
 
+    /// <summary>Word Wrap checkbox state (#120). Flipping it runs the toggle
+    /// handler, which updates <c>WindowSettings.WordWrap</c> + persists; the
+    /// window relayouts live via the tool's ToolTextWrapping binding.</summary>
+    public bool IsWordWrapOn
+    {
+        get => _isWordWrapOn;
+        set
+        {
+            if (_isWordWrapOn == value) return;
+            this.RaiseAndSetIfChanged(ref _isWordWrapOn, value);
+            _onWordWrapToggled?.Invoke(value);
+        }
+    }
+
     /// <summary>"Float" when the window is docked, "Re-dock" when it's already
     /// floating in its own top-level window. Refreshed by
     /// <see cref="RefreshFloatState"/> when the menu opens (the user can drag a
@@ -161,4 +193,8 @@ public sealed class WindowMenuModel : ReactiveObject
     /// <summary>Mirror an external Name List Only change into the checkmark.</summary>
     public void SyncNameListOnly(bool value) =>
         this.RaiseAndSetIfChanged(ref _isNameListOnlyOn, value, nameof(IsNameListOnlyOn));
+
+    /// <summary>Mirror an external Word Wrap change into the checkmark.</summary>
+    public void SyncWordWrap(bool value) =>
+        this.RaiseAndSetIfChanged(ref _isWordWrapOn, value, nameof(IsWordWrapOn));
 }

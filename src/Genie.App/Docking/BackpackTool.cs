@@ -7,9 +7,13 @@ using Genie.Core.Layout;
 
 namespace Genie.App.Docking;
 
-public class BackpackTool : Tool, IWindowMenuHost
+public class BackpackTool : Tool, IWindowMenuHost, IFindHost
 {
     public InventoryViewModel ViewModel { get; }
+
+    /// <summary>In-window Find bar state (#120) — "where did that scimitar
+    /// go" over the inventory list.</summary>
+    public FindInWindowModel Find { get; }
 
     /// <summary>Right-click window menu (Clear / Close), built by
     /// <see cref="GenieDockFactory"/>.</summary>
@@ -30,11 +34,23 @@ public class BackpackTool : Tool, IWindowMenuHost
     private double     _toolFontSize = 11;
     public  double     ToolFontSize { get => _toolFontSize; private set => SetProperty(ref _toolFontSize, value); }
 
+    // Word Wrap (#120) — see GameTextDocument for the semantics. Especially
+    // useful here: wrap OFF keeps long item names on one row so the two-column
+    // inventory layout survives narrow panels.
+    private TextWrapping _toolTextWrapping = TextWrapping.Wrap;
+    public  TextWrapping ToolTextWrapping { get => _toolTextWrapping; private set => SetProperty(ref _toolTextWrapping, value); }
+
+    private Avalonia.Controls.Primitives.ScrollBarVisibility _toolHScroll
+        = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
+    public  Avalonia.Controls.Primitives.ScrollBarVisibility ToolHScroll
+    { get => _toolHScroll; private set => SetProperty(ref _toolHScroll, value); }
+
     public BackpackTool(InventoryViewModel vm, WindowSettings? settings = null)
     {
         ViewModel = vm;
         Id        = "backpack";   // persistence key — saved layouts, ws.Get, dock registry depend on it
         Title     = "Inventory";
+        Find      = new FindInWindowModel(() => vm.Items.Select(l => l.Text).ToArray());
 
         if (settings is not null)
         {
@@ -53,5 +69,9 @@ public class BackpackTool : Tool, IWindowMenuHost
         ToolFontSize   = WindowSettingsResolver.ResolveFontSize(s.FontSize);
         ToolForeground = WindowSettingsResolver.ResolveForeground(s.Foreground);
         ToolBackground = WindowSettingsResolver.ResolveBackground(s.Background);
+        ToolTextWrapping = s.WordWrap ? TextWrapping.Wrap : TextWrapping.NoWrap;
+        ToolHScroll      = s.WordWrap
+            ? Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
+            : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
     }
 }

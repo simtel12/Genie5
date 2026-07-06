@@ -66,6 +66,15 @@ public sealed class WindowSettings
     /// </summary>
     public bool    EchoToMain   { get; set; } = false;
 
+    /// <summary>
+    /// Per-window word wrap (#120). On (the default) long lines wrap to the
+    /// window width — the shipped behaviour. Off, each line stays on one row
+    /// and the window scrolls horizontally; useful for column-aligned output
+    /// (inventory tables, score sheets). Toggled from the window right-click
+    /// menu and persisted per-window.
+    /// </summary>
+    public bool    WordWrap     { get; set; } = true;
+
     public string? IfClosed     { get; set; }
     public event Action? Changed;
     public void NotifyChanged() => Changed?.Invoke();

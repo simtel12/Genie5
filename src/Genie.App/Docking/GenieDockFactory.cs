@@ -871,19 +871,82 @@ public class GenieDockFactory : Factory
                 () => WindowClipboard.CopyLinesAsync(rx.ViewModel.Lines)),
             PluginWindowTool pw => ReactiveCommand.CreateFromTask(
                 () => WindowClipboard.CopyLinesAsync(pw.ViewModel.Lines.Select(l => l.Text))),
+            BackpackTool bp     => ReactiveCommand.CreateFromTask(
+                () => WindowClipboard.CopyLinesAsync(bp.ViewModel.Items.Select(l => l.Text))),
+            // Field/content panels (#120 follow-up): not line buffers, but
+            // their text is just as copy/export-worthy.
+            RoomTool rm         => ReactiveCommand.CreateFromTask(
+                () => WindowClipboard.CopyLinesAsync(RoomLines(rm))),
+            ExperienceTool ex   => ReactiveCommand.CreateFromTask(
+                () => WindowClipboard.CopyLinesAsync(ContentLines(ex.ViewModel.Content))),
+            ActiveSpellsTool sp => ReactiveCommand.CreateFromTask(
+                () => WindowClipboard.CopyLinesAsync(ContentLines(sp.ViewModel.Content))),
+            TimeTrackerTool tt  => ReactiveCommand.CreateFromTask(
+                () => WindowClipboard.CopyLinesAsync(ContentLines(tt.ViewModel.Content))),
             _                   => null
         };
 
+        // Save As… (#120) — same windows that can Copy All, plus the
+        // inventory list: export the buffer as plain text via the OS picker.
+        ICommand? saveAs = dockable switch
+        {
+            GameTextDocument gd => ReactiveCommand.CreateFromTask(
+                () => WindowSaveAs.SaveLinesAsync(gd.Title, gd.ViewModel.Lines.Select(l => l.Text))),
+            StreamTool st       => ReactiveCommand.CreateFromTask(
+                () => WindowSaveAs.SaveLinesAsync(st.Title, st.Buffer.Lines.Select(l => l.Text))),
+            BackpackTool bp     => ReactiveCommand.CreateFromTask(
+                () => WindowSaveAs.SaveLinesAsync(bp.Title, bp.ViewModel.Items.Select(l => l.Text))),
+            RawXmlTool rx       => ReactiveCommand.CreateFromTask(
+                () => WindowSaveAs.SaveLinesAsync(rx.Title, rx.ViewModel.Lines)),
+            PluginWindowTool pw => ReactiveCommand.CreateFromTask(
+                () => WindowSaveAs.SaveLinesAsync(pw.Title, pw.ViewModel.Lines.Select(l => l.Text))),
+            RoomTool rm         => ReactiveCommand.CreateFromTask(
+                () => WindowSaveAs.SaveLinesAsync(rm.Title, RoomLines(rm))),
+            ExperienceTool ex   => ReactiveCommand.CreateFromTask(
+                () => WindowSaveAs.SaveLinesAsync(ex.Title, ContentLines(ex.ViewModel.Content))),
+            ActiveSpellsTool sp => ReactiveCommand.CreateFromTask(
+                () => WindowSaveAs.SaveLinesAsync(sp.Title, ContentLines(sp.ViewModel.Content))),
+            TimeTrackerTool tt  => ReactiveCommand.CreateFromTask(
+                () => WindowSaveAs.SaveLinesAsync(tt.Title, ContentLines(tt.ViewModel.Content))),
+            _                   => null
+        };
+
+        // Find… (#120) — any window hosting an in-window find bar.
+        ICommand? find = dockable is IFindHost findHost
+            ? ReactiveCommand.Create(() => { findHost.Find.IsOpen = true; })
+            : null;
+
+        // Word Wrap (#120) — WindowSettings-backed per-window toggle for the
+        // TextLine feeds. Plugin windows stay always-wrap (menu-script text
+        // depends on it); Raw XML stays always-NoWrap (protocol dump).
+        var  wrapInit   = true;
+        Action<bool>? wrapToggle = null;
+        if (dockable is GameTextDocument or StreamTool or BackpackTool)
+        {
+            var wrapSettings = _vm.WindowSettings.Get(id);
+            wrapInit   = wrapSettings.WordWrap;
+            wrapToggle = on =>
+            {
+                wrapSettings.WordWrap = on;
+                wrapSettings.NotifyChanged();   // tool re-resolves ToolTextWrapping live
+                _vm.SaveWindowSettings();
+            };
+        }
+
         // Time Stamp + Name List Only + Pause Scrolling only make sense for the
-        // per-line text feeds; everything else gets Copy All (where it has a
-        // buffer) + Clear + Float + Close.
+        // per-line text feeds; everything else gets Copy All / Save As (where
+        // it has a buffer) + Find + Clear + Float + Close.
         if (dockable is not (StreamTool or GameTextDocument))
             return new WindowMenuModel(
-                clear:           clear,
-                close:           close,
-                copyAll:         copyAll,
-                onToggleFloat:   toggleFloat,
-                floatStateProbe: floatProbe);
+                clear:             clear,
+                close:             close,
+                copyAll:           copyAll,
+                saveAs:            saveAs,
+                find:              find,
+                wordWrapOn:        wrapInit,
+                onWordWrapToggled: wrapToggle,
+                onToggleFloat:     toggleFloat,
+                floatStateProbe:   floatProbe);
 
         var settings = _vm.WindowSettings.Get(id);
 
@@ -921,7 +984,11 @@ public class GenieDockFactory : Factory
             scrollPausedOn:        pausedInit,
             onScrollPauseToggled:  pauseToggle,
             onToggleFloat:         toggleFloat,
-            floatStateProbe:       floatProbe);
+            floatStateProbe:       floatProbe,
+            saveAs:                saveAs,
+            find:                  find,
+            wordWrapOn:            wrapInit,
+            onWordWrapToggled:     wrapToggle);
 
         // Keep the checkmarks in sync if the same settings are edited elsewhere
         // (e.g. the Configuration → Layout tab's Time Stamp checkbox).
@@ -929,10 +996,29 @@ public class GenieDockFactory : Factory
         {
             menu.SyncTimestamp(settings.Timestamp);
             menu.SyncNameListOnly(settings.NameListOnly);
+            menu.SyncWordWrap(settings.WordWrap);
         };
 
         return menu;
     }
+
+    /// <summary>Flatten the Room panel's fields (title, description, exits,
+    /// players, objects) to text lines for Copy All / Save As — the panel is
+    /// field-based, not a line buffer, so it needs its own flattening. Empty
+    /// fields are skipped, mirroring their collapsed rows in the panel.</summary>
+    private static IEnumerable<string> RoomLines(RoomTool room)
+    {
+        var vm = room.ViewModel;
+        return new[] { vm.Title, vm.Description, vm.Exits, vm.Players, vm.Objects }
+            .Where(f => !string.IsNullOrWhiteSpace(f));
+    }
+
+    /// <summary>Split a single-string panel body (Experience, Active Spells,
+    /// Time Tracker) into lines for Copy All / Save As.</summary>
+    private static IEnumerable<string> ContentLines(string content)
+        => string.IsNullOrEmpty(content)
+            ? Array.Empty<string>()
+            : content.Replace("\r\n", "\n").Split('\n');
 
     /// <summary>Push the Name List Only flag onto the window's line buffer so its
     /// Add path starts (or stops) filtering.</summary>

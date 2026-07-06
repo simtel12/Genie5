@@ -7,9 +7,13 @@ using Genie.Core.Layout;
 
 namespace Genie.App.Docking;
 
-public class GameTextDocument : Document, IWindowMenuHost
+public class GameTextDocument : Document, IWindowMenuHost, IFindHost
 {
     public GameTextViewModel ViewModel { get; }
+
+    /// <summary>In-window Find bar state (#120). The overlay in the game-text
+    /// template binds to this; Ctrl+F / the window menu opens it.</summary>
+    public FindInWindowModel Find { get; }
 
     /// <summary>Right-click window menu (Clear / Time Stamp / Name List Only),
     /// built by <see cref="GenieDockFactory"/>. The main game window has no
@@ -35,6 +39,17 @@ public class GameTextDocument : Document, IWindowMenuHost
     private double     _toolFontSize = 13;
     public  double     ToolFontSize { get => _toolFontSize; private set => SetProperty(ref _toolFontSize, value); }
 
+    // Word Wrap (#120): resolved from WindowSettings.WordWrap. Wrap on (the
+    // default) keeps the shipped look; wrap off pairs NoWrap with an Auto
+    // horizontal scrollbar so long lines scroll instead of clipping.
+    private TextWrapping _toolTextWrapping = TextWrapping.Wrap;
+    public  TextWrapping ToolTextWrapping { get => _toolTextWrapping; private set => SetProperty(ref _toolTextWrapping, value); }
+
+    private Avalonia.Controls.Primitives.ScrollBarVisibility _toolHScroll
+        = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
+    public  Avalonia.Controls.Primitives.ScrollBarVisibility ToolHScroll
+    { get => _toolHScroll; private set => SetProperty(ref _toolHScroll, value); }
+
     /// <summary>"Pause Scrolling" window-menu state. Bound to the game-text
     /// ScrollViewer's <c>AutoScrollBehavior.Paused</c>; the window menu toggles
     /// it. Transient (not persisted).</summary>
@@ -46,6 +61,7 @@ public class GameTextDocument : Document, IWindowMenuHost
         ViewModel = vm;
         Id        = "game-text";
         Title     = "Game";
+        Find      = new FindInWindowModel(() => vm.Lines.Select(l => l.Text).ToArray());
 
         if (settings is not null)
         {
@@ -74,5 +90,9 @@ public class GameTextDocument : Document, IWindowMenuHost
         ToolFontSize   = WindowSettingsResolver.ResolveFontSize(s.FontSize);
         ToolForeground = WindowSettingsResolver.ResolveForeground(s.Foreground);
         ToolBackground = WindowSettingsResolver.ResolveBackground(s.Background); // null = transparent
+        ToolTextWrapping = s.WordWrap ? TextWrapping.Wrap : TextWrapping.NoWrap;
+        ToolHScroll      = s.WordWrap
+            ? Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
+            : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
     }
 }

@@ -137,6 +137,13 @@
                           <MenuItem Header="Copy All"
                                     Command="{Binding WindowMenu.CopyAllCommand}"
                                     IsVisible="{Binding WindowMenu.ShowCopyAll}" />
+                          <MenuItem Header="Save As…"
+                                    Command="{Binding WindowMenu.SaveAsCommand}"
+                                    IsVisible="{Binding WindowMenu.ShowSaveAs}" />
+                          <MenuItem Header="Find…"
+                                    InputGesture="Ctrl+F"
+                                    Command="{Binding WindowMenu.FindCommand}"
+                                    IsVisible="{Binding WindowMenu.ShowFind}" />
                           <MenuItem Header="Clear"
                                     Command="{Binding WindowMenu.ClearCommand}"
                                     IsVisible="{Binding WindowMenu.ShowClear}" />
@@ -148,6 +155,10 @@
                                     ToggleType="CheckBox"
                                     IsChecked="{Binding WindowMenu.IsNameListOnlyOn, Mode=TwoWay}"
                                     IsVisible="{Binding WindowMenu.ShowNameListOnly}" />
+                          <MenuItem Header="Word Wrap"
+                                    ToggleType="CheckBox"
+                                    IsChecked="{Binding WindowMenu.IsWordWrapOn, Mode=TwoWay}"
+                                    IsVisible="{Binding WindowMenu.ShowWordWrap}" />
                           <MenuItem Header="Pause Scrolling"
                                     ToggleType="CheckBox"
                                     IsChecked="{Binding WindowMenu.IsScrollPaused, Mode=TwoWay}"

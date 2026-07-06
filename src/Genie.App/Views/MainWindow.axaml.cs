@@ -731,6 +731,20 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             return;
         }
 
+        // #120: Ctrl+F opens the Find bar on the selected game/stream window —
+        // PageScroll's click-target, so it follows the same "active window"
+        // the PageUp/PageDown keys scroll (main game window before any click).
+        // Checked before the generic macro dispatch but only when no ctrl+f
+        // macro exists, so an existing user binding keeps winning.
+        if (e.Key == Key.F && e.KeyModifiers == KeyModifiers.Control &&
+            ViewModel?.Core?.Commands?.Macros?.Get("ctrl+f") is null &&
+            PageScroll.CurrentTarget?.DataContext is Docking.IFindHost findHost)
+        {
+            findHost.Find.IsOpen = true;
+            e.Handled = true;
+            return;
+        }
+
         if (ViewModel?.Core?.Commands?.Macros is not { } macros) return;
 
         var keyString = MacroKeyConverter.ToMacroKey(e.Key, e.KeyModifiers);
