@@ -189,6 +189,7 @@ public class GenieDockFactory : Factory
         var itemlog  = new StreamTool      (_vm.StreamTabs.ItemLog,  ws.Get("itemlog"));
         var experience = new ExperienceTool(_vm.Experience,          ws.Get("experience"));
         var activeSpells = new ActiveSpellsTool(_vm.ActiveSpells,    ws.Get("active-spells"));
+        var timeTracker = new TimeTrackerTool(_vm.TimeTracker,       ws.Get("time-tracker"));
         var scripts    = new ScriptsTool   (_vm.Scripts,            ws.Get("scripts"));
         var scene      = new SceneTool     (_vm.Scene,              ws.Get("scene"));
         var mobs       = new MobsTool      (_vm.Mobs,               ws.Get("mobs"));
@@ -348,6 +349,11 @@ public class GenieDockFactory : Factory
         // Timer fills it. First-class tool (not a plugin window) so it keeps MDI
         // decorations and never re-opens itself on a server push (#112).
         _tools[activeSpells.Id] = (activeSpells, backpackDock.Id);
+        // Time Tracker: registered but hidden by default — re-opens beside the
+        // Backpack via Window → Time Tracker. The builtin tracker fills it.
+        // First-class tool (not a plugin window) for the same reasons as
+        // Active Spells: top-level menu entry, no self-re-open on repaint.
+        _tools[timeTracker.Id] = (timeTracker, backpackDock.Id);
         // Scripts: registered but hidden by default (like Vitals/Experience) —
         // re-opens beside the Backpack via Window → Scripts.
         _tools[scripts.Id]    = (scripts,    backpackDock.Id);
@@ -431,6 +437,7 @@ public class GenieDockFactory : Factory
         var itemlog    = new StreamTool      (_vm.StreamTabs.ItemLog,  ws.Get("itemlog"));
         var experience = new ExperienceTool  (_vm.Experience,          ws.Get("experience"));
         var activeSpells = new ActiveSpellsTool(_vm.ActiveSpells,       ws.Get("active-spells"));
+        var timeTracker = new TimeTrackerTool (_vm.TimeTracker,        ws.Get("time-tracker"));
         var scene      = new SceneTool        (_vm.Scene,              ws.Get("scene"));
         var mobs       = new MobsTool         (_vm.Mobs,               ws.Get("mobs"));
         var players    = new PlayersTool      (_vm.Players,            ws.Get("players"));
@@ -445,7 +452,7 @@ public class GenieDockFactory : Factory
             ("combat", combat), ("familiar", familiar), ("death", death), ("assess", assess),
             ("atmospherics", atmospherics), ("log", log), ("itemlog", itemlog),
             ("vitals", vitals), ("experience", experience), ("active-spells", activeSpells),
-            ("scene", scene),
+            ("time-tracker", timeTracker), ("scene", scene),
             ("mobs", mobs), ("players", players), ("raw-xml", rawXml),
             ("injuries", injuries),
         };
@@ -767,7 +774,21 @@ public class GenieDockFactory : Factory
                 // (with its persisted title) so the arrangement restores; the
                 // plugin repopulates it on its next SetWindow.
                 if (IsPluginWindowId(n.Id))
+                {
+                    // Window names that were dynamic plugin panels in earlier
+                    // builds but are first-class tools now (Time Tracker moved
+                    // builtin): map the stale leaf onto the real tool in its
+                    // saved spot instead of resurrecting a dead generic panel
+                    // no extension will ever write to again.
+                    var migrated = n.Id.Substring(PluginWindowPrefix.Length) switch
+                    {
+                        "time tracker" => "time-tracker",
+                        _              => null,
+                    };
+                    if (migrated is not null)
+                        return _tools.TryGetValue(migrated, out var m) ? m.Dockable : null;
                     return CreatePluginWindowTool(n.Id, n.Title);
+                }
                 return null;   // unregistered id — skip
             default:
                 return null;
