@@ -1110,27 +1110,39 @@
 
     <DataTemplate DataType="docking:ExperienceTool">
       <DockPanel>
-        <!-- Per-panel density slider (public #125). Snaps 0 Full … 4 Brief and -->
-        <!-- writes #config experiencedensity, so the slider, the command line,  -->
-        <!-- and settings.cfg stay in sync.                                      -->
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,140,Auto" Margin="8,2">
-          <TextBlock Grid.Column="0" Text="Density" VerticalAlignment="Center"
-                     Margin="0,0,6,0" FontSize="11" Opacity="0.7"/>
-          <Slider Grid.Column="1" Minimum="0" Maximum="4"
+        <!-- Per-panel density slider (public #125) + Track-gain toggle (#144).   -->
+        <!-- Each writes its #config value directly, so the controls, the command -->
+        <!-- line, and settings.cfg stay in sync.                                 -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,2" Spacing="6">
+          <TextBlock Text="Density" VerticalAlignment="Center"
+                     FontSize="11" Opacity="0.7"/>
+          <Slider Width="140" Minimum="0" Maximum="4"
                   TickFrequency="1" IsSnapToTickEnabled="True"
                   VerticalAlignment="Center"
                   Value="{Binding ViewModel.DensityValue, Mode=TwoWay}"/>
-          <TextBlock Grid.Column="2" Text="{Binding ViewModel.DensityLabel}"
-                     VerticalAlignment="Center" Margin="6,0,0,0"
-                     FontSize="11" MinWidth="68"/>
-        </Grid>
+          <TextBlock Text="{Binding ViewModel.DensityLabel}"
+                     VerticalAlignment="Center" FontSize="11" MinWidth="68"/>
+          <CheckBox Content="Track gain" VerticalAlignment="Center" FontSize="11"
+                    IsChecked="{Binding ViewModel.TrackGain, Mode=TwoWay}"
+                    ToolTip.Tip="Show ranks gained this session per skill, plus a session total."/>
+        </StackPanel>
+        <!-- One SelectableTextBlock per row (via Lines/Inlines) so user highlights -->
+        <!-- fire on the Experience window (#144). No wrapping: keep columns aligned; -->
+        <!-- an Auto h-scrollbar hands long rows their full width.                    -->
         <ScrollViewer HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
-          <SelectableTextBlock Text="{Binding ViewModel.Content}"
-                               FontFamily="{Binding ToolFontFamily}"
-                               FontSize="{Binding ToolFontSize}"
-                               Margin="8"
-                               Foreground="{DynamicResource GameBrush}"/>
+          <ItemsControl ItemsSource="{Binding ViewModel.Lines}"
+                        FontFamily="{Binding ToolFontFamily}"
+                        FontSize="{Binding ToolFontSize}"
+                        Margin="8"
+                        Foreground="{DynamicResource GameBrush}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="vm:TextLine">
+                <SelectableTextBlock ContextFlyout="{x:Null}"
+                                     controls:InlinesBehavior.Source="{Binding Inlines}"/>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
         </ScrollViewer>
       </DockPanel>
     </DataTemplate>

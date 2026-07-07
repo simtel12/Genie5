@@ -878,7 +878,7 @@ public class GenieDockFactory : Factory
             RoomTool rm         => ReactiveCommand.CreateFromTask(
                 () => WindowClipboard.CopyLinesAsync(RoomLines(rm))),
             ExperienceTool ex   => ReactiveCommand.CreateFromTask(
-                () => WindowClipboard.CopyLinesAsync(ContentLines(ex.ViewModel.Content))),
+                () => WindowClipboard.CopyLinesAsync(ex.ViewModel.Lines.Select(l => l.Text))),
             ActiveSpellsTool sp => ReactiveCommand.CreateFromTask(
                 () => WindowClipboard.CopyLinesAsync(ContentLines(sp.ViewModel.Content))),
             TimeTrackerTool tt  => ReactiveCommand.CreateFromTask(
@@ -903,7 +903,7 @@ public class GenieDockFactory : Factory
             RoomTool rm         => ReactiveCommand.CreateFromTask(
                 () => WindowSaveAs.SaveLinesAsync(rm.Title, RoomLines(rm))),
             ExperienceTool ex   => ReactiveCommand.CreateFromTask(
-                () => WindowSaveAs.SaveLinesAsync(ex.Title, ContentLines(ex.ViewModel.Content))),
+                () => WindowSaveAs.SaveLinesAsync(ex.Title, ex.ViewModel.Lines.Select(l => l.Text))),
             ActiveSpellsTool sp => ReactiveCommand.CreateFromTask(
                 () => WindowSaveAs.SaveLinesAsync(sp.Title, ContentLines(sp.ViewModel.Content))),
             TimeTrackerTool tt  => ReactiveCommand.CreateFromTask(

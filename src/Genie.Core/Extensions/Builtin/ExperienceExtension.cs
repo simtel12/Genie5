@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Genie.Core.Events;
@@ -49,6 +50,16 @@ public sealed class ExperienceExtension : IGameExtension
     // "collection was modified".
     private readonly object _gate = new();
 
+    /// <summary>First-seen (rank, percent) per skill this session — the baseline the
+    /// optional rank-gain display subtracts from (#144). Guarded by <see cref="_gate"/>;
+    /// cleared on character switch.</summary>
+    private readonly Dictionary<string, (int Rank, int Percent)> _baseline = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>UTC time the first skill datum of this session arrived — drives the
+    /// "Session H:MM:SS" header (#144). Null until data arrives; reset on character
+    /// switch. Guarded by <see cref="_gate"/>.</summary>
+    private DateTime? _sessionStart;
+
     /// <summary>Canonical 35 DR learning states (0–34), authoritative order from
     /// Genie 4's EXPTracker.</summary>
     private static readonly string[] MindStates =
@@ -80,7 +91,12 @@ public sealed class ExperienceExtension : IGameExtension
     /// learning rates. A same-character reconnect does NOT call this.</summary>
     public void OnReset()
     {
-        lock (_gate) _skills.Clear();
+        lock (_gate)
+        {
+            _skills.Clear();
+            _baseline.Clear();
+            _sessionStart = null;
+        }
         _dirty = false;
         _host?.SetWindow(WindowName, Render());
     }
@@ -180,6 +196,8 @@ public sealed class ExperienceExtension : IGameExtension
         var info = new SkillInfo(rank, pct, mind);
         lock (_gate)
         {
+            _sessionStart ??= DateTime.UtcNow;   // session clock starts at the first datum
+            _baseline.TryAdd(name, (rank, pct));  // first-seen rank = session baseline (#144)
             if (_skills.TryGetValue(name, out var prev) && prev == info) return;  // no display change
             _skills[name] = info;
         }
@@ -204,19 +222,46 @@ public sealed class ExperienceExtension : IGameExtension
     private int Density() =>
         int.TryParse(_host.GetConfig("experiencedensity"), out var d) ? Math.Clamp(d, 0, 4) : 0;
 
+    /// <summary>Whether to show per-skill session rank-gain (a "+N.NN" column plus a
+    /// session total). Genie 4 EXPTracker parity (#144); read live from
+    /// <c>#config experiencetrackgain</c> so the panel checkbox, command line, and
+    /// settings.cfg all drive one value.</summary>
+    private bool TrackGain() => bool.TryParse(_host.GetConfig("experiencetrackgain"), out var b) && b;
+
     /// <summary>Render one learning row at the given density. 0 = Full (rank, %,
     /// learning word, count); 1 = drop the <c>(n/34)</c> count; 2 = numbers only
-    /// (rank + %); 3 = short skill name + rank + %; 4 = Brief (short name + rank).
+    /// (rank + % + numeric mindstate); 3 = short skill name + rank + % + numeric
+    /// mindstate; 4 = Brief (short name + rank). The "Numbers only" and "Short names"
+    /// stops carry the mindstate as a number (#144) — it's the most-watched field.
     /// Column widths match within a name style so the list stays aligned.</summary>
     internal static string FormatLine(string name, int rank, int percent, int mindstate, int density) =>
         density switch
         {
             >= 4 => $"{ShortName(name),-12} {rank,3}",
-            3    => $"{ShortName(name),-12} {rank,3} {percent,2}%",
-            2    => $"{name,-18} {rank,3} {percent,2}%",
+            3    => $"{ShortName(name),-12} {rank,3} {percent,2}%  {mindstate,2}",
+            2    => $"{name,-18} {rank,3} {percent,2}%  {mindstate,2}",
             1    => $"{name,-18} {rank,3} {percent,2}%  {MindStates[mindstate]}",
             _    => $"{name,-18} {rank,3} {percent,2}%  {MindStates[mindstate]} ({mindstate}/34)",
         };
+
+    /// <summary>Fractional ranks gained: the whole-rank delta plus the percent-into-rank
+    /// delta, so a rank 100 34% baseline now at 101 5% reads as +0.71.</summary>
+    internal static double GainValue(int rank, int percent, int baseRank, int basePercent)
+        => (rank - baseRank) + (percent - basePercent) / 100.0;
+
+    /// <summary>Signed 2-dp gain string ("+2.34", "+0.00"). Invariant culture so the
+    /// decimal point never localises to a comma.</summary>
+    internal static string FormatGain(double gain)
+        => (gain >= 0 ? "+" : "") + gain.ToString("0.00", CultureInfo.InvariantCulture);
+
+    /// <summary>Elapsed session time — "H:MM:SS" once past an hour, "M:SS" under it.
+    /// Clamped at zero (replay timestamps can run negative).</summary>
+    internal static string FormatElapsed(TimeSpan t)
+    {
+        if (t < TimeSpan.Zero) t = TimeSpan.Zero;
+        int h = (int)t.TotalHours;
+        return h > 0 ? $"{h}:{t.Minutes:00}:{t.Seconds:00}" : $"{t.Minutes}:{t.Seconds:00}";
+    }
 
     /// <summary>Compact skill name for the short/brief densities: every word except
     /// the last is clipped to a 2-letter prefix ("Small Edged" → "Sm Edged",
@@ -234,21 +279,48 @@ public sealed class ExperienceExtension : IGameExtension
     private string Render()
     {
         List<KeyValuePair<string, SkillInfo>> learning;
+        Dictionary<string, (int Rank, int Percent)> baseline;
+        DateTime? start;
+        int locked;
+        double totalGain;
         lock (_gate)
+        {
             learning = _skills
                 .Where(kv => kv.Value.Mindstate > 0)
                 .OrderByDescending(kv => kv.Value.Mindstate)
                 .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            locked = _skills.Count(kv => kv.Value.Mindstate >= MindStates.Length - 1);  // 34 = mind lock
+            start  = _sessionStart;
+            totalGain = 0;
+            foreach (var kv in _skills)
+                if (_baseline.TryGetValue(kv.Key, out var b))
+                    totalGain += GainValue(kv.Value.Rank, kv.Value.Percent, b.Rank, b.Percent);
+            baseline = new Dictionary<string, (int Rank, int Percent)>(_baseline, StringComparer.OrdinalIgnoreCase);
+        }
 
-        var density = Density();
+        var density   = Density();
+        var trackGain = TrackGain();
+
         var sb = new StringBuilder();
-        sb.Append("Learning: ").Append(learning.Count).Append('\n');
+        // Header: skills learning (#144), plus mind-locked count and session clock.
+        sb.Append("Learning: ").Append(learning.Count);
+        if (locked > 0)     sb.Append("   Locked: ").Append(locked);
+        if (start is { } s) sb.Append("   Session ").Append(FormatElapsed(DateTime.UtcNow - s));
+        sb.Append('\n');
         sb.Append("──────────────────────────────────────\n");
+
         foreach (var (name, info) in learning)
-            sb.AppendLine(FormatLine(name, info.Rank, info.Percent, info.Mindstate, density));
+        {
+            sb.Append(FormatLine(name, info.Rank, info.Percent, info.Mindstate, density));
+            if (trackGain && baseline.TryGetValue(name, out var b))
+                sb.Append("  ").Append(FormatGain(GainValue(info.Rank, info.Percent, b.Rank, b.Percent)));
+            sb.Append('\n');
+        }
         if (learning.Count == 0)
-            sb.Append("(nothing learning — train a skill, or type 'exp')");
+            sb.Append("(nothing learning — train a skill, or type 'exp')\n");
+        if (trackGain && start is not null)
+            sb.Append("Total gained: ").Append(FormatGain(totalGain)).Append(" ranks\n");
         return sb.ToString().TrimEnd();
     }
 }

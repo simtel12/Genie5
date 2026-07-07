@@ -57,6 +57,11 @@ public sealed class GenieConfig
     /// 4 = Brief (short name + rank). Read by
     /// <see cref="Extensions.Builtin.ExperienceExtension"/> on render.</summary>
     public int ExperienceDensity { get; set; }
+    /// <summary>Experience-window rank-gain tracking (Genie 4 EXPTracker parity, #144).
+    /// When on, each learning row shows the ranks gained since the session started and
+    /// the panel adds a session total. Default off. Read by
+    /// <see cref="Extensions.Builtin.ExperienceExtension"/> on render.</summary>
+    public bool ExperienceTrackGain { get; set; }
     /// <summary>Built-in Time Tracker (Elanthian time / sky "Time Tracker" dock panel).
     /// Default on. Was the external Plugin_TimeTrackerV5, now in Core.</summary>
     public bool ShowTimeTracker { get; set; } = true;
@@ -373,6 +378,7 @@ public sealed class GenieConfig
         ("spelltimer", ShowSpellTimer.ToString()),
         ("showexperience", ShowExperience.ToString()),
         ("experiencedensity", ExperienceDensity.ToString()),
+        ("experiencetrackgain", ExperienceTrackGain.ToString()),
         ("showtimetracker", ShowTimeTracker.ToString()),
         ("autolog", AutoLog.ToString()),
         ("automapper", AutoMapper.ToString()),
@@ -463,7 +469,7 @@ public sealed class GenieConfig
     {
         ("Connection",       new[] { "classicconnect", "conndebug", "connectscript", "frontend", "reconnect" }),
         ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines" }),
-        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety" }),
+        ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "scripttimeout", "maxgosubdepth", "abortdupescript", "scriptextension", "editor" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "updatemapperscripts" }),
@@ -508,6 +514,7 @@ public sealed class GenieConfig
                 case "spelltimer": ShowSpellTimer = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "showexperience": ShowExperience = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "experiencedensity": ExperienceDensity = Math.Clamp(UtilityCore.StringToInteger(value), 0, 4); Notify(ConfigFieldUpdated.Trackers); break;
+                case "experiencetrackgain": ExperienceTrackGain = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "showtimetracker": ShowTimeTracker = ToBool(value); Notify(ConfigFieldUpdated.Trackers); break;
                 case "autolog": AutoLog = ToBool(value); Notify(ConfigFieldUpdated.Autolog); break;
                 case "classicconnect": ClassicConnect = ToBool(value); Notify(ConfigFieldUpdated.ClassicConnect); break;

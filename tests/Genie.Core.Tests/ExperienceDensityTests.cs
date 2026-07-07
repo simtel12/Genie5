@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using Genie.Core.Config;
+using Genie.Core.Events;
+using Genie.Core.Extensions;
 using Genie.Core.Extensions.Builtin;
 using Genie.Core.Runtime;
 using Xunit;
@@ -15,11 +19,12 @@ namespace Genie.Core.Tests;
 public class ExperienceDensityTests
 {
     // "Small Edged", rank 142, 71%, mindstate 13 ("examining" in the canonical table).
+    // Densities 2 (Numbers only) and 3 (Short names) carry the numeric mindstate (#144).
     [Theory]
     [InlineData(0, "Small Edged        142 71%  examining (13/34)")]
     [InlineData(1, "Small Edged        142 71%  examining")]
-    [InlineData(2, "Small Edged        142 71%")]
-    [InlineData(3, "Sm Edged     142 71%")]
+    [InlineData(2, "Small Edged        142 71%  13")]
+    [InlineData(3, "Sm Edged     142 71%  13")]
     [InlineData(4, "Sm Edged     142")]
     public void FormatLine_RendersExpectedFormatPerDensity(int density, string expected)
     {
@@ -38,14 +43,48 @@ public class ExperienceDensityTests
     }
 
     [Fact]
-    public void FormatLine_FullAndNoCount_KeepAlignedColumns()
+    public void FormatLine_FullAndNumbersOnly_ShareColumnPrefix()
     {
         // Name column (18) + rank (3) + percent (2) must line up across densities so
-        // a switch doesn't ragged the list.
+        // a switch doesn't ragged the list. Numbers-only then appends a numeric
+        // mindstate column (#144).
         var full = ExperienceExtension.FormatLine("Astrology", 432, 15, 1, 0);
         var nums = ExperienceExtension.FormatLine("Astrology", 432, 15, 1, 2);
         Assert.StartsWith("Astrology          432 15%", full);
-        Assert.Equal("Astrology          432 15%", nums);
+        Assert.Equal("Astrology          432 15%   1", nums);
+    }
+
+    [Theory]
+    [InlineData(101, 5, 100, 34, "+0.71")]   // rank up one, percent down: fractional gain
+    [InlineData(100, 34, 100, 34, "+0.00")]  // no change
+    [InlineData(105, 0, 100, 0, "+5.00")]    // five whole ranks
+    [InlineData(100, 50, 100, 20, "+0.30")]  // same rank, percent climb
+    public void GainValue_TracksFractionalRankGain(int rank, int pct, int baseRank, int basePct, string expected)
+    {
+        var gain = ExperienceExtension.GainValue(rank, pct, baseRank, basePct);
+        Assert.Equal(expected, ExperienceExtension.FormatGain(gain));
+    }
+
+    [Theory]
+    [InlineData(0, 0, 45, "0:45")]           // under a minute
+    [InlineData(0, 3, 7, "3:07")]            // minutes:seconds, zero-padded
+    [InlineData(1, 2, 9, "1:02:09")]         // past an hour → H:MM:SS
+    [InlineData(-5, 0, 0, "0:00")]           // negative (replay) clamps to zero
+    public void FormatElapsed_FormatsSessionClock(int hours, int minutes, int seconds, string expected)
+    {
+        var t = new TimeSpan(hours, minutes, seconds);
+        Assert.Equal(expected, ExperienceExtension.FormatElapsed(t));
+    }
+
+    [Theory]
+    [InlineData("True", true)]
+    [InlineData("False", false)]
+    [InlineData("", false)]                  // unset defaults off
+    public void Config_ExperienceTrackGain_RoundTrips(string input, bool expected)
+    {
+        var cfg = new GenieConfig(new LocalDirectoryService("Genie5Test", AppContext.BaseDirectory));
+        cfg.SetSetting("experiencetrackgain", input, showException: false);
+        Assert.Equal(expected, cfg.ExperienceTrackGain);
     }
 
     [Theory]
@@ -63,5 +102,90 @@ public class ExperienceDensityTests
         cfg.SetSetting("experiencedensity", input, showException: false);
         Assert.Equal(expected, cfg.ExperienceDensity);
         Assert.Equal(expected.ToString(), cfg.GetSetting("experiencedensity"));
+    }
+
+    // ── extension end-to-end render (fake host) — #144 header + gain ────────────
+
+    /// <summary>Minimal host: feeds the extension the two <c>#config</c> keys it reads
+    /// (density + track-gain) and captures the last SetWindow payload.</summary>
+    private sealed class FakeHost : IExtensionHost
+    {
+        private readonly Dictionary<string, string> _config;
+        public FakeHost(int density = 0, bool trackGain = false) => _config = new()
+        {
+            ["experiencedensity"]   = density.ToString(),
+            ["experiencetrackgain"] = trackGain.ToString(),
+        };
+        public string Window = "";
+        public IDictionary<string, string> Globals { get; } = new Dictionary<string, string>();
+        public string ConfigDir { get; } = Path.GetTempPath();
+        public void Echo(string text) { }
+        public void SendCommand(string command) { }
+        public void SetWindow(string window, string content) => Window = content;
+        public void Log(string message) { }
+        public string? GetConfig(string key) => _config.TryGetValue(key, out var v) ? v : null;
+    }
+
+    private static ComponentEvent Exp(string skill, string body) =>
+        new($"exp {skill}", $"{skill}: {body}");
+
+    [Fact]
+    public void Render_ShowsLearningCountAndSessionClock()
+    {
+        var host = new FakeHost();
+        var ext  = new ExperienceExtension();
+        ext.Initialize(host);
+
+        ext.OnGameEvent(Exp("Attunement", "550 73% dabbling"));
+        ext.OnPrompt();
+
+        Assert.Contains("Learning: 1", host.Window);
+        Assert.Contains("Session ", host.Window);   // clock starts at first datum
+        Assert.Contains("Attunement", host.Window);
+    }
+
+    [Fact]
+    public void Render_TrackGain_ShowsPerSkillDeltaAndSessionTotal()
+    {
+        var host = new FakeHost(trackGain: true);
+        var ext  = new ExperienceExtension();
+        ext.Initialize(host);
+
+        ext.OnGameEvent(Exp("Attunement", "550 73% dabbling"));   // baseline 550/73
+        ext.OnGameEvent(Exp("Attunement", "551 10% dabbling"));   // +1 rank, −63% → +0.37
+        ext.OnPrompt();
+
+        Assert.Contains("+0.37", host.Window);
+        Assert.Contains("Total gained: +0.37 ranks", host.Window);
+    }
+
+    [Fact]
+    public void Render_TrackGainOff_OmitsGainTotal()
+    {
+        var host = new FakeHost(trackGain: false);
+        var ext  = new ExperienceExtension();
+        ext.Initialize(host);
+
+        ext.OnGameEvent(Exp("Attunement", "551 10% dabbling"));
+        ext.OnPrompt();
+
+        Assert.DoesNotContain("Total gained", host.Window);
+    }
+
+    [Fact]
+    public void Render_CharacterSwitch_ResetsSessionBaseline()
+    {
+        var host = new FakeHost(trackGain: true);
+        var ext  = new ExperienceExtension();
+        ext.Initialize(host);
+
+        ext.OnGameEvent(Exp("Attunement", "550 73% dabbling"));
+        ext.OnGameEvent(Exp("Attunement", "560 0% dabbling"));   // +9.27 vs the pre-switch baseline
+        ext.OnReset();                                           // new character clears baselines
+        ext.OnGameEvent(Exp("Attunement", "560 50% dabbling"));  // becomes the fresh baseline
+        ext.OnPrompt();
+
+        // Baseline re-captured after the reset, so the session total starts at zero.
+        Assert.Contains("Total gained: +0.00 ranks", host.Window);
     }
 }
