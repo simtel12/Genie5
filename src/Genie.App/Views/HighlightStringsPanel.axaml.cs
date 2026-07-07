@@ -41,6 +41,13 @@ public partial class HighlightStringsPanel : UserControl
     private Action?          _onRulesChanged;
     private string           _filter = string.Empty;
 
+    /// <summary>Pattern of the rule currently loaded in the editor, captured at
+    /// selection time. Null when composing a brand-new entry. Save keys the
+    /// update on THIS (not the live textbox text) so editing the pattern
+    /// rewrites the selected rule in place instead of leaving the old one
+    /// behind and adding a duplicate (#142).</summary>
+    private string?          _editingPattern;
+
     public HighlightStringsPanel()
     {
         InitializeComponent();
@@ -87,6 +94,7 @@ public partial class HighlightStringsPanel : UserControl
         if (_engine is null || ItemsList.SelectedItem is not HighlightRow row) return;
         var rule = _engine.Rules.FirstOrDefault(r => r.Pattern == row.Pattern);
         if (rule is null) return;
+        _editingPattern              = rule.Pattern;
         PatternBox.Text              = rule.Pattern;
         ColorPickerHelpers.LoadColor(FgColorPicker, FgDefaultCheck, rule.ForegroundColor, "Default");
         ColorPickerHelpers.LoadColor(BgColorPicker, BgNoneCheck,    rule.BackgroundColor, "");
@@ -117,14 +125,30 @@ public partial class HighlightStringsPanel : UserControl
             catch (RegexParseException ex) { StatusText.Text = $"Invalid regex: {ex.Message}"; return; }
         }
 
+        // Key the update on the ORIGINALLY-selected pattern, not the textbox
+        // text, so a pattern edit rewrites that rule in place (#142). For a
+        // brand-new entry (_editingPattern null) the key IS the new pattern.
+        var editKey  = string.IsNullOrEmpty(_editingPattern) ? pattern : _editingPattern;
+
         // Carry the CLI-managed fields (per-rule sound + speak) through the
         // edit — the form doesn't surface them, and dropping them here would
         // silently strip a #highlight-added sound/speak on every dialog save.
-        var existing = _engine.Rules.FirstOrDefault(r => r.Pattern == pattern);
-        _engine.RemoveRule(pattern);
+        var existing = _engine.Rules.FirstOrDefault(r => r.Pattern == editKey);
+
+        // Remove the rule being edited, plus any rule that already uses the new
+        // pattern (dedup — a rename must not leave two rules sharing a pattern).
+        _engine.RemoveRule(editKey);
+        if (!string.Equals(editKey, pattern, StringComparison.Ordinal))
+            _engine.RemoveRule(pattern);
+
         _engine.AddRule(pattern, color, bgColor, matchType, caseSensitive, enabled, className,
                         existing?.SoundFile ?? "", existing?.Speak ?? "");
+        _editingPattern = pattern;   // keep the editor pointed at the saved rule
         Refresh();
+        // Re-select the saved row so the editor stays consistent after a rename
+        // (Refresh keys selection off the old row, which no longer exists).
+        ItemsList.SelectedItem = (ItemsList.ItemsSource as IEnumerable<HighlightRow>)?
+            .FirstOrDefault(r => r.Pattern == pattern);
         _onRulesChanged?.Invoke();
         UserHighlights.NotifyRulesChanged();
         StatusText.Text = $"Saved “{pattern}” → {color}.";
@@ -199,6 +223,7 @@ public partial class HighlightStringsPanel : UserControl
 
     private void ClearForm()
     {
+        _editingPattern              = null;
         ItemsList.SelectedItem       = null;
         PatternBox.Text              = string.Empty;
         FgColorPicker.Color          = Colors.Yellow;
