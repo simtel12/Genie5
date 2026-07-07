@@ -36,11 +36,11 @@
          and apply immediately; otherwise edits act on draft engines that
          load on the next connect to that profile.
          ════════════════════════════════════════════════════════════════ -->
-    <Border Grid.Row="0" Background="#0e2438" CornerRadius="3"
+    <Border Grid.Row="0" Background="{DynamicResource Theme.AccentBg}" CornerRadius="3"
             Padding="8,4" Margin="0,0,0,6">
       <Grid ColumnDefinitions="Auto,*,Auto,Auto">
         <TextBlock Grid.Column="0" Text="Profile:"
-                   Foreground="#9bcbe8" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                   Foreground="{DynamicResource Theme.Accent}" VerticalAlignment="Center" Margin="0,0,8,0"/>
         <ComboBox Grid.Column="1"
                   ItemsSource="{Binding Profiles}"
                   SelectedItem="{Binding SelectedProfile}"
@@ -53,15 +53,15 @@
           </ComboBox.ItemTemplate>
         </ComboBox>
         <Border Grid.Column="2" Margin="8,0,0,0" Padding="6,2"
-                Background="#1a4a1a" CornerRadius="3"
+                Background="{DynamicResource Theme.SuccessBg}" CornerRadius="3"
                 IsVisible="{Binding IsEditingConnectedProfile}"
                 ToolTip.Tip="Editing the connected profile — changes are live">
-          <TextBlock Text="LIVE" Foreground="#c8ffc8" FontWeight="SemiBold"/>
+          <TextBlock Text="LIVE" Foreground="{DynamicResource Theme.Success}" FontWeight="SemiBold"/>
         </Border>
         <Border Grid.Column="3" Margin="6,0,0,0" Padding="6,2"
-                Background="#4a3a18" CornerRadius="3"
+                Background="{DynamicResource Theme.WarningBg}" CornerRadius="3"
                 ToolTip.Tip="Editing a different profile — saved to disk, applies on next connect">
-          <TextBlock Text="{Binding EditingLabel}" Foreground="#ffe0a0"/>
+          <TextBlock Text="{Binding EditingLabel}" Foreground="{DynamicResource Theme.Warning}"/>
         </Border>
       </Grid>
     </Border>

@@ -12,7 +12,7 @@
          OK then overwrites that entry. -->
     <TextBlock x:Name="ExistingHeader" Grid.Row="0"
                Text="Existing (click to overwrite, or type a new name below):"
-               Foreground="#cdd" FontSize="12"
+               Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12"
                TextWrapping="Wrap"
                Margin="0,0,0,6"/>
 
@@ -23,7 +23,7 @@
 
     <TextBlock x:Name="PromptText" Grid.Row="2"
                Text="Enter a name:"
-               Foreground="#cdd" FontSize="12"
+               Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12"
                Margin="0,0,0,8"/>
 
     <TextBox x:Name="NameInput" Grid.Row="3"

@@ -9,20 +9,20 @@
   <StackPanel Margin="26,22,26,18" Spacing="11">
 
     <!-- Wordmark + tagline -->
-    <TextBlock Text="Genie 5" FontSize="28" FontWeight="Bold" Foreground="#FFE6E6E6"/>
+    <TextBlock Text="Genie 5" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource Theme.TextPrimary}"/>
     <TextBlock Text="A cross-platform client for DragonRealms — the modern successor to Genie 4."
-               TextWrapping="Wrap" FontSize="13" Foreground="#FFB8C0CC"/>
+               TextWrapping="Wrap" FontSize="13" Foreground="{DynamicResource Theme.TextSecondary}"/>
 
-    <Border Height="1" Background="#FF2A313C" Margin="0,3"/>
+    <Border Height="1" Background="{DynamicResource Theme.Border}" Margin="0,3"/>
 
     <!-- Version + runtime -->
     <Grid ColumnDefinitions="92,*" RowDefinitions="Auto,Auto" >
-      <TextBlock Grid.Row="0" Grid.Column="0" Text="Version" FontSize="12" Foreground="#FF8A93A0"/>
+      <TextBlock Grid.Row="0" Grid.Column="0" Text="Version" FontSize="12" Foreground="{DynamicResource Theme.TextMuted}"/>
       <TextBlock Grid.Row="0" Grid.Column="1" x:Name="VersionText"
-                 FontFamily="Consolas,Menlo,monospace" FontSize="13" Foreground="#FFE6E6E6"/>
-      <TextBlock Grid.Row="1" Grid.Column="0" Text="Runtime" FontSize="12" Foreground="#FF8A93A0" Margin="0,3,0,0"/>
+                 FontFamily="Consolas,Menlo,monospace" FontSize="13" Foreground="{DynamicResource Theme.TextPrimary}"/>
+      <TextBlock Grid.Row="1" Grid.Column="0" Text="Runtime" FontSize="12" Foreground="{DynamicResource Theme.TextMuted}" Margin="0,3,0,0"/>
       <TextBlock Grid.Row="1" Grid.Column="1" Text=".NET 8 · Avalonia · Windows / macOS / Linux"
-                 FontSize="13" Foreground="#FFB8C0CC" Margin="0,3,0,0"/>
+                 FontSize="13" Foreground="{DynamicResource Theme.TextSecondary}" Margin="0,3,0,0"/>
     </Grid>
 
     <!-- Links -->
@@ -33,14 +33,14 @@
       <Button Content="Releases" Click="OnReleases" MinWidth="78"/>
     </StackPanel>
 
-    <Border Height="1" Background="#FF2A313C" Margin="0,3"/>
+    <Border Height="1" Background="{DynamicResource Theme.Border}" Margin="0,3"/>
 
     <!-- License + credits -->
     <StackPanel Spacing="3">
-      <TextBlock Text="Licensed under GPL-3.0." FontSize="12" Foreground="#FF8A93A0"/>
+      <TextBlock Text="Licensed under GPL-3.0." FontSize="12" Foreground="{DynamicResource Theme.TextMuted}"/>
       <TextBlock Text="App icon, status-indicator glyphs &amp; compass icons by @dylb0t (GPL-3.0)."
-                 FontSize="12" Foreground="#FF8A93A0" TextWrapping="Wrap"/>
-      <TextBlock Text="© 2026 the Genie 5 contributors." FontSize="12" Foreground="#FF8A93A0"/>
+                 FontSize="12" Foreground="{DynamicResource Theme.TextMuted}" TextWrapping="Wrap"/>
+      <TextBlock Text="© 2026 the Genie 5 contributors." FontSize="12" Foreground="{DynamicResource Theme.TextMuted}"/>
     </StackPanel>
 
     <!-- Close -->

@@ -12,7 +12,7 @@
 
     <TextBlock Grid.Row="0"
                Text="Layouts for the connected profile and the shared Global set. ★ marks the default applied on connect."
-               TextWrapping="Wrap" Foreground="#cdd" FontSize="12"
+               TextWrapping="Wrap" Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12"
                Margin="0,0,0,10"/>
 
     <!-- Layout list -->
@@ -54,7 +54,7 @@
     <!-- Status + close -->
     <Grid Grid.Row="4" ColumnDefinitions="*,Auto" Margin="0,14,0,0">
       <TextBlock Grid.Column="0" Text="{Binding Status}"
-                 Foreground="#9c9" FontSize="11" VerticalAlignment="Center"
+                 Foreground="{DynamicResource Theme.Success}" FontSize="11" VerticalAlignment="Center"
                  TextWrapping="Wrap"/>
       <Button Grid.Column="1" Content="Close" Width="80" IsCancel="True" Click="OnClose"/>
     </Grid>

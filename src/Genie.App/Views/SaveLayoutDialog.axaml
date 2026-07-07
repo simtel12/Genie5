@@ -9,14 +9,14 @@
 
     <!-- Target scope -->
     <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="16" Margin="0,0,0,10">
-      <TextBlock Text="Save to:" VerticalAlignment="Center" Foreground="#cdd" FontSize="12"/>
+      <TextBlock Text="Save to:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12"/>
       <RadioButton x:Name="ProfileRadio" GroupName="scope" Content="This profile" FontSize="12"/>
       <RadioButton x:Name="GlobalRadio"  GroupName="scope" Content="Global"       FontSize="12"/>
     </StackPanel>
 
     <TextBlock Grid.Row="1"
                Text="Existing (click to overwrite, or type a new name below):"
-               Foreground="#cdd" FontSize="12" TextWrapping="Wrap"
+               Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12" TextWrapping="Wrap"
                Margin="0,0,0,6"/>
 
     <ListBox x:Name="ExistingList" Grid.Row="2"

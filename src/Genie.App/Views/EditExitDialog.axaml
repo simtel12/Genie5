@@ -12,8 +12,8 @@
     <!-- Section card — matches the read-only header card so each bucket
          (Skill / Environment / Guild / Notes) reads as a distinct group. -->
     <Style Selector="Border.card">
-      <Setter Property="Background" Value="#1a1a1a"/>
-      <Setter Property="BorderBrush" Value="#333"/>
+      <Setter Property="Background" Value="{DynamicResource Theme.PanelBg}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Theme.Border}"/>
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="CornerRadius" Value="3"/>
       <Setter Property="Padding" Value="12,10"/>
@@ -23,24 +23,24 @@
   <Grid RowDefinitions="Auto,*,Auto" Margin="16">
 
     <!-- ── Context row (read-only header) ─────────────────────────────── -->
-    <Border Grid.Row="0" Background="#1a1a1a" BorderBrush="#333"
+    <Border Grid.Row="0" Background="{DynamicResource Theme.PanelBg}" BorderBrush="{DynamicResource Theme.Border}"
             BorderThickness="1" CornerRadius="3" Padding="12,8" Margin="0,0,0,12">
       <StackPanel Spacing="3">
         <Grid ColumnDefinitions="60,*">
-          <TextBlock Grid.Column="0" Text="From:" Foreground="#888" FontSize="11"/>
+          <TextBlock Grid.Column="0" Text="From:" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
           <TextBlock Grid.Column="1" Text="{Binding FromRoomTitle}"
-                     Foreground="#cdd" FontSize="11" FontWeight="SemiBold"/>
+                     Foreground="{DynamicResource Theme.TextPrimary}" FontSize="11" FontWeight="SemiBold"/>
         </Grid>
         <Grid ColumnDefinitions="60,*">
-          <TextBlock Grid.Column="0" Text="Verb:" Foreground="#888" FontSize="11"/>
+          <TextBlock Grid.Column="0" Text="Verb:" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
           <TextBlock Grid.Column="1" Text="{Binding ExitVerb}"
-                     Foreground="#88c0e8" FontSize="11"
+                     Foreground="{DynamicResource Theme.Accent}" FontSize="11"
                      FontFamily="Consolas,Courier New,monospace"/>
         </Grid>
         <Grid ColumnDefinitions="60,*">
-          <TextBlock Grid.Column="0" Text="To:" Foreground="#888" FontSize="11"/>
+          <TextBlock Grid.Column="0" Text="To:" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
           <TextBlock Grid.Column="1" Text="{Binding ToRoomTitle}"
-                     Foreground="#cdd" FontSize="11" FontWeight="SemiBold"/>
+                     Foreground="{DynamicResource Theme.TextPrimary}" FontSize="11" FontWeight="SemiBold"/>
         </Grid>
       </StackPanel>
     </Border>
@@ -53,10 +53,10 @@
         <!-- ── SKILL REQUIREMENTS ─────────────────────────────────────── -->
         <Border Classes="card">
         <StackPanel Spacing="4">
-          <TextBlock Text="SKILL REQUIREMENTS" Foreground="#7a92a8" FontSize="10"
+          <TextBlock Text="SKILL REQUIREMENTS" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="10"
                      FontWeight="SemiBold"/>
           <TextBlock Text="Trained skill ranks needed to take this exit."
-                     Foreground="#668" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,2"/>
+                     Foreground="{DynamicResource Theme.TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,2"/>
 
           <!-- Skill rows -->
           <ItemsControl ItemsSource="{Binding SkillRequirements}">
@@ -76,13 +76,13 @@
                                    FontSize="12"
                                    ToolTip.Tip="Pick a DragonRealms skill — type to filter the list. A free-typed name is allowed for skills not yet in the list."/>
                   <TextBlock Grid.Column="1" Text="≥" VerticalAlignment="Center"
-                             Margin="6,0,4,0" Foreground="#888"/>
+                             Margin="6,0,4,0" Foreground="{DynamicResource Theme.TextMuted}"/>
                   <NumericUpDown Grid.Column="2" Value="{Binding MinRank}"
                                  Minimum="0" Maximum="2000" Increment="5"
                                  FormatString="0" FontSize="12"/>
                   <Button Grid.Column="3" Content="✕" Margin="4,0,0,0"
                           FontSize="11" Padding="6,2"
-                          Background="#3a2828" Foreground="#d09090"
+                          Background="{DynamicResource Theme.DangerBg}" Foreground="{DynamicResource Theme.Danger}"
                           Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveSkillCommand}"
                           CommandParameter="{Binding}"
                           ToolTip.Tip="Remove this skill requirement"/>
@@ -102,13 +102,13 @@
         <!-- ── ENVIRONMENT ────────────────────────────────────────────── -->
         <Border Classes="card">
         <StackPanel Spacing="4">
-          <TextBlock Text="ENVIRONMENT" Foreground="#7a92a8" FontSize="10"
+          <TextBlock Text="ENVIRONMENT" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="10"
                      FontWeight="SemiBold"/>
           <TextBlock Text="How the exit is traversed — ropes, bridges, boats — and its time cost."
-                     Foreground="#668" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,2"/>
+                     Foreground="{DynamicResource Theme.TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,2"/>
           <Grid ColumnDefinitions="100,*">
             <TextBlock Grid.Column="0" Text="Type:" VerticalAlignment="Center"
-                       Foreground="#888" FontSize="12"/>
+                       Foreground="{DynamicResource Theme.TextMuted}" FontSize="12"/>
             <AutoCompleteBox Grid.Column="1" Text="{Binding Environment, Mode=TwoWay}"
                              ItemsSource="{Binding AvailableEnvironments}"
                              FilterMode="Contains"
@@ -119,49 +119,49 @@
           </Grid>
           <Grid ColumnDefinitions="100,*,40">
             <TextBlock Grid.Column="0" Text="RT cost:" VerticalAlignment="Center"
-                       Foreground="#888" FontSize="12"/>
+                       Foreground="{DynamicResource Theme.TextMuted}" FontSize="12"/>
             <NumericUpDown Grid.Column="1" Value="{Binding RtCost}"
                            Minimum="0" Maximum="60" Increment="1"
                            FormatString="0" FontSize="12"
                            HorizontalAlignment="Stretch"/>
             <TextBlock Grid.Column="2" Text="sec" VerticalAlignment="Center"
-                       Foreground="#888" FontSize="11" Margin="4,0,0,0"/>
+                       Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" Margin="4,0,0,0"/>
           </Grid>
           <Grid ColumnDefinitions="100,*,40">
             <TextBlock Grid.Column="0" Text="Wait min:" VerticalAlignment="Center"
-                       Foreground="#888" FontSize="12"/>
+                       Foreground="{DynamicResource Theme.TextMuted}" FontSize="12"/>
             <NumericUpDown Grid.Column="1" Value="{Binding WaitMin}"
                            Minimum="0" Maximum="3600" Increment="30"
                            FormatString="0" FontSize="12"
                            HorizontalAlignment="Stretch"/>
             <TextBlock Grid.Column="2" Text="sec" VerticalAlignment="Center"
-                       Foreground="#888" FontSize="11" Margin="4,0,0,0"/>
+                       Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" Margin="4,0,0,0"/>
           </Grid>
           <Grid ColumnDefinitions="100,*,40">
             <TextBlock Grid.Column="0" Text="Wait max:" VerticalAlignment="Center"
-                       Foreground="#888" FontSize="12"/>
+                       Foreground="{DynamicResource Theme.TextMuted}" FontSize="12"/>
             <NumericUpDown Grid.Column="1" Value="{Binding WaitMax}"
                            Minimum="0" Maximum="3600" Increment="30"
                            FormatString="0" FontSize="12"
                            HorizontalAlignment="Stretch"/>
             <TextBlock Grid.Column="2" Text="sec" VerticalAlignment="Center"
-                       Foreground="#888" FontSize="11" Margin="4,0,0,0"/>
+                       Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" Margin="4,0,0,0"/>
           </Grid>
           <TextBlock Text="Use Wait min/max for boats and scheduled departures. The pathfinder averages the two."
-                     Foreground="#668" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                     Foreground="{DynamicResource Theme.TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,0"/>
         </StackPanel>
         </Border>
 
         <!-- ── GUILD ──────────────────────────────────────────────────── -->
         <Border Classes="card">
         <StackPanel Spacing="4">
-          <TextBlock Text="GUILD" Foreground="#7a92a8" FontSize="10"
+          <TextBlock Text="GUILD" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="10"
                      FontWeight="SemiBold"/>
           <TextBlock Text="Guild-restricted routes — Trader caravans, Thief passages, Ranger trails, Moon Mage portals."
-                     Foreground="#668" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,2"/>
+                     Foreground="{DynamicResource Theme.TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,2"/>
           <Grid ColumnDefinitions="100,*">
             <TextBlock Grid.Column="0" Text="Guild:" VerticalAlignment="Center"
-                       Foreground="#888" FontSize="12"/>
+                       Foreground="{DynamicResource Theme.TextMuted}" FontSize="12"/>
             <AutoCompleteBox Grid.Column="1" Text="{Binding RequiredClass, Mode=TwoWay}"
                              ItemsSource="{Binding AvailableGuilds}"
                              FilterMode="Contains"
@@ -172,7 +172,7 @@
           </Grid>
           <Grid ColumnDefinitions="100,*">
             <TextBlock Grid.Column="0" Text="Min level:" VerticalAlignment="Center"
-                       Foreground="#888" FontSize="12"/>
+                       Foreground="{DynamicResource Theme.TextMuted}" FontSize="12"/>
             <NumericUpDown Grid.Column="1" Value="{Binding MinLevel}"
                            Minimum="0" Maximum="200" Increment="1"
                            FormatString="0" FontSize="12"
@@ -184,14 +184,14 @@
         <!-- ── NOTES section ──────────────────────────────────────────── -->
         <Border Classes="card">
         <StackPanel Spacing="4">
-          <TextBlock Text="NOTES" Foreground="#7a92a8" FontSize="10"
+          <TextBlock Text="NOTES" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="10"
                      FontWeight="SemiBold" Margin="0,0,0,4"/>
           <TextBox Text="{Binding Notes}"
                    Watermark="Free-form notes for the community Maps repo"
                    FontSize="11" MinHeight="60" MaxHeight="100"
                    AcceptsReturn="True" TextWrapping="Wrap"/>
           <TextBlock Text="e.g. &quot;rope needed for ascent&quot; · &quot;only available at night&quot; · &quot;requires beggar disguise&quot;"
-                     Foreground="#668" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                     Foreground="{DynamicResource Theme.TextMuted}" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,0"/>
         </StackPanel>
         </Border>
 

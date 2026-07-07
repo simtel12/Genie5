@@ -65,7 +65,7 @@
         <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2"
                    Text="Leave blank for the default location. Set it to keep this character's data in a folder you choose."
                    TextWrapping="Wrap"
-                   Foreground="#888" FontSize="11" Margin="0,2,0,0"/>
+                   Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" Margin="0,2,0,0"/>
       </Grid>
 
       <!-- Direct (SGE) fields -->
@@ -101,7 +101,7 @@
 
         <TextBlock Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2"
                    Text="{Binding FetchStatus}"
-                   Foreground="#888" FontSize="11" Margin="0,2,0,0"/>
+                   Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" Margin="0,2,0,0"/>
 
         <CheckBox  Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2"
                    IsChecked="{Binding UseTls}"
@@ -140,7 +140,7 @@
         <TextBlock Grid.Row="3" Grid.Column="1"
                    Text="Lich must already be running and authenticated for this character. Genie just attaches to its local port."
                    TextWrapping="Wrap"
-                   Foreground="#888" FontSize="11" Margin="0,6,0,0"/>
+                   Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" Margin="0,6,0,0"/>
       </Grid>
     </StackPanel>
 

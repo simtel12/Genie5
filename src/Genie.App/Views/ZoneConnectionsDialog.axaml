@@ -12,14 +12,14 @@
 
     <!-- ── Intro ──────────────────────────────────────────────────────── -->
     <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,12">
-      <TextBlock Text="Cross-Zone Connections" Foreground="#cdd"
+      <TextBlock Text="Cross-Zone Connections" Foreground="{DynamicResource Theme.TextPrimary}"
                  FontSize="14" FontWeight="SemiBold"/>
-      <TextBlock Foreground="#888" FontSize="11" TextWrapping="Wrap"
+      <TextBlock Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" TextWrapping="Wrap"
                  Text="Links between zones the multi-zone pathfinder consults — boats, ferry crossings, climb-walls between adjacent zones, etc. Empty database is OK; the pathfinder degrades to single-zone routing."/>
     </StackPanel>
 
     <!-- ── Connections grid ──────────────────────────────────────────── -->
-    <Border Grid.Row="1" Background="#1a1a1a" BorderBrush="#333"
+    <Border Grid.Row="1" Background="{DynamicResource Theme.PanelBg}" BorderBrush="{DynamicResource Theme.Border}"
             BorderThickness="1" CornerRadius="3">
       <Grid ColumnDefinitions="250,*">
 
@@ -31,8 +31,8 @@
             <DataTemplate x:DataType="mapper:ZoneConnection">
               <StackPanel Spacing="1" Margin="2">
                 <TextBlock Text="{Binding Verb}" FontSize="12" FontWeight="SemiBold"
-                           Foreground="#cdd" TextTrimming="CharacterEllipsis"/>
-                <TextBlock FontSize="10" Foreground="#888" TextTrimming="CharacterEllipsis">
+                           Foreground="{DynamicResource Theme.TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                <TextBlock FontSize="10" Foreground="{DynamicResource Theme.TextMuted}" TextTrimming="CharacterEllipsis">
                   <Run Text="{Binding FromZone}"/><Run Text=" → "/><Run Text="{Binding ToZone}"/>
                 </TextBlock>
               </StackPanel>
@@ -46,77 +46,77 @@
                       IsVisible="{Binding Selected, Converter={x:Static ObjectConverters.IsNotNull}}">
           <StackPanel Spacing="8" DataContext="{Binding Selected}">
 
-            <TextBlock Text="ENDPOINTS" Foreground="#7a92a8" FontSize="10"
+            <TextBlock Text="ENDPOINTS" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="10"
                        FontWeight="SemiBold"/>
             <Grid ColumnDefinitions="100,*">
-              <TextBlock Grid.Column="0" Text="From zone:" VerticalAlignment="Center" Foreground="#888" FontSize="11"/>
+              <TextBlock Grid.Column="0" Text="From zone:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
               <TextBox Grid.Column="1" Text="{Binding FromZone}"
                        Watermark="Map01_Crossing"
                        FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
             </Grid>
             <Grid ColumnDefinitions="100,*">
-              <TextBlock Grid.Column="0" Text="From room:" VerticalAlignment="Center" Foreground="#888" FontSize="11"/>
+              <TextBlock Grid.Column="0" Text="From room:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
               <TextBox Grid.Column="1" Text="{Binding FromRoom}"
                        Watermark="#37666999  or  42"
                        FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
             </Grid>
             <Grid ColumnDefinitions="100,*">
-              <TextBlock Grid.Column="0" Text="To zone:" VerticalAlignment="Center" Foreground="#888" FontSize="11"/>
+              <TextBlock Grid.Column="0" Text="To zone:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
               <TextBox Grid.Column="1" Text="{Binding ToZone}"
                        Watermark="Map35_Throne_City"
                        FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
             </Grid>
             <Grid ColumnDefinitions="100,*">
-              <TextBlock Grid.Column="0" Text="To room:" VerticalAlignment="Center" Foreground="#888" FontSize="11"/>
+              <TextBlock Grid.Column="0" Text="To room:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
               <TextBox Grid.Column="1" Text="{Binding ToRoom}"
                        Watermark="#37666500  or  17"
                        FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
             </Grid>
 
             <Separator Margin="0,4,0,4"/>
-            <TextBlock Text="TRANSIT" Foreground="#7a92a8" FontSize="10"
+            <TextBlock Text="TRANSIT" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="10"
                        FontWeight="SemiBold"/>
             <Grid ColumnDefinitions="100,*">
-              <TextBlock Grid.Column="0" Text="Verb:" VerticalAlignment="Center" Foreground="#888" FontSize="11"/>
+              <TextBlock Grid.Column="0" Text="Verb:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
               <TextBox Grid.Column="1" Text="{Binding Verb}"
                        Watermark="board boat / climb wall / swim river / …"
                        FontSize="11"/>
             </Grid>
             <Grid ColumnDefinitions="100,*">
-              <TextBlock Grid.Column="0" Text="Type:" VerticalAlignment="Center" Foreground="#888" FontSize="11"/>
+              <TextBlock Grid.Column="0" Text="Type:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
               <TextBox Grid.Column="1" Text="{Binding TransitType}"
                        Watermark="boat / climb / portal / ride / swim"
                        FontSize="11"/>
             </Grid>
             <Grid ColumnDefinitions="100,*,40">
-              <TextBlock Grid.Column="0" Text="RT cost:" VerticalAlignment="Center" Foreground="#888" FontSize="11"/>
+              <TextBlock Grid.Column="0" Text="RT cost:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
               <NumericUpDown Grid.Column="1" Value="{Binding RtCost}"
                              Minimum="0" Maximum="60" Increment="1" FormatString="0"
                              FontSize="11" HorizontalAlignment="Stretch"/>
-              <TextBlock Grid.Column="2" Text="sec" VerticalAlignment="Center" Foreground="#888" FontSize="11" Margin="4,0,0,0"/>
+              <TextBlock Grid.Column="2" Text="sec" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" Margin="4,0,0,0"/>
             </Grid>
             <Grid ColumnDefinitions="100,*,40">
-              <TextBlock Grid.Column="0" Text="Wait min:" VerticalAlignment="Center" Foreground="#888" FontSize="11"/>
+              <TextBlock Grid.Column="0" Text="Wait min:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
               <NumericUpDown Grid.Column="1" Value="{Binding WaitMin}"
                              Minimum="0" Maximum="3600" Increment="30" FormatString="0"
                              FontSize="11" HorizontalAlignment="Stretch"/>
-              <TextBlock Grid.Column="2" Text="sec" VerticalAlignment="Center" Foreground="#888" FontSize="11" Margin="4,0,0,0"/>
+              <TextBlock Grid.Column="2" Text="sec" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" Margin="4,0,0,0"/>
             </Grid>
             <Grid ColumnDefinitions="100,*,40">
-              <TextBlock Grid.Column="0" Text="Wait max:" VerticalAlignment="Center" Foreground="#888" FontSize="11"/>
+              <TextBlock Grid.Column="0" Text="Wait max:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
               <NumericUpDown Grid.Column="1" Value="{Binding WaitMax}"
                              Minimum="0" Maximum="3600" Increment="30" FormatString="0"
                              FontSize="11" HorizontalAlignment="Stretch"/>
-              <TextBlock Grid.Column="2" Text="sec" VerticalAlignment="Center" Foreground="#888" FontSize="11" Margin="4,0,0,0"/>
+              <TextBlock Grid.Column="2" Text="sec" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" Margin="4,0,0,0"/>
             </Grid>
             <Grid ColumnDefinitions="100,*">
-              <TextBlock Grid.Column="0" Text="Requires:" VerticalAlignment="Center" Foreground="#888" FontSize="11"/>
+              <TextBlock Grid.Column="0" Text="Requires:" VerticalAlignment="Center" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11"/>
               <TextBox Grid.Column="1" Text="{Binding Requires}"
                        Watermark="climbing>=50, athletics>=30"
                        FontSize="11" FontFamily="Consolas,Courier New,monospace"/>
             </Grid>
             <Grid ColumnDefinitions="100,*">
-              <TextBlock Grid.Column="0" Text="Notes:" VerticalAlignment="Top" Foreground="#888" FontSize="11" Margin="0,3,0,0"/>
+              <TextBlock Grid.Column="0" Text="Notes:" VerticalAlignment="Top" Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" Margin="0,3,0,0"/>
               <TextBox Grid.Column="1" Text="{Binding Notes}"
                        Watermark="Free-form community notes"
                        FontSize="11" MinHeight="48" MaxHeight="80"
@@ -129,7 +129,7 @@
 
     <!-- ── Status row ────────────────────────────────────────────────── -->
     <TextBlock Grid.Row="2" Text="{Binding Status}"
-               Foreground="#aab" FontSize="11" Margin="0,8,0,0"
+               Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" Margin="0,8,0,0"
                IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
     <!-- ── Buttons ───────────────────────────────────────────────────── -->
@@ -138,7 +138,7 @@
               Command="{Binding AddCommand}" Width="100"
               ToolTip.Tip="Add a new cross-zone connection"/>
       <Button Grid.Column="1" Content="✕ Remove"
-              Background="#3a2828" Foreground="#d09090"
+              Background="{DynamicResource Theme.DangerBg}" Foreground="{DynamicResource Theme.Danger}"
               Command="{Binding RemoveCommand}" Width="100"
               ToolTip.Tip="Delete the selected connection"/>
       <Button Grid.Column="3" Content="Save" Margin="0,0,8,0"

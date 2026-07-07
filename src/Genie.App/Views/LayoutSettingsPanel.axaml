@@ -10,9 +10,9 @@
     <StackPanel Margin="4" Spacing="4">
 
       <!-- Scope banner — these settings are app-wide, shared by every profile. -->
-      <Border Background="#0e2438" CornerRadius="3" Padding="8,4" Margin="0,0,0,8">
+      <Border Background="{DynamicResource Theme.AccentBg}" CornerRadius="3" Padding="8,4" Margin="0,0,0,8">
         <TextBlock Text="Window settings are global (display.json) — they apply to every profile."
-                   Foreground="#9bcbe8" TextWrapping="Wrap"/>
+                   Foreground="{DynamicResource Theme.Accent}" TextWrapping="Wrap"/>
       </Border>
 
       <TextBlock Text="Window behaviour" FontWeight="SemiBold" Margin="0,0,0,4"/>

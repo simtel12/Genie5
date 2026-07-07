@@ -13,9 +13,9 @@
 
       <!-- Scope banner — these settings are app-wide, shared by every profile. -->
       <Border Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
-              Background="#0e2438" CornerRadius="3" Padding="8,4" Margin="0,0,0,8">
+              Background="{DynamicResource Theme.AccentBg}" CornerRadius="3" Padding="8,4" Margin="0,0,0,8">
         <TextBlock Text="Script settings are global (settings.cfg) — they apply to every profile."
-                   Foreground="#9bcbe8" TextWrapping="Wrap"/>
+                   Foreground="{DynamicResource Theme.Accent}" TextWrapping="Wrap"/>
       </Border>
 
       <!-- ── Script execution ──────────────────────────────────────────── -->

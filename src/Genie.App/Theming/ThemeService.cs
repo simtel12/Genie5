@@ -166,13 +166,73 @@ public sealed class ThemeService
             return false;
         theme.Name = name;
 
-        Directory.CreateDirectory(_themesDir);
-        File.WriteAllText(PathFor(name), theme.ToJson());
-        ReloadCustomThemes();
+        WriteTheme(theme);
 
         _display.ThemeName = name;
         ThemeApplied?.Invoke();
         return true;
+    }
+
+    /// <summary>
+    /// Copy an existing theme (built-in or custom) to a new custom theme
+    /// file WITHOUT activating it — the Display Settings "Duplicate" button.
+    /// Overwrites an existing custom of the same name (the name prompt shows
+    /// existing names as click-to-overwrite, same as Save Current As…).
+    /// Returns null when the source is missing or the name is empty /
+    /// reserved by a built-in.
+    /// </summary>
+    public Theme? Duplicate(string sourceName, string newName)
+    {
+        var source = Find(sourceName);
+        newName = newName.Trim();
+        if (source is null || newName.Length == 0) return null;
+        if (BuiltInThemes.All.Any(b => b.Name.Equals(newName, StringComparison.OrdinalIgnoreCase)))
+            return null;
+
+        var copy = source.Clone(newName);
+        WriteTheme(copy);
+        return copy;
+    }
+
+    /// <summary>
+    /// Import theme JSON (a shared/hand-written file) as a custom theme,
+    /// WITHOUT activating it. The name is uniquified against every existing
+    /// theme — an import can never overwrite anything. Null = unparseable.
+    /// </summary>
+    public Theme? Import(string json)
+    {
+        var theme = Theme.FromJson(json);
+        if (theme is null) return null;
+        if (string.IsNullOrWhiteSpace(theme.Name)) theme.Name = "Imported Theme";
+        theme.Name = UniqueName(theme.Name.Trim());
+        WriteTheme(theme);
+        return theme;
+    }
+
+    /// <summary>Write a theme (built-in or custom) to an arbitrary path for sharing.</summary>
+    public bool ExportTo(string name, string destPath)
+    {
+        var theme = Find(name);
+        if (theme is null) return false;
+        try { File.WriteAllText(destPath, theme.ToJson()); return true; }
+        catch { return false; }
+    }
+
+    private string UniqueName(string baseName)
+    {
+        if (Find(baseName) is null) return baseName;
+        for (var i = 2; ; i++)
+        {
+            var candidate = $"{baseName} ({i})";
+            if (Find(candidate) is null) return candidate;
+        }
+    }
+
+    private void WriteTheme(Theme theme)
+    {
+        Directory.CreateDirectory(_themesDir);
+        File.WriteAllText(PathFor(theme.Name), theme.ToJson());
+        ReloadCustomThemes();
     }
 
     /// <summary>Delete a custom theme file. Built-ins are refused.</summary>

@@ -174,7 +174,9 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             {
                 var dlg = new DisplaySettingsDialog
                 {
-                    DataContext = new DisplaySettingsViewModel(ctx.Input)
+                    // ThemeService powers the Theme tab (#20): dropdown +
+                    // import/export/duplicate/delete over Config/Themes.
+                    DataContext = new DisplaySettingsViewModel(ctx.Input, ViewModel!.Themes)
                 };
                 var ok = await dlg.ShowDialog<bool>(this);
                 ctx.SetOutput(ok);

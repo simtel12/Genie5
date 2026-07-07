@@ -22,12 +22,12 @@
 
         <StackPanel Grid.Column="1" VerticalAlignment="Center">
           <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
-          <TextBlock Text="{Binding Source}" FontSize="11" Foreground="#9aa"/>
+          <TextBlock Text="{Binding Source}" FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}"/>
         </StackPanel>
 
         <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="8,0" Spacing="3">
           <TextBlock Text="{Binding Status}"
-                     FontSize="11" Foreground="#9c9"
+                     FontSize="11" Foreground="{DynamicResource Theme.Success}"
                      TextWrapping="Wrap"/>
           <!-- Inline bar: determinate for Maps (real N/M), marquee for the
                unmeasured plugin steps and Check polls. Hidden at rest. -->
@@ -63,7 +63,7 @@
                      FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
 
           <Grid Grid.Row="1" ColumnDefinitions="120,*" Margin="0,4">
-            <TextBlock Grid.Column="0" Text="Installed:" Foreground="#aab"/>
+            <TextBlock Grid.Column="0" Text="Installed:" Foreground="{DynamicResource Theme.TextSecondary}"/>
             <TextBlock Grid.Column="1" Text="{Binding CoreInstalledVersion}" FontWeight="SemiBold"/>
           </Grid>
 
@@ -71,14 +71,14 @@
                to read from this install. Useful for confirming a Mac/Linux
                install routes to the right per-platform RELEASES file. -->
           <Grid Grid.Row="2" ColumnDefinitions="120,*" Margin="0,4">
-            <TextBlock Grid.Column="0" Text="Platform:" Foreground="#aab"/>
+            <TextBlock Grid.Column="0" Text="Platform:" Foreground="{DynamicResource Theme.TextSecondary}"/>
             <TextBlock Grid.Column="1" Text="{Binding CorePlatformChannel}"
-                       Foreground="#9cb"
+                       Foreground="{DynamicResource Theme.Accent}"
                        ToolTip.Tip="Velopack platform channel for this install — drives which RELEASES file is read on GitHub. Windows uses the default (empty) channel."/>
           </Grid>
 
           <Grid Grid.Row="3" ColumnDefinitions="120,Auto" Margin="0,4">
-            <TextBlock Grid.Column="0" Text="Channel:" Foreground="#aab" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="0" Text="Channel:" Foreground="{DynamicResource Theme.TextSecondary}" VerticalAlignment="Center"/>
             <ComboBox  Grid.Column="1"
                        ItemsSource="{Binding AvailableChannels}"
                        SelectedItem="{Binding CoreChannel}"
@@ -87,9 +87,9 @@
           </Grid>
 
           <Grid Grid.Row="4" ColumnDefinitions="120,*" Margin="0,12,0,4">
-            <TextBlock Grid.Column="0" Text="Status:" Foreground="#aab"/>
+            <TextBlock Grid.Column="0" Text="Status:" Foreground="{DynamicResource Theme.TextSecondary}"/>
             <TextBlock Grid.Column="1" Text="{Binding CoreLatestVersion}"
-                       Foreground="#9c9" TextWrapping="Wrap"/>
+                       Foreground="{DynamicResource Theme.Success}" TextWrapping="Wrap"/>
           </Grid>
 
           <!-- Action buttons + live progress. Check is always available (cheap
@@ -115,7 +115,7 @@
                            Height="6" VerticalAlignment="Center"/>
               <TextBlock   Grid.Column="1"
                            Text="{Binding CoreProgressPhase}"
-                           Foreground="#9cb" FontSize="11"
+                           Foreground="{DynamicResource Theme.Accent}" FontSize="11"
                            VerticalAlignment="Center" Margin="10,0,0,0"/>
             </Grid>
           </StackPanel>
@@ -125,14 +125,14 @@
                running from `dotnet run` or a raw publish/, not a vpk install. -->
           <Border Grid.Row="6"
                   IsVisible="{Binding !CoreCanUpdate}"
-                  BorderBrush="#5a4a2a" BorderThickness="1"
-                  Background="#2a2418" CornerRadius="3"
+                  BorderBrush="{DynamicResource Theme.Warning}" BorderThickness="1"
+                  Background="{DynamicResource Theme.WarningBg}" CornerRadius="3"
                   Padding="10,8" Margin="0,14,0,0">
-            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#cca"
+            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource Theme.TextPrimary}"
                        Text="Running from a development build (not a Velopack-built install). Check still works for version awareness, but Update is disabled — to enable in-app updates, install Genie 5 from the Velopack installer artifact."/>
           </Border>
 
-          <TextBlock Grid.Row="7" Margin="0,16,0,0" Foreground="#9aa" FontSize="11" TextWrapping="Wrap"
+          <TextBlock Grid.Row="7" Margin="0,16,0,0" Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" TextWrapping="Wrap"
                      Text="Updates are delivered via the Velopack framework: it downloads the delta package and pivots a helper process to replace the running binaries while preserving your settings."/>
         </Grid>
       </TabItem>
@@ -143,7 +143,7 @@
           <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
             <TextBlock Grid.Column="0" VerticalAlignment="Center" TextWrapping="Wrap"
                        Text="Map zone repositories. Each row is a GitHub repo of zone XML files; updates merge upstream changes while preserving your stamped ServerRoomIds."
-                       Foreground="#cdd" FontSize="12"/>
+                       Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12"/>
             <Button    Grid.Column="1" Content="Add Source…"
                        Command="{Binding AddMapsSourceCommand}"
                        MinWidth="100" Margin="8,0,0,0"/>
@@ -163,7 +163,7 @@
 
           <TextBlock Grid.Row="2"
                      Text="Tip: Update merges per-file. Locally-collected room IDs survive an update."
-                     Foreground="#9aa" FontSize="11" Margin="0,8,0,0"/>
+                     Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" Margin="0,8,0,0"/>
         </Grid>
       </TabItem>
 
@@ -173,7 +173,7 @@
           <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
             <TextBlock Grid.Column="0" VerticalAlignment="Center" TextWrapping="Wrap"
                        Text="Plugin DLL sources. Updates download the asset, unload the running plugin, replace the DLL, and reload — no restart needed."
-                       Foreground="#cdd" FontSize="12"/>
+                       Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12"/>
             <Button    Grid.Column="1" Content="Add Source…"
                        Command="{Binding AddPluginsSourceCommand}"
                        MinWidth="100" Margin="8,0,0,0"/>
@@ -193,7 +193,7 @@
 
           <TextBlock Grid.Row="2"
                      Text="Tip: Plugin DLLs run inside Genie 5 with full access. Only add sources from authors you trust."
-                     Foreground="#9aa" FontSize="11" Margin="0,8,0,0"/>
+                     Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" Margin="0,8,0,0"/>
         </Grid>
       </TabItem>
 
@@ -203,7 +203,7 @@
           <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
             <TextBlock Grid.Column="0" VerticalAlignment="Center" TextWrapping="Wrap"
                        Text="Script repositories. Each row is a GitHub repo of .cmd / .js scripts; Update pulls new and changed files (subfolders included) into your Scripts folder — like a git pull. Files the repo doesn't know about are never touched."
-                       Foreground="#cdd" FontSize="12"/>
+                       Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12"/>
             <Button    Grid.Column="1" Content="Add Source…"
                        Command="{Binding AddScriptsSourceCommand}"
                        MinWidth="100" Margin="8,0,0,0"/>
@@ -223,7 +223,7 @@
 
           <TextBlock Grid.Row="2"
                      Text="Tip: there is no merge — a locally-edited script with the same name as a repo file is overwritten on Update. Rename scripts you customize."
-                     Foreground="#9aa" FontSize="11" Margin="0,8,0,0"/>
+                     Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" Margin="0,8,0,0"/>
         </Grid>
       </TabItem>
 
@@ -236,7 +236,7 @@
                   MinWidth="100"
                   ToolTip.Tip="Run a check against every enabled Maps, Plugins, and Scripts source."/>
       <TextBlock  Grid.Column="1" Text="{Binding Status}"
-                  VerticalAlignment="Center" Foreground="#9c9"
+                  VerticalAlignment="Center" Foreground="{DynamicResource Theme.Success}"
                   FontSize="11" Margin="12,0"
                   TextWrapping="Wrap"/>
       <Button     Grid.Column="3" Content="Close" Width="80"

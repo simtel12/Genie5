@@ -10,12 +10,12 @@
 
     <TextBlock Grid.Row="0" x:Name="HeaderText"
                Text="Paste a GitHub repo URL or owner/repo shorthand."
-               TextWrapping="Wrap" Foreground="#cdd" FontSize="12"
+               TextWrapping="Wrap" Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12"
                Margin="0,0,0,8"/>
 
     <TextBlock Grid.Row="1"
                Text="Examples:  https://github.com/Owner/Plugin_Foo   |   Owner/Plugin_Foo"
-               TextWrapping="Wrap" Foreground="#9aa" FontSize="11" FontStyle="Italic"
+               TextWrapping="Wrap" Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" FontStyle="Italic"
                Margin="0,0,0,8"/>
 
     <TextBox Grid.Row="2" x:Name="UrlInput"
@@ -27,25 +27,25 @@
     <!-- Third-party-code acknowledgment (Plugins + Scripts — hidden for Maps).
          WarningText is swapped per mode from code-behind. -->
     <Border Grid.Row="3" x:Name="WarningPanel"
-            BorderBrush="#8a6a2a" BorderThickness="1"
-            Background="#3a2a14" CornerRadius="3"
+            BorderBrush="{DynamicResource Theme.Warning}" BorderThickness="1"
+            Background="{DynamicResource Theme.WarningBg}" CornerRadius="3"
             Padding="10,8" Margin="0,4,0,0"
             IsVisible="False">
       <StackPanel Spacing="6">
         <TextBlock Text="⚠ Third-party code"
-                   Foreground="#fdb" FontWeight="SemiBold" FontSize="12"/>
-        <TextBlock x:Name="WarningText" Foreground="#ddc" FontSize="11" TextWrapping="Wrap">
+                   Foreground="{DynamicResource Theme.Warning}" FontWeight="SemiBold" FontSize="12"/>
+        <TextBlock x:Name="WarningText" Foreground="{DynamicResource Theme.TextPrimary}" FontSize="11" TextWrapping="Wrap">
           Plugin DLLs run inside Genie 5 with full access to your input, character data, and machine. Only add sources from authors you trust. The plugin runs as soon as you Update it the first time.
         </TextBlock>
         <CheckBox x:Name="AcknowledgeBox" Margin="0,4,0,0">
-          <TextBlock Foreground="#ddc" FontSize="11" TextWrapping="Wrap"
+          <TextBlock Foreground="{DynamicResource Theme.TextPrimary}" FontSize="11" TextWrapping="Wrap"
                      Text="I understand this is third-party code and I trust the source."/>
         </CheckBox>
       </StackPanel>
     </Border>
 
     <TextBlock Grid.Row="4" x:Name="ErrorText"
-               Foreground="#f99" FontSize="11"
+               Foreground="{DynamicResource Theme.Danger}" FontSize="11"
                TextWrapping="Wrap"
                Margin="0,8,0,0"
                IsVisible="False"/>
