@@ -199,17 +199,12 @@ public static class DefaultHighlights
             }
         }
 
-        // ── Built-in default highlights (room titles, currencies, …) ──
-        foreach (var (pattern, brush) in Rules)
-        {
-            foreach (Match m in pattern.Matches(text))
-            {
-                for (int i = m.Index; i < m.Index + m.Length; i++)
-                    if (brushes[i] is null) brushes[i] = brush;  // first rule wins
-            }
-        }
-
         // ── User-defined highlights from the live HighlightEngine ─────
+        // User rules paint FIRST so they win over the built-in defaults on
+        // overlap (#143) — Genie 4 semantics, where the user's own highlight
+        // config is supreme. A user rule on the room title or on EXP numbers
+        // now beats the built-in RoomTitle/Number colours; the defaults below
+        // fill only the characters no user rule claimed.
         // Timed into the Highlights stage (no-op overhead when the overlay is
         // hidden). This is the render-path cost of user highlight rules.
         if (UserHighlights.Engine is { Enabled: true } engine)
@@ -247,6 +242,18 @@ public static class DefaultHighlights
                 metrics.Time(PipelineStage.Highlights, ApplyUserHighlights);
             else
                 ApplyUserHighlights();
+        }
+
+        // ── Built-in default highlights (room titles, currencies, …) ──
+        // Fill only positions no user rule claimed above (the null check keeps
+        // user highlights on top); within this set, earlier rules still win.
+        foreach (var (pattern, brush) in Rules)
+        {
+            foreach (Match m in pattern.Matches(text))
+            {
+                for (int i = m.Index; i < m.Index + m.Length; i++)
+                    if (brushes[i] is null) brushes[i] = brush;
+            }
         }
 
         // ── MonsterBold (#131) ───────────────────────────────────────────
