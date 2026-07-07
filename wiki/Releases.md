@@ -4,7 +4,20 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8.2 — Themes & Type-Anywhere
+## Latest: v5.0.0-alpha.8.3 — Experience & Highlights
+
+The Experience window catches up to Genie 3/4, a Display Settings Theme manager arrives, dock windows gain Save As / Find / Word Wrap, and a batch of highlight fixes land.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.3** as a delta.
+
+- **Experience window parity ([#144](https://github.com/GenieClient/Genie5/issues/144))** — a **Track gain** checkbox shows session rank-gain per skill plus a total; **Numbers Only** / **Short Names** density stops now show the mindstate as a number; **your highlights colour the panel**; and the header shows skills learning, mind-locked count, and elapsed session time.
+- **Display Settings → Theme tab ([#20](https://github.com/GenieClient/Genie5/issues/20))** — import / export / duplicate / delete themes from one place; the secondary dialogs follow the active theme too.
+- **Dock-window Save As…, Find…, Word Wrap ([#120](https://github.com/GenieClient/Genie5/issues/120))** — save a text window to a file, search within it, or toggle word wrap; plus a window-menu Copy fix.
+- **Highlight fixes** — the long `Roundtime: N seconds.` form highlights fully ([#145](https://github.com/GenieClient/Genie5/issues/145)); editing a highlight updates it in place instead of duplicating ([#142](https://github.com/GenieClient/Genie5/issues/142)); your highlight rules now win over the built-in default colours ([#143](https://github.com/GenieClient/Genie5/issues/143)).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.3)
+
+## v5.0.0-alpha.8.2 — Themes & Type-Anywhere
 
 Seven built-in UI themes with a live in-app editor, three Genie 3/4 input features straight from community requests, spoken-alert upgrades, and a batch of script-engine fixes.
 

@@ -1,3 +1,45 @@
+# Genie 5 — v5.0.0-alpha.8.3
+
+The Experience window catches up to Genie 3/4 — session rank-gain, numeric
+mindstates, and your own highlights now colour it — alongside a Display
+Settings Theme manager, three dock-window tools, and a batch of highlight
+fixes.
+
+> **Alpha software.** Windows SmartScreen may warn on first launch
+> (More info → Run anyway) while code signing is being rolled out — tracked
+> in #33.
+
+## ✨ New
+
+- **Experience window Genie 3/4 parity (#144)** — a **Track gain** checkbox
+  shows the ranks each skill has gained this session plus a running session
+  total; the **Numbers Only** and **Short Names** density stops now carry the
+  mindstate as a number (the field you actually watch); your **highlight
+  rules colour the panel**; and the header shows how many skills are
+  learning, how many are mind-locked, and the elapsed session time.
+- **Display Settings → Theme tab (#20)** — manage themes from one place:
+  import and export theme JSON, duplicate a preset to tweak it, and delete
+  the ones you don't use. The secondary dialogs (About, Connect, Updates, …)
+  now follow the active theme too.
+- **Dock-window Save As…, Find…, and Word Wrap (#120)** — right-click a text
+  window to save its contents to a file, search within it (the same find bar
+  the game window uses), or toggle word wrap — plus a fix so the window
+  menu's Copy acts on the right window.
+
+## 🐛 Fixes
+
+- **Roundtime highlight (#145)** — the long form `Roundtime: 3 seconds.` now
+  highlights the whole word, not just `sec`.
+- **Highlight editing (#142)** — editing a saved highlight updates it in
+  place instead of leaving the old entry behind and adding a duplicate.
+- **Highlight priority (#143)** — your highlight rules now win over the
+  built-in default colours (room titles, numbers), so a rule aimed at the
+  room name or the EXP numbers takes effect. Genie 3/4 semantics.
+
+## 🙏 Thanks
+
+Saragos, for the #142 / #143 / #144 / #145 reports.
+
 # Genie 5 — v5.0.0-alpha.8.2
 
 Themes arrive: seven built-in looks (including Light, High Contrast, and
