@@ -55,6 +55,8 @@
           <CheckBox Name="EnabledCheck"       Content="Enabled" IsChecked="True"/>
           <CheckBox Name="EvalCheck"          Content="Eval action"
                     ToolTip.Tip="Evaluate {…} expression blocks in the action as script expressions before it runs (math / functions / variables)."/>
+          <CheckBox Name="MatchAllCheck"      Content="Match all"
+                    ToolTip.Tip="Fire the action once per match on the line (each with its own $1..$n) instead of once for the first match."/>
           <Button   Content="Save"  Click="OnSave"/>
           <Button   Content="Clear" Click="OnClear"/>
         </StackPanel>

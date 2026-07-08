@@ -37,9 +37,9 @@ public sealed class TriggerEngineFinal
 
     public TriggerRule AddTrigger(string pattern, string action, bool caseSensitive = false,
                                   bool isEnabled = true, string className = "", string soundFile = "",
-                                  string speak = "", bool eval = false)
+                                  string speak = "", bool eval = false, bool matchAll = false)
     {
-        var trigger = new TriggerRule(pattern, action, caseSensitive, isEnabled, className, _safetyEnabled, soundFile, speak, eval);
+        var trigger = new TriggerRule(pattern, action, caseSensitive, isEnabled, className, _safetyEnabled, soundFile, speak, eval, matchAll);
         _triggers.Add(trigger);
         if (!string.IsNullOrEmpty(className)) Classes?.Ensure(className);
         return trigger;
@@ -63,24 +63,45 @@ public sealed class TriggerEngineFinal
         {
             if (!trigger.IsEnabled) continue;
             if (Classes is not null && !Classes.IsActive(trigger.ClassName)) continue;
-            if (trigger.SafeMatch(line) is not { } match) continue;
-            // Optional per-trigger SFX (host applies the PlaySounds gate).
-            if (!string.IsNullOrEmpty(trigger.SoundFile))
-                _host?.PlaySound(trigger.SoundFile);
-            // Optional per-trigger TTS: "*" speaks the matched line, anything
-            // else speaks that text with $0..$n expanded. Urgent — these are the
-            // user's hand-picked alerts, so they barge in over stream read-aloud.
-            if (!string.IsNullOrEmpty(trigger.Speak))
-                _host?.Speak(trigger.Speak == "*" ? line : ExpandAction(trigger.Speak, match),
-                             urgent: true);
-            var expandedAction = ExpandAction(trigger.Action, match);
-            // Opt-in (#150): evaluate {…} expression blocks as script expressions
-            // after capture substitution, before dispatch.
-            if (trigger.Eval) expandedAction = EvalBraces(expandedAction);
-            // Automated (game-text-driven) — not interactive, so a #var/#tvar in
-            // the action sets silently instead of echoing "Variable set:".
-            _commandEngine?.ProcessInput(expandedAction, interactive: false);
+
+            if (trigger.MatchAll)
+            {
+                // #23 — fire the action once per match, each with its own $0..$n.
+                var matches = trigger.SafeMatchAll(line);
+                if (matches.Count == 0) continue;
+                // Alerts (sound + speak) are line-level notifications, so they
+                // fire ONCE per line (on the first match); only the action repeats.
+                FireAlerts(trigger, line, matches[0]);
+                foreach (var m in matches) FireAction(trigger, m);
+            }
+            else
+            {
+                if (trigger.SafeMatch(line) is not { } match) continue;
+                FireAlerts(trigger, line, match);
+                FireAction(trigger, match);
+            }
         }
+    }
+
+    /// <summary>Per-trigger SFX + TTS (line-level alerts). Sound rides the host's
+    /// PlaySounds gate; "*" speaks the whole matched line, anything else the text
+    /// with $0..$n expanded, urgent so it barges in over stream read-aloud.</summary>
+    private void FireAlerts(TriggerRule trigger, string line, Match match)
+    {
+        if (!string.IsNullOrEmpty(trigger.SoundFile))
+            _host?.PlaySound(trigger.SoundFile);
+        if (!string.IsNullOrEmpty(trigger.Speak))
+            _host?.Speak(trigger.Speak == "*" ? line : ExpandAction(trigger.Speak, match), urgent: true);
+    }
+
+    /// <summary>Expand $0..$n (and, opt-in #150, evaluate {…} blocks), then
+    /// dispatch the action. Automated — not interactive, so a #var/#tvar in the
+    /// action sets silently instead of echoing "Variable set:".</summary>
+    private void FireAction(TriggerRule trigger, Match match)
+    {
+        var expandedAction = ExpandAction(trigger.Action, match);
+        if (trigger.Eval) expandedAction = EvalBraces(expandedAction);
+        _commandEngine?.ProcessInput(expandedAction, interactive: false);
     }
 
     private static string ExpandAction(string action, Match match)

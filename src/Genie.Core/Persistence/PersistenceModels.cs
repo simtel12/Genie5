@@ -20,6 +20,9 @@ public sealed class TriggerPersistenceModel
     /// <summary>Opt-in script-expression evaluation of the action (#150): evaluate
     /// <c>{…}</c> blocks before dispatch. Default off preserves existing triggers.</summary>
     public bool Eval { get; set; }
+    /// <summary>Opt-in "match all" (#23): fire the action once per match on the
+    /// line instead of once per line. Default off preserves existing triggers.</summary>
+    public bool MatchAll { get; set; }
 }
 
 public sealed class VariablePersistenceModel

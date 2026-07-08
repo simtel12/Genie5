@@ -57,6 +57,7 @@ public sealed class PersistenceService
             SoundFile = t.SoundFile,
             Speak = t.Speak,
             Eval = t.Eval,
+            MatchAll = t.MatchAll,
         });
 
         File.WriteAllText(path, JsonSerializer.Serialize(data, _options));

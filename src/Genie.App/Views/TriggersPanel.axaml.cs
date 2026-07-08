@@ -54,6 +54,7 @@ public partial class TriggersPanel : UserControl
         CaseSensitiveCheck.IsChecked = trigger.CaseSensitive;
         EnabledCheck.IsChecked       = trigger.IsEnabled;
         EvalCheck.IsChecked          = trigger.Eval;
+        MatchAllCheck.IsChecked      = trigger.MatchAll;
         StatusText.Text              = string.Empty;
     }
 
@@ -66,6 +67,7 @@ public partial class TriggersPanel : UserControl
         var caseSensitive = CaseSensitiveCheck.IsChecked == true;
         var enabled       = EnabledCheck.IsChecked == true;
         var eval          = EvalCheck.IsChecked == true;
+        var matchAll      = MatchAllCheck.IsChecked == true;
 
         if (string.IsNullOrEmpty(pattern)) { StatusText.Text = "Pattern is required."; return; }
 
@@ -78,7 +80,7 @@ public partial class TriggersPanel : UserControl
         var existing = _engine.Triggers.FirstOrDefault(t => t.Pattern == pattern);
         _engine.RemoveTrigger(pattern);
         _engine.AddTrigger(pattern, action, caseSensitive, enabled, className,
-                           existing?.SoundFile ?? "", existing?.Speak ?? "", eval);
+                           existing?.SoundFile ?? "", existing?.Speak ?? "", eval, matchAll);
         Refresh();
         _onChanged?.Invoke();
         StatusText.Text = "Saved.";
@@ -153,6 +155,7 @@ public partial class TriggersPanel : UserControl
         CaseSensitiveCheck.IsChecked = false;
         EnabledCheck.IsChecked       = true;
         EvalCheck.IsChecked          = false;
+        MatchAllCheck.IsChecked      = false;
         StatusText.Text              = string.Empty;
     }
 }

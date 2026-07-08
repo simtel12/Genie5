@@ -11,7 +11,8 @@ public sealed class TriggerRule
 
     public TriggerRule(string pattern, string action, bool caseSensitive = false,
                        bool isEnabled = true, string className = "", bool safe = true,
-                       string soundFile = "", string speak = "", bool eval = false)
+                       string soundFile = "", string speak = "", bool eval = false,
+                       bool matchAll = false)
     {
         Pattern       = pattern;
         Action        = action;
@@ -21,6 +22,7 @@ public sealed class TriggerRule
         SoundFile     = soundFile;
         Speak         = speak;
         Eval          = eval;
+        MatchAll      = matchAll;
         _cmp          = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
         Rebuild(safe);
     }
@@ -35,6 +37,10 @@ public sealed class TriggerRule
     /// <c>$0..$n</c> capture substitution, before the action is dispatched.
     /// Off = the action is dispatched as-is (current behaviour).</summary>
     public bool   Eval          { get; set; }
+    /// <summary>Opt-in "match all" (#23). When true, the action fires once per
+    /// match on the line (each with its own <c>$0..$n</c> captures) instead of
+    /// once for the first match. Off = fire once per line (current behaviour).</summary>
+    public bool   MatchAll      { get; set; }
     /// <summary>Optional sound played when this trigger fires (resolved against
     /// SoundDir). Empty = silent.</summary>
     public string SoundFile     { get; set; }
@@ -57,6 +63,25 @@ public sealed class TriggerRule
         if (_safe && _hint is not null && !line.Contains(_hint, _cmp)) return null;
         try { var m = Regex.Match(line); return m.Success ? m : null; }
         catch (RegexMatchTimeoutException) { RegexSafety.ReportTimeout(PipelineStage.Triggers); return null; }
+    }
+
+    /// <summary>
+    /// All non-overlapping matches on the line (for a <c>MatchAll</c> trigger),
+    /// under the same literal pre-filter + match-timeout safety as <see cref="SafeMatch"/>.
+    /// Zero-length matches are skipped so a zero-width pattern can't fire the
+    /// action once per character. Empty if nothing matches.
+    /// </summary>
+    public IReadOnlyList<Match> SafeMatchAll(string line)
+    {
+        if (_safe && _hint is not null && !line.Contains(_hint, _cmp)) return Array.Empty<Match>();
+        try
+        {
+            List<Match>? matches = null;
+            foreach (Match m in Regex.Matches(line))
+                if (m.Success && m.Length > 0) (matches ??= new()).Add(m);
+            return (IReadOnlyList<Match>?)matches ?? Array.Empty<Match>();
+        }
+        catch (RegexMatchTimeoutException) { RegexSafety.ReportTimeout(PipelineStage.Triggers); return Array.Empty<Match>(); }
     }
 
     /// <summary>(Re)build the regex with or without the safety match-timeout.</summary>

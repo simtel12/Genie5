@@ -1568,7 +1568,7 @@ public sealed class CommandEngine
 
         if (sub == "add")
         {
-            if (parts.Count < 4) { _host.Echo("Usage: #trigger add {pattern} {action} [{class}] [{sound}] [{speak: * = line, or text}] [eval]"); return; }
+            if (parts.Count < 4) { _host.Echo("Usage: #trigger add {pattern} {action} [{class}] [{sound}] [{speak: * = line, or text}] [eval] [matchall]"); return; }
             AddTriggerFromArgs(parts.Skip(2).ToList());
             return;
         }
@@ -1585,29 +1585,31 @@ public sealed class CommandEngine
     private void AddTriggerFromArgs(List<string> args)
     {
         if (Triggers is null) return;
-        var eval    = ExtractEvalFlag(args);
-        var pattern = args[0];
-        var action  = args[1];
-        var cls     = args.Count > 2 ? args[2] : "";
-        var sound   = args.Count > 3 ? args[3] : "";
-        var speak   = args.Count > 4 ? args[4] : "";
+        var eval     = ExtractFlag(args, "eval");
+        var matchAll = ExtractFlag(args, "matchall");
+        var pattern  = args[0];
+        var action   = args[1];
+        var cls      = args.Count > 2 ? args[2] : "";
+        var sound    = args.Count > 3 ? args[3] : "";
+        var speak    = args.Count > 4 ? args[4] : "";
         Triggers.RemoveTrigger(pattern);
         try
         {
-            Triggers.AddTrigger(pattern, action, false, true, cls, sound, speak, eval);
-            _host.Echo($"Trigger added: {pattern} → {action}{(eval ? " (eval)" : "")}");
+            Triggers.AddTrigger(pattern, action, false, true, cls, sound, speak, eval, matchAll);
+            var flags = (eval ? " (eval)" : "") + (matchAll ? " (matchall)" : "");
+            _host.Echo($"Trigger added: {pattern} → {action}{flags}");
         }
         catch (ArgumentException) { _host.Echo($"Invalid regexp in trigger: {pattern}"); }
     }
 
-    /// <summary>Remove and report a bare <c>eval</c> keyword among the post-action
-    /// args so it doesn't shift the positional class/sound/speak slots. Braced
-    /// values (a literal class/sound named "eval") are unaffected — only a plain
-    /// token matches.</summary>
-    private static bool ExtractEvalFlag(List<string> args)
+    /// <summary>Remove and report a bare keyword flag (<c>eval</c> / <c>matchall</c>)
+    /// among the post-action args so it doesn't shift the positional class/sound/
+    /// speak slots. Braced values (a literal class/sound named that) are unaffected
+    /// — only a plain token matches.</summary>
+    private static bool ExtractFlag(List<string> args, string flag)
     {
         for (int i = 2; i < args.Count; i++)
-            if (args[i].Equals("eval", StringComparison.OrdinalIgnoreCase)) { args.RemoveAt(i); return true; }
+            if (args[i].Equals(flag, StringComparison.OrdinalIgnoreCase)) { args.RemoveAt(i); return true; }
         return false;
     }
 
@@ -1624,7 +1626,7 @@ public sealed class CommandEngine
                 t.Pattern.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0) continue;
             var flag = t.IsEnabled ? "" : " (disabled)";
             var cls  = string.IsNullOrEmpty(t.ClassName) ? "" : $" [{t.ClassName}]";
-            var ev   = t.Eval ? " (eval)" : "";
+            var ev   = (t.Eval ? " (eval)" : "") + (t.MatchAll ? " (matchall)" : "");
             _host.Echo($"{t.Pattern} → {t.Action}{cls}{ev}{flag}");
             shown++;
         }
@@ -1636,7 +1638,7 @@ public sealed class CommandEngine
         if (Triggers is null) return;
         var path  = Path.Combine(_config.ConfigProfileDir, "triggers.cfg");
         var lines = Triggers.Triggers.Select(t =>
-            $"#trigger add {ConfigPersistence.FormatArg(t.Pattern)} {ConfigPersistence.FormatArg(t.Action)} {ConfigPersistence.FormatArg(t.ClassName)} {ConfigPersistence.FormatArg(t.SoundFile)} {ConfigPersistence.FormatArg(t.Speak)}{(t.Eval ? " eval" : "")}");
+            $"#trigger add {ConfigPersistence.FormatArg(t.Pattern)} {ConfigPersistence.FormatArg(t.Action)} {ConfigPersistence.FormatArg(t.ClassName)} {ConfigPersistence.FormatArg(t.SoundFile)} {ConfigPersistence.FormatArg(t.Speak)}{(t.Eval ? " eval" : "")}{(t.MatchAll ? " matchall" : "")}");
         if (ConfigPersistence.WriteLines(path, lines))
             _host.Echo("Triggers Saved");
         else
