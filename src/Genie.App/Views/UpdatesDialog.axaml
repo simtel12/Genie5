@@ -18,6 +18,8 @@
         <CheckBox  Grid.Column="0"
                    IsChecked="{Binding Enabled}"
                    Margin="2,0,10,0"
+                   AutomationProperties.Name="Enable source"
+                   AutomationProperties.HelpText="Include this source in 'Check All' and background checks."
                    ToolTip.Tip="Include this source in 'Check All' and background checks."/>
 
         <StackPanel Grid.Column="1" VerticalAlignment="Center">
@@ -32,6 +34,7 @@
           <!-- Inline bar: determinate for Maps (real N/M), marquee for the
                unmeasured plugin steps and Check polls. Hidden at rest. -->
           <ProgressBar Minimum="0" Maximum="100"
+                       AutomationProperties.Name="Update progress"
                        Value="{Binding Progress}"
                        IsIndeterminate="{Binding ProgressIndeterminate}"
                        IsVisible="{Binding ProgressActive}"
@@ -47,6 +50,8 @@
         <Button    Grid.Column="5" Content="✕"
                    Command="{Binding RemoveCommand}"
                    Width="28"  Margin="6,0,0,0"
+                   AutomationProperties.Name="Remove source"
+                   AutomationProperties.HelpText="Remove this source from the feed list. Files already on disk are left alone."
                    ToolTip.Tip="Remove this source from the feed list. Files already on disk are left alone."/>
       </Grid>
     </DataTemplate>
@@ -80,6 +85,8 @@
           <Grid Grid.Row="3" ColumnDefinitions="120,Auto" Margin="0,4">
             <TextBlock Grid.Column="0" Text="Channel:" Foreground="{DynamicResource Theme.TextSecondary}" VerticalAlignment="Center"/>
             <ComboBox  Grid.Column="1"
+                       AutomationProperties.Name="Channel"
+                       AutomationProperties.HelpText="Stable: latest non-prerelease GitHub release. Beta: includes prereleases."
                        ItemsSource="{Binding AvailableChannels}"
                        SelectedItem="{Binding CoreChannel}"
                        MinWidth="120"
@@ -109,6 +116,7 @@
                   IsVisible="{Binding CoreProgressActive}"
                   Margin="0,4,0,0">
               <ProgressBar Grid.Column="0"
+                           AutomationProperties.Name="Core update progress"
                            Minimum="0" Maximum="100"
                            Value="{Binding CoreProgress}"
                            IsIndeterminate="{Binding CoreProgressIndeterminate}"

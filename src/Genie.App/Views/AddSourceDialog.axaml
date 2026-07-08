@@ -19,6 +19,7 @@
                Margin="0,0,0,8"/>
 
     <TextBox Grid.Row="2" x:Name="UrlInput"
+             AutomationProperties.Name="GitHub repo URL"
              Watermark="https://github.com/Owner/Repo"
              FontFamily="Consolas,Courier New,monospace"
              FontSize="13"
@@ -37,7 +38,8 @@
         <TextBlock x:Name="WarningText" Foreground="{DynamicResource Theme.TextPrimary}" FontSize="11" TextWrapping="Wrap">
           Plugin DLLs run inside Genie 5 with full access to your input, character data, and machine. Only add sources from authors you trust. The plugin runs as soon as you Update it the first time.
         </TextBlock>
-        <CheckBox x:Name="AcknowledgeBox" Margin="0,4,0,0">
+        <CheckBox x:Name="AcknowledgeBox" Margin="0,4,0,0"
+                  AutomationProperties.Name="I understand this is third-party code and I trust the source.">
           <TextBlock Foreground="{DynamicResource Theme.TextPrimary}" FontSize="11" TextWrapping="Wrap"
                      Text="I understand this is third-party code and I trust the source."/>
         </CheckBox>

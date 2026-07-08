@@ -152,6 +152,15 @@ public class ConfigurationViewModel : ReactiveObject
     /// </summary>
     public GenieConfig? ScriptConfig => _core?.Config;
 
+    /// <summary>Optional TTS hooks handed in by the main window (which owns
+    /// the TtsService): speak a sample line from the Text-to-Speech tab's
+    /// Test button, and drop the cached synth engine after a voice change.
+    /// Null when TTS isn't available — the tab disables the Test button.</summary>
+    public Action<string>? SpeakSample { get; set; }
+
+    /// <inheritdoc cref="SpeakSample"/>
+    public Action? TtsVoiceChanged { get; set; }
+
     // ── Persistence hooks (called by every panel after an edit) ──────────────
 
     public void OnHighlightsChanged()

@@ -21,6 +21,7 @@
 
             <TextBlock Grid.Row="0" Grid.Column="0" Text="Font family" VerticalAlignment="Center"/>
             <ComboBox  Grid.Row="0" Grid.Column="1"
+                       AutomationProperties.Name="Font family"
                        ItemsSource="{Binding SystemFonts}"
                        SelectedItem="{Binding FontFamily}"
                        HorizontalAlignment="Stretch"
@@ -36,6 +37,7 @@
 
             <TextBlock Grid.Row="1" Grid.Column="0" Text="Font size" VerticalAlignment="Center" Margin="0,8,0,0"/>
             <NumericUpDown Grid.Row="1" Grid.Column="1"
+                           AutomationProperties.Name="Font size"
                            Value="{Binding FontSize}"
                            Minimum="8" Maximum="48" Increment="1"
                            FormatString="0"
@@ -48,6 +50,7 @@
           <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto">
             <TextBlock Grid.Row="0" Grid.Column="0" Text="Game text" VerticalAlignment="Center"/>
             <ColorPicker Grid.Row="0" Grid.Column="1"
+                         AutomationProperties.Name="Game text"
                          Color="{Binding GameColor}"
                          HorizontalAlignment="Stretch"
                          IsAlphaVisible="False"
@@ -55,6 +58,7 @@
 
             <TextBlock Grid.Row="1" Grid.Column="0" Text="Echoes" VerticalAlignment="Center" Margin="0,8,0,0"/>
             <ColorPicker Grid.Row="1" Grid.Column="1"
+                         AutomationProperties.Name="Echoes"
                          Color="{Binding EchoColor}"
                          HorizontalAlignment="Stretch"
                          IsAlphaVisible="False"
@@ -75,6 +79,7 @@
                        FontSize="11" Foreground="{DynamicResource Theme.TextMuted}"
                        TextWrapping="Wrap" Margin="0,0,0,4"/>
             <TextBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                     AutomationProperties.Name="External editor"
                      Text="{Binding EditorPath}"
                      Watermark="Leave empty to use OS default — e.g. C:\Program Files\Notepad++\notepad++.exe"
                      FontFamily="Consolas,Courier New,monospace"
@@ -91,6 +96,7 @@
           <Grid ColumnDefinitions="110,*">
             <TextBlock Grid.Column="0" Text="Theme" VerticalAlignment="Center"/>
             <ComboBox  Grid.Column="1"
+                       AutomationProperties.Name="Theme"
                        ItemsSource="{Binding ThemeNames}"
                        SelectedItem="{Binding SelectedThemeName}"
                        HorizontalAlignment="Stretch"

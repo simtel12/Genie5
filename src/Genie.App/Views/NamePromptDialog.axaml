@@ -17,6 +17,7 @@
                Margin="0,0,0,6"/>
 
     <ListBox x:Name="ExistingList" Grid.Row="1"
+             AutomationProperties.Name="Existing names"
              SelectionMode="Single"
              FontSize="12"
              Margin="0,0,0,10"/>
@@ -27,6 +28,7 @@
                Margin="0,0,0,8"/>
 
     <TextBox x:Name="NameInput" Grid.Row="3"
+             AutomationProperties.Name="Name"
              Text=""
              FontSize="12"
              VerticalAlignment="Top"/>

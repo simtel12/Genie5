@@ -64,6 +64,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// display from the server's injuries dialog (#18). Hidden by default.</summary>
     public InjuriesViewModel   Injuries   { get; } = new();
 
+    /// <summary>Backs the dockable Analytics panel — skill-history charts
+    /// (XP/hour, gain curves, session comparison) over the local recorder's
+    /// data. Hidden by default.</summary>
+    public AnalyticsViewModel  Analytics  { get; } = new();
+
     /// <summary>
     /// Global layout presets, shared across every character —
     /// <c>{AppData}/Genie5/Layouts/</c>. Always present.
@@ -526,6 +531,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     [Reactive] public bool BackpackVisible { get; private set; } = true;
     [Reactive] public bool MapperVisible   { get; private set; } = true;
     [Reactive] public bool ExperienceVisible { get; private set; }   // hidden by default (opt-in)
+    [Reactive] public bool AnalyticsVisible  { get; private set; }   // hidden by default (opt-in)
     [Reactive] public bool ActiveSpellsVisible { get; private set; } // hidden by default (opt-in)
     [Reactive] public bool TimeTrackerVisible { get; private set; }  // hidden by default (opt-in)
     [Reactive] public bool LogonsVisible   { get; private set; } = true;
@@ -553,6 +559,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> ToggleBackpackCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleMapperCommand   { get; }
     public ReactiveCommand<Unit, Unit> ToggleExperienceCommand { get; }
+    public ReactiveCommand<Unit, Unit> ToggleAnalyticsCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleActiveSpellsCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleTimeTrackerCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleLogonsCommand   { get; }
@@ -1111,6 +1118,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         WindowSettings.Register("itemlog",   "ItemLog");
         WindowSettings.Register("mapper",    "Mapper");
         WindowSettings.Register("experience", "Experience");
+        WindowSettings.Register("analytics",  "Analytics");
         WindowSettings.Register("active-spells", "Active Spells");
         WindowSettings.Register("time-tracker", "Time Tracker");
         WindowSettings.Register("scripts",   "Scripts");
@@ -1210,6 +1218,9 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             // straight to the live engines; otherwise edits act on draft
             // engines loaded from that profile's directory.
             var cfgVm = new ConfigurationViewModel(_core, _configDir, Profiles, ConnectedProfile, WindowSettings, Display, _displayPath);
+            // TTS hooks for the Text-to-Speech tab — this VM owns the TtsService.
+            cfgVm.SpeakSample     = text => _tts?.Speak(text, Services.TtsPriority.High);
+            cfgVm.TtsVoiceChanged = () => _tts?.Reset();
             await ShowConfigurationDialog.Handle(cfgVm);
         });
 
@@ -1820,6 +1831,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             MapperVisible = newVisible;
         });
         ToggleExperienceCommand = MakeToggleCommand("experience", v => ExperienceVisible = v);
+        ToggleAnalyticsCommand  = MakeToggleCommand("analytics",  v => AnalyticsVisible  = v);
         ToggleActiveSpellsCommand = MakeToggleCommand("active-spells", v => ActiveSpellsVisible = v);
         ToggleTimeTrackerCommand = MakeToggleCommand("time-tracker", v => TimeTrackerVisible = v);
         ToggleLogonsCommand   = MakeToggleCommand("logons",    v => LogonsVisible   = v);
@@ -2747,6 +2759,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         SetVisibilityBool("backpack",  factory.IsToolVisible("backpack"));
         SetVisibilityBool("mapper",    factory.IsToolVisible("mapper"));
         SetVisibilityBool("experience", factory.IsToolVisible("experience"));
+        SetVisibilityBool("analytics",  factory.IsToolVisible("analytics"));
         SetVisibilityBool("active-spells", factory.IsToolVisible("active-spells"));
         SetVisibilityBool("time-tracker", factory.IsToolVisible("time-tracker"));
         SetVisibilityBool("logons",    factory.IsToolVisible("logons"));
@@ -2785,7 +2798,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     private static readonly HashSet<string> ReservedWindowNames =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            "experience", "active spells", "time tracker", "main", "game", "game-text", "room", "vitals",
+            "experience", "analytics", "active spells", "time tracker", "main", "game", "game-text", "room", "vitals",
             "backpack", "mapper", "scripts", "scene",
             "logons", "talk", "whispers", "thoughts", "combat",
             "log", "itemlog",
@@ -3245,6 +3258,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             case "backpack":  ForceSet(visible, v => BackpackVisible = v, () => BackpackVisible); break;
             case "mapper":    ForceSet(visible, v => MapperVisible   = v, () => MapperVisible);   break;
             case "experience": ForceSet(visible, v => ExperienceVisible = v, () => ExperienceVisible); break;
+            case "analytics": ForceSet(visible, v => AnalyticsVisible = v, () => AnalyticsVisible); break;
             case "active-spells": ForceSet(visible, v => ActiveSpellsVisible = v, () => ActiveSpellsVisible); break;
             case "time-tracker": ForceSet(visible, v => TimeTrackerVisible = v, () => TimeTrackerVisible); break;
             case "logons":    ForceSet(visible, v => LogonsVisible   = v, () => LogonsVisible);   break;
@@ -3445,7 +3459,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     }
 
     /// <summary>Handle a <c>#tts</c> subcommand (install / use / voices / read /
-    /// mute / rate / volume / stop / status). Runs on the engine (UI) thread; the
+    /// mute / priority / rate / volume / stop / status). Runs on the engine (UI) thread; the
     /// actual download runs off-thread and reports back via UI-marshaled system
     /// lines.</summary>
     private void HandleTtsCommand(string args)
@@ -3552,6 +3566,47 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 break;
             }
 
+            case "priority":
+            case "prio":
+            {
+                if (parts.Length < 2)
+                {
+                    var overrides = _core.Config.TtsStreamPriorityOverrides();
+                    var streams = SplitStreams(_core.Config.TtsReadStreamsRaw);
+                    foreach (var key in overrides.Keys) streams.Add(key);
+                    Echo("[tts] stream priorities (high barges in, low yields):");
+                    foreach (var s in streams)
+                        Echo($"  {s,-14} {_core.Config.TtsUrgencyFor(s).ToString().ToLowerInvariant()}" +
+                             (overrides.ContainsKey(s) ? "  [override]" : "  [default]"));
+                    Echo("  #tts priority <stream> <low|normal|high>  |  #tts priority <stream> default");
+                    break;
+                }
+                string stream = parts[1].ToLowerInvariant();
+                if (parts.Length < 3)
+                {
+                    Echo($"[tts] {stream}: {_core.Config.TtsUrgencyFor(stream).ToString().ToLowerInvariant()}. " +
+                         "Usage: #tts priority <stream> <low|normal|high|default>");
+                    break;
+                }
+                string word = parts[2].ToLowerInvariant();
+                var map = new SortedDictionary<string, string>(StringComparer.Ordinal);
+                foreach (var kv in _core.Config.TtsStreamPriorityOverrides())
+                    map[kv.Key] = kv.Value.ToString().ToLowerInvariant();
+                if (word == "default")
+                    map.Remove(stream);
+                else if (word is "low" or "normal" or "high")
+                    map[stream] = word;
+                else
+                {
+                    Echo($"[tts] unknown priority '{parts[2]}' — use low, normal, high, or default.");
+                    break;
+                }
+                _core.Config.TtsStreamPriorityRaw = string.Join(",", map.Select(kv => $"{kv.Key}:{kv.Value}"));
+                Echo($"[tts] {stream}: {_core.Config.TtsUrgencyFor(stream).ToString().ToLowerInvariant()}" +
+                     $"{(word == "default" ? " (default)" : "")}. Persists when settings are saved.");
+                break;
+            }
+
             case "stop":
             case "silence":
             case "shutup":
@@ -3595,25 +3650,65 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 if (n == 0) Echo("  no voices installed — run #tts install");
                 Echo($"  read-aloud: {(_core.Config.TtsRead ? "on" : "off")}; " +
                      $"streams: {_core.Config.TtsReadStreamsRaw}");
+                if (!string.IsNullOrEmpty(_core.Config.TtsStreamPriorityRaw))
+                    Echo($"  priorities: {_core.Config.TtsStreamPriorityRaw} (see #tts priority)");
                 Echo($"  rate: {FormatRate(_core.Config.TtsRate)}; volume: {_core.Config.TtsVolume}%");
                 break;
             }
 
             default:
-                Echo("Usage: #tts install [voice] | use <voice> | voices | read [on|off|<stream>] | mute <stream> | rate <n> | volume <n> | stop | status");
+                Echo("Usage: #tts install [voice] | use <voice> | voices | read [on|off|<stream>] | mute <stream> | priority [<stream> <low|normal|high|default>] | rate <n> | volume <n> | stop | status");
                 break;
         }
     }
 
-    /// <summary>Map a stream to its read-aloud urgency. Whispers/death barge in;
-    /// the chatty/background streams stay Low so they yield to anything else.</summary>
-    private static Services.TtsPriority TtsPriorityFor(string stream) =>
-        (stream ?? "").ToLowerInvariant() switch
+    /// <summary>One-time advisory the first time skill-history recording is
+    /// active for this profile: what's recorded, where it lives, how to turn
+    /// it off. Three-way: Keep enabled / Turn off (both persist
+    /// <c>analyticsnoticeshown</c>) / Esc = decide later (asks again next
+    /// connect). Recording is already on while the dialog shows — local-only
+    /// data, so nothing leaves the machine either way.</summary>
+    private void MaybeShowAnalyticsNotice()
+    {
+        if (_core?.SkillHistory is not { } hist) return;
+        if (_core.Config.AnalyticsNoticeShown || !_core.Config.Analytics) return;
+
+        Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
         {
-            "whispers" or "death" => Services.TtsPriority.High,
-            "logons" or "atmospherics" or "familiar" => Services.TtsPriority.Low,
-            _ => Services.TtsPriority.Normal,
-        };
+            var owner = Avalonia.Application.Current?.ApplicationLifetime is
+                Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime d
+                ? d.MainWindow : null;
+            if (owner is null) return;
+
+            var dlg = new Views.ConfirmDialog(
+                "Skill history recording",
+                "Genie now records your character's skill history locally, powering the new\n" +
+                "Analytics window (Window → Analytics): XP/hour, skill-gain curves, and\n" +
+                "session summaries.\n\n" +
+                $"The data is your own character's skill table and nothing else. It is stored\n" +
+                $"only on this computer, under:\n  {hist.Directory}\n" +
+                "and is never uploaded.\n\n" +
+                "Change this anytime: #config analytics off, or the Record toggle in the\n" +
+                "Analytics panel.",
+                "Keep enabled", "Turn off", "Decide later");
+            var choice = await dlg.ShowDialog<bool?>(owner);
+            if (choice is null) return;               // ask again next connect
+            if (choice == false)
+                _core.Config.SetSetting("analytics", "False", showException: false);
+            _core.Config.SetSetting("analyticsnoticeshown", "True", showException: false);
+            _core.Config.Save();
+        });
+    }
+
+    /// <summary>Map a stream to its read-aloud urgency — user overrides from
+    /// <c>#tts priority</c> first, else the classic defaults (whispers/death
+    /// barge in; the chatty/background streams stay Low so they yield).
+    /// The map lives in <see cref="Genie.Core.Config.GenieConfig.TtsUrgencyFor"/>;
+    /// the enums share numeric values so the cast is exact.</summary>
+    private Services.TtsPriority TtsPriorityFor(string stream) =>
+        _core is null
+            ? Services.TtsPriority.Normal
+            : (Services.TtsPriority)(int)_core.Config.TtsUrgencyFor(stream);
 
     private static SortedSet<string> SplitStreams(string csv) =>
         new(csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -3758,6 +3853,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 {
                     ReportConnectionTransport(e.Message);
                     OnConnectionEstablished();
+                    MaybeShowAnalyticsNotice();
                 }
                 else if (e.Kind is ConnectionEventKind.Disconnected or ConnectionEventKind.Error)
                 {
@@ -3923,6 +4019,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // ShowGameText / ShowEchoText / ShowScriptText at subscription time.
         GameText.DisplaySettings = Display;
         GameText.Attach(_core);
+
+        // Analytics panel — reads the skill-history store; re-hooks to the
+        // per-connection recorder on each Connected event internally.
+        Analytics.Attach(_core);
         // AutoLog start is per-connect (uses the login character/game) — see ConnectAsync.
 
         Vitals.Attach(_core);

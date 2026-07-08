@@ -112,6 +112,10 @@
         <views:ScriptsPanel   Name="ScriptsPanelCtrl"/>
       </TabItem>
 
+      <TabItem Header="Text-to-Speech">
+        <views:TtsPanel       Name="TtsPanelCtrl"/>
+      </TabItem>
+
       <TabItem Header="Macros">
         <views:MacrosPanel    Name="MacrosPanelCtrl"/>
       </TabItem>

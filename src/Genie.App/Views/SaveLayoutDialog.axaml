@@ -20,10 +20,12 @@
                Margin="0,0,0,6"/>
 
     <ListBox x:Name="ExistingList" Grid.Row="2"
+             AutomationProperties.Name="Existing layouts"
              SelectionMode="Single" FontSize="12"
              Margin="0,0,0,10"/>
 
     <TextBox x:Name="NameInput" Grid.Row="3"
+             AutomationProperties.Name="Layout name"
              FontSize="12" VerticalAlignment="Top"/>
 
     <StackPanel Grid.Row="4" Orientation="Horizontal"

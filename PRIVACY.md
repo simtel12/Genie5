@@ -40,6 +40,11 @@ or send usage analytics.
   data, all stored locally on your device.
 - **Session recordings** — only if you use the Session Recorder; these raw-XML captures
   are written to local disk and never uploaded.
+- **Skill history (Analytics)** — the Analytics window records your own character's
+  skill table over time (ranks, learning rates, session summaries) to local files under
+  `{AppData}/Genie5/Analytics/`. It contains no other players' data and is never
+  uploaded. A one-time notice explains this at first connect; disable anytime with
+  `#config analytics off` or the panel's Record toggle.
 
 All of this data stays on your machine. Uninstalling Genie 5 and deleting its
 `{AppData}/Genie5/` folder removes it.

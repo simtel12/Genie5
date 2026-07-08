@@ -247,6 +247,57 @@ public sealed class GenieConfig
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Any(s => s.Equals(stream, StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>Per-stream read-aloud urgency overrides — CSV of
+    /// <c>stream:low|normal|high</c> pairs (e.g. <c>talk:high,combat:low</c>).
+    /// Empty = built-in defaults (whispers/death High; logons/atmospherics/
+    /// familiar Low; everything else Normal). Malformed pairs are ignored,
+    /// duplicates last-wins. Edited by <c>#tts priority</c>.</summary>
+    public string TtsStreamPriorityRaw { get; set; } = "";
+
+    /// <summary>Read-aloud urgency for <paramref name="stream"/> — the
+    /// <see cref="TtsStreamPriorityRaw"/> override when present, else the
+    /// built-in default map. Never throws on malformed input.</summary>
+    public TtsUrgency TtsUrgencyFor(string stream)
+    {
+        string s = (stream ?? "").Trim().ToLowerInvariant();
+        if (TtsStreamPriorityOverrides().TryGetValue(s, out var u)) return u;
+        return TtsDefaultUrgencyFor(s);
+    }
+
+    /// <summary>The built-in urgency map with no overrides applied —
+    /// whispers/death barge in; the chatty background streams stay Low;
+    /// everything else Normal.</summary>
+    public static TtsUrgency TtsDefaultUrgencyFor(string stream) =>
+        (stream ?? "").Trim().ToLowerInvariant() switch
+        {
+            "whispers" or "death" => TtsUrgency.High,
+            "logons" or "atmospherics" or "familiar" => TtsUrgency.Low,
+            _ => TtsUrgency.Normal,
+        };
+
+    /// <summary>Parsed view of <see cref="TtsStreamPriorityRaw"/> — lowercased
+    /// stream → urgency. Malformed pairs are skipped, duplicates last-wins.</summary>
+    public IReadOnlyDictionary<string, TtsUrgency> TtsStreamPriorityOverrides()
+    {
+        var map = new Dictionary<string, TtsUrgency>(StringComparer.Ordinal);
+        foreach (var pair in TtsStreamPriorityRaw.Split(',',
+                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            int i = pair.IndexOf(':');
+            if (i <= 0 || i == pair.Length - 1) continue;
+            string name = pair[..i].Trim().ToLowerInvariant();
+            TtsUrgency? u = pair[(i + 1)..].Trim().ToLowerInvariant() switch
+            {
+                "low" => TtsUrgency.Low,
+                "normal" => TtsUrgency.Normal,
+                "high" => TtsUrgency.High,
+                _ => null,
+            };
+            if (name.Length > 0 && u is not null) map[name] = u.Value;
+        }
+        return map;
+    }
+
     /// <summary>TTS speaking rate multiplier — 1.0 = the voice's natural pace,
     /// higher = faster. Clamped 0.5–3.0. <c>#tts rate</c>.</summary>
     public double TtsRate { get; set; } = 1.0;
@@ -271,6 +322,38 @@ public sealed class GenieConfig
     public string PluginDir => _localDirectory.Shared.ResolvePath(PluginDirRaw);
     public string ConfigDir => _localDirectory.Current.ResolvePath(ConfigDirRaw);
     public string ConfigProfileDir => _localDirectory.Current.ResolvePath(ProfileConfigDirRaw);
+
+    // ── Analytics (local skill-history recording) ───────────────────────────
+
+    /// <summary>Master switch for local skill-history recording (the Analytics
+    /// window's data). On by default — local-only JSONL under
+    /// <see cref="AnalyticsDir"/>, never uploaded. <c>#config analytics</c>.</summary>
+    public bool Analytics { get; set; } = true;
+
+    /// <summary>Seconds between skill-history snapshot flushes (clamped 10–600).
+    /// <c>#config analyticsinterval</c>.</summary>
+    public int AnalyticsInterval { get; set; } = 60;
+
+    /// <summary>Days of raw snapshot history to keep before folding into daily
+    /// rollups (0 = keep raw forever). <c>#config analyticsretentiondays</c>.</summary>
+    public int AnalyticsRetentionDays { get; set; } = 90;
+
+    /// <summary>Record DevReplay sessions too (their rows are marked replay and
+    /// hidden from charts by default) — a development/testing aid, off by
+    /// default because replay timestamps are fake. <c>#config analyticsreplay</c>.
+    /// Read at connect time; toggle then reconnect.</summary>
+    public bool AnalyticsReplay { get; set; }
+
+    /// <summary>True once the one-time "skill history is being recorded"
+    /// advisory has been acknowledged for this profile — the dialog never
+    /// repeats after either Keep-enabled or Turn-off.</summary>
+    public bool AnalyticsNoticeShown { get; set; }
+
+    public string AnalyticsDirRaw { get; set; } = "Analytics";
+
+    /// <summary>Root folder for skill-history data (one subfolder per
+    /// character slug). <c>#config analyticsdir</c>.</summary>
+    public string AnalyticsDir => _localDirectory.Current.ResolvePath(AnalyticsDirRaw);
     public string LogDir => _localDirectory.Current.ResolvePath(LogDirRaw);
 
     /// <summary>
@@ -299,7 +382,7 @@ public sealed class GenieConfig
             return ConfigProfileDir;
         }
 
-        var slug = $"{Sanitize(characterName)}-{Sanitize(accountName)}";
+        var slug = CharacterSlug(characterName, accountName);
         var rel  = Path.Combine("Profiles", slug);
         ProfileConfigDirRaw = rel;
 
@@ -325,6 +408,13 @@ public sealed class GenieConfig
         }
         return full;
     }
+
+    /// <summary>Filesystem-safe per-character folder slug — <c>{Char}-{Acct}</c>
+    /// with illegal characters stripped. Shared by the <c>Profiles</c> config
+    /// dirs and the <c>Analytics</c> history folders so one character maps to
+    /// one identity everywhere.</summary>
+    public static string CharacterSlug(string characterName, string accountName) =>
+        $"{Sanitize(characterName)}-{Sanitize(accountName)}";
 
     /// <summary>Files that are character-specific and should follow the profile dir.</summary>
     private static readonly string[] CfgFiles =
@@ -411,8 +501,15 @@ public sealed class GenieConfig
         ("ttsvoice", TtsVoice),
         ("ttsread", TtsRead.ToString()),
         ("ttsreadstreams", TtsReadStreamsRaw),
+        ("ttsstreampriority", TtsStreamPriorityRaw),
         ("ttsrate", TtsRate.ToString(System.Globalization.CultureInfo.InvariantCulture)),
         ("ttsvolume", TtsVolume.ToString()),
+        ("analytics", Analytics.ToString()),
+        ("analyticsinterval", AnalyticsInterval.ToString()),
+        ("analyticsretentiondays", AnalyticsRetentionDays.ToString()),
+        ("analyticsreplay", AnalyticsReplay.ToString()),
+        ("analyticsnoticeshown", AnalyticsNoticeShown.ToString()),
+        ("analyticsdir", AnalyticsDirRaw),
         ("artdir", ArtDirRaw),
         ("mapdir", MapDirRaw),
         ("plugindir", PluginDirRaw),
@@ -486,8 +583,9 @@ public sealed class GenieConfig
         ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "updatemapperscripts" }),
         ("Auto-Walk",        new[] { "autowalkpauseonunfocus", "autowalkunfocusseconds" }),
-        ("Sound / TTS",      new[] { "muted", "ttsvoice", "ttsvoicedir", "ttsread", "ttsreadstreams", "ttsrate", "ttsvolume" }),
+        ("Sound / TTS",      new[] { "muted", "ttsvoice", "ttsvoicedir", "ttsread", "ttsreadstreams", "ttsstreampriority", "ttsrate", "ttsvolume" }),
         ("Logging",          new[] { "autolog" }),
+        ("Analytics",        new[] { "analytics", "analyticsinterval", "analyticsretentiondays", "analyticsreplay", "analyticsnoticeshown", "analyticsdir" }),
         ("Updates",          new[] { "autoupdate", "checkforupdates" }),
         ("Directories",      new[] { "scriptdir", "sounddir", "artdir", "mapdir", "plugindir", "configdir", "logdir" }),
     };
@@ -552,6 +650,7 @@ public sealed class GenieConfig
                 case "ttsvoice": TtsVoice = value.Trim(); break;
                 case "ttsread": TtsRead = ToBool(value); break;
                 case "ttsreadstreams": TtsReadStreamsRaw = value.Trim(); break;
+                case "ttsstreampriority": TtsStreamPriorityRaw = value.Trim().ToLowerInvariant(); break;
                 case "ttsrate":
                     // Ignore garbage (StringToDouble returns -1) rather than
                     // stomping the current rate; clamp real values to sane speech.
@@ -562,6 +661,18 @@ public sealed class GenieConfig
                     var ttsVol = (int)UtilityCore.StringToDouble(value);
                     if (ttsVol >= 0) TtsVolume = Math.Clamp(ttsVol, 0, 100);
                     break;
+                case "analytics": Analytics = ToBool(value); break;
+                case "analyticsinterval":
+                    var ai = (int)UtilityCore.StringToDouble(value);
+                    if (ai > 0) AnalyticsInterval = Math.Clamp(ai, 10, 600);
+                    break;
+                case "analyticsretentiondays":
+                    var ar = (int)UtilityCore.StringToDouble(value);
+                    if (ar >= 0) AnalyticsRetentionDays = Math.Clamp(ar, 0, 3650);
+                    break;
+                case "analyticsreplay": AnalyticsReplay = ToBool(value); break;
+                case "analyticsnoticeshown": AnalyticsNoticeShown = ToBool(value); break;
+                case "analyticsdir": AnalyticsDirRaw = SetDir(value); break;
                 case "artdir": ArtDirRaw = SetDir(value); break;
                 case "mapdir": MapDirRaw = SetDir(value); break;
                 case "plugindir": PluginDirRaw = SetDir(value); break;

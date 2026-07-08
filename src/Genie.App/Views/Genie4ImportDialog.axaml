@@ -24,6 +24,7 @@
                  FontSize="10" FontWeight="SemiBold"/>
       <Grid ColumnDefinitions="*,Auto">
         <TextBox Grid.Column="0" Text="{Binding SourcePath}"
+                 AutomationProperties.Name="Genie 4 config folder"
                  FontFamily="Consolas,Courier New,monospace" FontSize="11"
                  Watermark="C:\Users\You\AppData\Roaming\Genie Client 4\Config"/>
         <Button Grid.Column="1" Content="Browse…" Margin="4,0,0,0"
@@ -45,7 +46,7 @@
 
           <Grid ColumnDefinitions="*,*">
             <StackPanel Grid.Column="0" Spacing="2">
-              <CheckBox IsChecked="{Binding ImportHighlights}">
+              <CheckBox IsChecked="{Binding ImportHighlights}" AutomationProperties.Name="Highlights">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <TextBlock Text="Highlights" FontSize="12"/>
                   <TextBlock Text="{Binding CountHighlights, StringFormat='— {0} rules'}"
@@ -53,7 +54,7 @@
                              IsVisible="{Binding CountHighlights, Converter={x:Static vm:Genie4ImportViewModel.PositiveConverter}}"/>
                 </StackPanel>
               </CheckBox>
-              <CheckBox IsChecked="{Binding ImportTriggers}">
+              <CheckBox IsChecked="{Binding ImportTriggers}" AutomationProperties.Name="Triggers">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <TextBlock Text="Triggers" FontSize="12"/>
                   <TextBlock Text="{Binding CountTriggers, StringFormat='— {0} rules'}"
@@ -61,7 +62,7 @@
                              IsVisible="{Binding CountTriggers, Converter={x:Static vm:Genie4ImportViewModel.PositiveConverter}}"/>
                 </StackPanel>
               </CheckBox>
-              <CheckBox IsChecked="{Binding ImportSubstitutes}">
+              <CheckBox IsChecked="{Binding ImportSubstitutes}" AutomationProperties.Name="Substitutes">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <TextBlock Text="Substitutes" FontSize="12"/>
                   <TextBlock Text="{Binding CountSubstitutes, StringFormat='— {0} rules'}"
@@ -69,7 +70,7 @@
                              IsVisible="{Binding CountSubstitutes, Converter={x:Static vm:Genie4ImportViewModel.PositiveConverter}}"/>
                 </StackPanel>
               </CheckBox>
-              <CheckBox IsChecked="{Binding ImportGags}">
+              <CheckBox IsChecked="{Binding ImportGags}" AutomationProperties.Name="Gags">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <TextBlock Text="Gags" FontSize="12"/>
                   <TextBlock Text="{Binding CountGags, StringFormat='— {0} rules'}"
@@ -79,7 +80,7 @@
               </CheckBox>
             </StackPanel>
             <StackPanel Grid.Column="1" Spacing="2">
-              <CheckBox IsChecked="{Binding ImportAliases}">
+              <CheckBox IsChecked="{Binding ImportAliases}" AutomationProperties.Name="Aliases">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <TextBlock Text="Aliases" FontSize="12"/>
                   <TextBlock Text="{Binding CountAliases, StringFormat='— {0} rules'}"
@@ -87,7 +88,7 @@
                              IsVisible="{Binding CountAliases, Converter={x:Static vm:Genie4ImportViewModel.PositiveConverter}}"/>
                 </StackPanel>
               </CheckBox>
-              <CheckBox IsChecked="{Binding ImportMacros}">
+              <CheckBox IsChecked="{Binding ImportMacros}" AutomationProperties.Name="Macros">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <TextBlock Text="Macros" FontSize="12"/>
                   <TextBlock Text="{Binding CountMacros, StringFormat='— {0} rules'}"
@@ -95,7 +96,7 @@
                              IsVisible="{Binding CountMacros, Converter={x:Static vm:Genie4ImportViewModel.PositiveConverter}}"/>
                 </StackPanel>
               </CheckBox>
-              <CheckBox IsChecked="{Binding ImportVariables}">
+              <CheckBox IsChecked="{Binding ImportVariables}" AutomationProperties.Name="Variables">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <TextBlock Text="Variables" FontSize="12"/>
                   <TextBlock Text="{Binding CountVariables, StringFormat='— {0} rules'}"
@@ -103,7 +104,7 @@
                              IsVisible="{Binding CountVariables, Converter={x:Static vm:Genie4ImportViewModel.PositiveConverter}}"/>
                 </StackPanel>
               </CheckBox>
-              <CheckBox IsChecked="{Binding ImportClasses}">
+              <CheckBox IsChecked="{Binding ImportClasses}" AutomationProperties.Name="Classes">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <TextBlock Text="Classes" FontSize="12"/>
                   <TextBlock Text="{Binding CountClasses, StringFormat='— {0} rules'}"

@@ -68,5 +68,11 @@ public partial class ConfigurationDialog : ReactiveWindow<ConfigurationViewModel
         // they're profile-independent. ScriptConfig is null pre-connect — the
         // panel disables itself and shows a hint in that case.
         ScriptsPanelCtrl.Initialize(vm.ScriptConfig, vm.OnScriptSettingsChanged);
+
+        // TTS settings share the same global GenieConfig + persistence path.
+        // The speak-sample / voice-reset hooks come from the main window
+        // (which owns the TtsService); null just disables the Test button.
+        TtsPanelCtrl.Initialize(vm.ScriptConfig, vm.OnScriptSettingsChanged,
+                                vm.SpeakSample, vm.TtsVoiceChanged);
     }
 }

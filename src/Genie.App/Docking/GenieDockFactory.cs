@@ -188,6 +188,7 @@ public class GenieDockFactory : Factory
         var log      = new StreamTool      (_vm.StreamTabs.Log,      ws.Get("log"));
         var itemlog  = new StreamTool      (_vm.StreamTabs.ItemLog,  ws.Get("itemlog"));
         var experience = new ExperienceTool(_vm.Experience,          ws.Get("experience"));
+        var analytics  = new AnalyticsTool (_vm.Analytics,           ws.Get("analytics"));
         var activeSpells = new ActiveSpellsTool(_vm.ActiveSpells,    ws.Get("active-spells"));
         var timeTracker = new TimeTrackerTool(_vm.TimeTracker,       ws.Get("time-tracker"));
         var scripts    = new ScriptsTool   (_vm.Scripts,            ws.Get("scripts"));
@@ -344,6 +345,9 @@ public class GenieDockFactory : Factory
         // Experience: registered but hidden by default (like Vitals) — re-opens
         // beside the Backpack via Window → Experience. The plugin fills it.
         _tools[experience.Id] = (experience, backpackDock.Id);
+        // Analytics: skill-history charts — hidden by default, re-opens beside
+        // the Backpack via Window → Analytics (grouped with Experience).
+        _tools[analytics.Id] = (analytics, backpackDock.Id);
         // Active Spells: registered but hidden by default (like Experience) —
         // re-opens beside the Backpack via Window → Active Spells. The Spell
         // Timer fills it. First-class tool (not a plugin window) so it keeps MDI
@@ -436,6 +440,7 @@ public class GenieDockFactory : Factory
         var log        = new StreamTool      (_vm.StreamTabs.Log,      ws.Get("log"));
         var itemlog    = new StreamTool      (_vm.StreamTabs.ItemLog,  ws.Get("itemlog"));
         var experience = new ExperienceTool  (_vm.Experience,          ws.Get("experience"));
+        var analytics  = new AnalyticsTool   (_vm.Analytics,           ws.Get("analytics"));
         var activeSpells = new ActiveSpellsTool(_vm.ActiveSpells,       ws.Get("active-spells"));
         var timeTracker = new TimeTrackerTool (_vm.TimeTracker,        ws.Get("time-tracker"));
         var scene      = new SceneTool        (_vm.Scene,              ws.Get("scene"));
@@ -451,7 +456,8 @@ public class GenieDockFactory : Factory
             ("logons", logons), ("talk", talk), ("whispers", whispers), ("thoughts", thoughts),
             ("combat", combat), ("familiar", familiar), ("death", death), ("assess", assess),
             ("atmospherics", atmospherics), ("log", log), ("itemlog", itemlog),
-            ("vitals", vitals), ("experience", experience), ("active-spells", activeSpells),
+            ("vitals", vitals), ("experience", experience), ("analytics", analytics),
+            ("active-spells", activeSpells),
             ("time-tracker", timeTracker), ("scene", scene),
             ("mobs", mobs), ("players", players), ("raw-xml", rawXml),
             ("injuries", injuries),

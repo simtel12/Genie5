@@ -372,6 +372,11 @@
                   IsChecked="{Binding ExperienceVisible, Mode=OneWay}"
                   Command="{Binding ToggleExperienceCommand}"
                   ToolTip.Tip="Skill ranks and learning rates, tracked by the Experience plugin. Train a skill or type 'exp' to populate it."/>
+        <MenuItem Header="A_nalytics"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding AnalyticsVisible, Mode=OneWay}"
+                  Command="{Binding ToggleAnalyticsCommand}"
+                  ToolTip.Tip="Skill-history charts — XP/hour, gain curves, and session comparison from locally recorded history (#config analytics)."/>
         <MenuItem Header="_Active Spells"
                   ToggleType="CheckBox"
                   IsChecked="{Binding ActiveSpellsVisible, Mode=OneWay}"
@@ -722,6 +727,7 @@
                        ToolTip.Tip="Roundtime — your character can't act until this expires"/>
           </Border>
           <TextBlock Text="{Binding Vitals.RoundTimeSeconds, StringFormat='{}{0:F1}s'}"
+                     AutomationProperties.Name="{Binding Vitals.RoundTimeSeconds, StringFormat='Roundtime: {0:F1} seconds'}"
                      Foreground="#ffd0d0" FontSize="12" MinWidth="40"
                      VerticalAlignment="Center"/>
         </StackPanel>
@@ -737,10 +743,13 @@
         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
                     IsVisible="{Binding Display.UseEnhancedHandsStrip}">
           <controls:CompassView   Vitals="{Binding Vitals}" VerticalAlignment="Center"
+                                  AutomationProperties.Name="Compass"
                                   ToolTip.Tip="Compass — pixel-art rose with one overlay per active exit (data from the server's &lt;compass&gt; payload)."/>
           <controls:BodyView      Vitals="{Binding Vitals}" VerticalAlignment="Center"
+                                  AutomationProperties.Name="Posture"
                                   ToolTip.Tip="Posture sprite — standing / sitting / kneeling / prone / dead."/>
           <controls:StatusIconBar Vitals="{Binding Vitals}" VerticalAlignment="Center"
+                                  AutomationProperties.Name="Status effects"
                                   ToolTip.Tip="Active afflictions: stunned, bleeding, invisible, hidden, joined, webbed. Empty slots stay blank."/>
         </StackPanel>
 
@@ -749,6 +758,8 @@
             <TextBlock Text="L" Foreground="{DynamicResource Theme.TextSecondary}" FontWeight="SemiBold" FontSize="11"/>
           </Border>
           <TextBlock Text="{Binding Vitals.LeftHand, FallbackValue=Empty}"
+                     AutomationProperties.Name="{Binding Vitals.LeftHand, StringFormat='Left hand: {0}'}"
+                     AutomationProperties.LiveSetting="Polite"
                      Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12" MinWidth="140"
                      VerticalAlignment="Center"/>
         </StackPanel>
@@ -758,6 +769,8 @@
             <TextBlock Text="R" Foreground="{DynamicResource Theme.TextSecondary}" FontWeight="SemiBold" FontSize="11"/>
           </Border>
           <TextBlock Text="{Binding Vitals.RightHand, FallbackValue=Empty}"
+                     AutomationProperties.Name="{Binding Vitals.RightHand, StringFormat='Right hand: {0}'}"
+                     AutomationProperties.LiveSetting="Polite"
                      Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12" MinWidth="140"
                      VerticalAlignment="Center"/>
         </StackPanel>
@@ -773,32 +786,38 @@
         <Border IsVisible="{Binding Vitals.IsStanceOffensive}"
                 Background="#3a1818" CornerRadius="2" Padding="5,1" VerticalAlignment="Center"
                 ToolTip.Tip="Stance: Offensive — maximum damage out, minimum defense.">
-          <TextBlock Text="OFF" Foreground="#ff5050" FontSize="10" FontWeight="SemiBold"/>
+          <TextBlock Text="OFF" Foreground="#ff5050" FontSize="10" FontWeight="SemiBold"
+                     AutomationProperties.HelpText="Stance: Offensive — maximum damage out, minimum defense."/>
         </Border>
         <Border IsVisible="{Binding Vitals.IsStanceAdvance}"
                 Background="#3a2418" CornerRadius="2" Padding="5,1" VerticalAlignment="Center"
                 ToolTip.Tip="Stance: Advance — favors attack over defense.">
-          <TextBlock Text="ADV" Foreground="#ff8040" FontSize="10" FontWeight="SemiBold"/>
+          <TextBlock Text="ADV" Foreground="#ff8040" FontSize="10" FontWeight="SemiBold"
+                     AutomationProperties.HelpText="Stance: Advance — favors attack over defense."/>
         </Border>
         <Border IsVisible="{Binding Vitals.IsStanceForward}"
                 Background="#3a3018" CornerRadius="2" Padding="5,1" VerticalAlignment="Center"
                 ToolTip.Tip="Stance: Forward — slight tilt toward attack.">
-          <TextBlock Text="FWD" Foreground="#ffb040" FontSize="10" FontWeight="SemiBold"/>
+          <TextBlock Text="FWD" Foreground="#ffb040" FontSize="10" FontWeight="SemiBold"
+                     AutomationProperties.HelpText="Stance: Forward — slight tilt toward attack."/>
         </Border>
         <Border IsVisible="{Binding Vitals.IsStanceNeutral}"
                 Background="#2a2a2a" CornerRadius="2" Padding="5,1" VerticalAlignment="Center"
                 ToolTip.Tip="Stance: Neutral — balanced offense and defense.">
-          <TextBlock Text="NEU" Foreground="#d8c060" FontSize="10" FontWeight="SemiBold"/>
+          <TextBlock Text="NEU" Foreground="#d8c060" FontSize="10" FontWeight="SemiBold"
+                     AutomationProperties.HelpText="Stance: Neutral — balanced offense and defense."/>
         </Border>
         <Border IsVisible="{Binding Vitals.IsStanceGuarded}"
                 Background="#1c3018" CornerRadius="2" Padding="5,1" VerticalAlignment="Center"
                 ToolTip.Tip="Stance: Guarded — slight tilt toward defense.">
-          <TextBlock Text="GRD" Foreground="#80c060" FontSize="10" FontWeight="SemiBold"/>
+          <TextBlock Text="GRD" Foreground="#80c060" FontSize="10" FontWeight="SemiBold"
+                     AutomationProperties.HelpText="Stance: Guarded — slight tilt toward defense."/>
         </Border>
         <Border IsVisible="{Binding Vitals.IsStanceDefensive}"
                 Background="#143a14" CornerRadius="2" Padding="5,1" VerticalAlignment="Center"
                 ToolTip.Tip="Stance: Defensive — maximum defense, minimum damage out.">
-          <TextBlock Text="DEF" Foreground="#40d060" FontSize="10" FontWeight="SemiBold"/>
+          <TextBlock Text="DEF" Foreground="#40d060" FontSize="10" FontWeight="SemiBold"
+                     AutomationProperties.HelpText="Stance: Defensive — maximum defense, minimum damage out."/>
         </Border>
 
         <StackPanel Orientation="Horizontal" Spacing="6">
@@ -822,6 +841,8 @@
                Field", "Whole Displacement") so the bar (in the next sub-group)
                doesn't crowd against the trailing letter. -->
           <TextBlock Text="{Binding Vitals.PreparedSpellLabel}"
+                     AutomationProperties.Name="{Binding Vitals.PreparedSpellLabel, StringFormat='Prepared spell: {0}'}"
+                     AutomationProperties.LiveSetting="Polite"
                      Foreground="#c8a8e0" FontSize="12" MinWidth="170"
                      VerticalAlignment="Center"/>
         </StackPanel>
@@ -854,6 +875,7 @@
           <Grid>
             <ProgressBar Value="{Binding Vitals.CastBarSecondsRemaining}"
                          Maximum="{Binding Vitals.CastBarSecondsTotal}"
+                         AutomationProperties.Name="Spell preparation"
                          Foreground="#D040C0" Background="#2a1024"
                          Height="14" CornerRadius="2"/>
             <TextBlock Text="{Binding Vitals.CastBarSecondsRemaining}"
@@ -895,46 +917,54 @@
           <Border IsVisible="{Binding Vitals.IsHidden}"
                   Background="#2a2a2a" CornerRadius="2" Padding="5,1"
                   ToolTip.Tip="You are hidden.">
-            <TextBlock Text="HIDE" Foreground="#8090a8" FontSize="10" FontWeight="SemiBold"/>
+            <TextBlock Text="HIDE" Foreground="#8090a8" FontSize="10" FontWeight="SemiBold"
+                       AutomationProperties.HelpText="You are hidden."/>
           </Border>
           <Border IsVisible="{Binding Vitals.IsInvisible}"
                   Background="#2a2a2a" CornerRadius="2" Padding="5,1"
                   ToolTip.Tip="You are invisible.">
-            <TextBlock Text="INVIS" Foreground="#6080a0" FontSize="10" FontWeight="SemiBold"/>
+            <TextBlock Text="INVIS" Foreground="#6080a0" FontSize="10" FontWeight="SemiBold"
+                       AutomationProperties.HelpText="You are invisible."/>
           </Border>
 
           <!-- Combat conditions -->
           <Border IsVisible="{Binding Vitals.IsStunned}"
                   Background="#3a2a20" CornerRadius="2" Padding="5,1"
                   ToolTip.Tip="You are stunned — input ignored.">
-            <TextBlock Text="STUN" Foreground="#ffa040" FontSize="10" FontWeight="SemiBold"/>
+            <TextBlock Text="STUN" Foreground="#ffa040" FontSize="10" FontWeight="SemiBold"
+                       AutomationProperties.HelpText="You are stunned — input ignored."/>
           </Border>
           <Border IsVisible="{Binding Vitals.IsWebbed}"
                   Background="#3a3020" CornerRadius="2" Padding="5,1"
                   ToolTip.Tip="You are webbed.">
-            <TextBlock Text="WEB" Foreground="#d0c060" FontSize="10" FontWeight="SemiBold"/>
+            <TextBlock Text="WEB" Foreground="#d0c060" FontSize="10" FontWeight="SemiBold"
+                       AutomationProperties.HelpText="You are webbed."/>
           </Border>
           <Border IsVisible="{Binding Vitals.IsJoined}"
                   Background="#202a3a" CornerRadius="2" Padding="5,1"
                   ToolTip.Tip="You are joined to someone.">
-            <TextBlock Text="JOIN" Foreground="#80a0d0" FontSize="10" FontWeight="SemiBold"/>
+            <TextBlock Text="JOIN" Foreground="#80a0d0" FontSize="10" FontWeight="SemiBold"
+                       AutomationProperties.HelpText="You are joined to someone."/>
           </Border>
 
           <!-- Health afflictions -->
           <Border IsVisible="{Binding Vitals.IsBleeding}"
                   Background="#3a1a20" CornerRadius="2" Padding="5,1"
                   ToolTip.Tip="You are bleeding.">
-            <TextBlock Text="BLEED" Foreground="#e04060" FontSize="10" FontWeight="SemiBold"/>
+            <TextBlock Text="BLEED" Foreground="#e04060" FontSize="10" FontWeight="SemiBold"
+                       AutomationProperties.HelpText="You are bleeding."/>
           </Border>
           <Border IsVisible="{Binding Vitals.IsPoisoned}"
                   Background="#1f3a20" CornerRadius="2" Padding="5,1"
                   ToolTip.Tip="You are poisoned.">
-            <TextBlock Text="POIS" Foreground="#60d060" FontSize="10" FontWeight="SemiBold"/>
+            <TextBlock Text="POIS" Foreground="#60d060" FontSize="10" FontWeight="SemiBold"
+                       AutomationProperties.HelpText="You are poisoned."/>
           </Border>
           <Border IsVisible="{Binding Vitals.IsDiseased}"
                   Background="#3a3a1a" CornerRadius="2" Padding="5,1"
                   ToolTip.Tip="You are diseased.">
-            <TextBlock Text="DIS" Foreground="#a0a040" FontSize="10" FontWeight="SemiBold"/>
+            <TextBlock Text="DIS" Foreground="#a0a040" FontSize="10" FontWeight="SemiBold"
+                       AutomationProperties.HelpText="You are diseased."/>
           </Border>
 
           <!-- Critical — bright + bold so it can't be missed at a glance -->
@@ -1073,6 +1103,7 @@
 
       <Grid Grid.Column="0" Margin="0,0,2,0">
         <ProgressBar Value="{Binding Vitals.Health}" Maximum="100"
+                     AutomationProperties.Name="Health"
                      Foreground="#C04040" Background="#3a1010" Height="18"
                      CornerRadius="3"/>
         <TextBlock Text="{Binding Vitals.Health, StringFormat='health {0}%'}"
@@ -1083,6 +1114,7 @@
       <Grid Grid.Column="1" Margin="2,0"
             IsVisible="{Binding Display.ShowMagicPanels}">
         <ProgressBar Value="{Binding Vitals.Mana}" Maximum="100"
+                     AutomationProperties.Name="Mana"
                      Foreground="#4060C0" Background="#172040" Height="18"
                      CornerRadius="3"/>
         <TextBlock Text="{Binding Vitals.Mana, StringFormat='mana {0}%'}"
@@ -1092,6 +1124,7 @@
 
       <Grid Grid.Column="2" Margin="2,0">
         <ProgressBar Value="{Binding Vitals.Stamina}" Maximum="100"
+                     AutomationProperties.Name="Fatigue"
                      Foreground="#C09040" Background="#4a3818" Height="18"
                      CornerRadius="3"/>
         <TextBlock Text="{Binding Vitals.Stamina, StringFormat='fatigue {0}%'}"
@@ -1101,6 +1134,7 @@
 
       <Grid Grid.Column="3" Margin="2,0">
         <ProgressBar Value="{Binding Vitals.Spirit}" Maximum="100"
+                     AutomationProperties.Name="Spirit"
                      Foreground="#40A040" Background="#143a14" Height="18"
                      CornerRadius="3"/>
         <TextBlock Text="{Binding Vitals.Spirit, StringFormat='spirit {0}%'}"
@@ -1110,6 +1144,7 @@
 
       <Grid Grid.Column="4" Margin="2,0,0,0">
         <ProgressBar Value="{Binding Vitals.Concentration}" Maximum="100"
+                     AutomationProperties.Name="Concentration"
                      Foreground="#8040C0" Background="#2a1444" Height="18"
                      CornerRadius="3"/>
         <TextBlock Text="{Binding Vitals.Concentration, StringFormat='concentration {0}%'}"
@@ -1140,11 +1175,14 @@
             Padding="6,1">
       <DockPanel>
         <Button DockPanel.Dock="Right" Content="✕"
+                AutomationProperties.Name="Dismiss update notice"
+                AutomationProperties.HelpText="Dismiss this notice (it returns if the next check still finds updates)"
                 Command="{Binding DismissUpdateNoticeCommand}"
                 Background="Transparent" BorderThickness="0" Padding="4,0"
                 FontSize="10" Foreground="{DynamicResource Theme.SectionHeader}"
                 ToolTip.Tip="Dismiss this notice (it returns if the next check still finds updates)"/>
         <Button Content="{Binding UpdateNotice}"
+                AutomationProperties.HelpText="Click to open the Updates dialog"
                 Command="{Binding ShowUpdatesCommand}"
                 Background="Transparent" BorderThickness="0" Padding="2,0"
                 HorizontalAlignment="Left" FontSize="11" Foreground="{DynamicResource Theme.SectionHeader}"
@@ -1163,11 +1201,14 @@
             Padding="6,1">
       <DockPanel>
         <Button DockPanel.Dock="Right" Content="✕"
+                AutomationProperties.Name="Dismiss XML gap notice"
+                AutomationProperties.HelpText="Dismiss (this element won't prompt again this session)"
                 Command="{Binding DismissXmlGapNoticeCommand}"
                 Background="Transparent" BorderThickness="0" Padding="4,0"
                 FontSize="10" Foreground="{DynamicResource Theme.SectionHeader}"
                 ToolTip.Tip="Dismiss (this element won't prompt again this session)"/>
         <Button Content="{Binding XmlGapNotice}"
+                AutomationProperties.HelpText="Opens a pre-filled, pre-redacted GitHub issue in your browser — you review and submit it"
                 Command="{Binding ReportXmlGapCommand}"
                 Background="Transparent" BorderThickness="0" Padding="2,0"
                 HorizontalAlignment="Left" FontSize="11" Foreground="{DynamicResource Theme.SectionHeader}"
@@ -1202,6 +1243,7 @@
                        ToolTip.Tip="Roundtime — your character can't act until this expires"/>
           </Border>
           <TextBlock Text="{Binding Vitals.RoundTimeSeconds, StringFormat='{}{0:F1}s'}"
+                     AutomationProperties.Name="{Binding Vitals.RoundTimeSeconds, StringFormat='Roundtime: {0:F1} seconds'}"
                      Foreground="#ffd0d0" FontSize="12" MinWidth="40"
                      VerticalAlignment="Center"/>
         </StackPanel>
@@ -1217,10 +1259,13 @@
         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
                     IsVisible="{Binding Display.UseEnhancedHandsStrip}">
           <controls:CompassView   Vitals="{Binding Vitals}" VerticalAlignment="Center"
+                                  AutomationProperties.Name="Compass"
                                   ToolTip.Tip="Compass — pixel-art rose with one overlay per active exit (data from the server's &lt;compass&gt; payload)."/>
           <controls:BodyView      Vitals="{Binding Vitals}" VerticalAlignment="Center"
+                                  AutomationProperties.Name="Posture"
                                   ToolTip.Tip="Posture sprite — standing / sitting / kneeling / prone / dead."/>
           <controls:StatusIconBar Vitals="{Binding Vitals}" VerticalAlignment="Center"
+                                  AutomationProperties.Name="Status effects"
                                   ToolTip.Tip="Active afflictions: stunned, bleeding, invisible, hidden, joined, webbed. Empty slots stay blank."/>
         </StackPanel>
 
@@ -1229,6 +1274,8 @@
             <TextBlock Text="L" Foreground="{DynamicResource Theme.TextSecondary}" FontWeight="SemiBold" FontSize="11"/>
           </Border>
           <TextBlock Text="{Binding Vitals.LeftHand, FallbackValue=Empty}"
+                     AutomationProperties.Name="{Binding Vitals.LeftHand, StringFormat='Left hand: {0}'}"
+                     AutomationProperties.LiveSetting="Polite"
                      Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12" MinWidth="140"
                      VerticalAlignment="Center"/>
         </StackPanel>
@@ -1238,6 +1285,8 @@
             <TextBlock Text="R" Foreground="{DynamicResource Theme.TextSecondary}" FontWeight="SemiBold" FontSize="11"/>
           </Border>
           <TextBlock Text="{Binding Vitals.RightHand, FallbackValue=Empty}"
+                     AutomationProperties.Name="{Binding Vitals.RightHand, StringFormat='Right hand: {0}'}"
+                     AutomationProperties.LiveSetting="Polite"
                      Foreground="{DynamicResource Theme.TextPrimary}" FontSize="12" MinWidth="140"
                      VerticalAlignment="Center"/>
         </StackPanel>
@@ -1253,32 +1302,38 @@
         <Border IsVisible="{Binding Vitals.IsStanceOffensive}"
                 Background="#3a1818" CornerRadius="2" Padding="5,1" VerticalAlignment="Center"
                 ToolTip.Tip="Stance: Offensive — maximum damage out, minimum defense.">
-          <TextBlock Text="OFF" Foreground="#ff5050" FontSize="10" FontWeight="SemiBold"/>
+          <TextBlock Text="OFF" Foreground="#ff5050" FontSize="10" FontWeight="SemiBold"
+                     AutomationProperties.HelpText="Stance: Offensive — maximum damage out, minimum defense."/>
         </Border>
         <Border IsVisible="{Binding Vitals.IsStanceAdvance}"
                 Background="#3a2418" CornerRadius="2" Padding="5,1" VerticalAlignment="Center"
                 ToolTip.Tip="Stance: Advance — favors attack over defense.">
-          <TextBlock Text="ADV" Foreground="#ff8040" FontSize="10" FontWeight="SemiBold"/>
+          <TextBlock Text="ADV" Foreground="#ff8040" FontSize="10" FontWeight="SemiBold"
+                     AutomationProperties.HelpText="Stance: Advance — favors attack over defense."/>
         </Border>
         <Border IsVisible="{Binding Vitals.IsStanceForward}"
                 Background="#3a3018" CornerRadius="2" Padding="5,1" VerticalAlignment="Center"
                 ToolTip.Tip="Stance: Forward — slight tilt toward attack.">
-          <TextBlock Text="FWD" Foreground="#ffb040" FontSize="10" FontWeight="SemiBold"/>
+          <TextBlock Text="FWD" Foreground="#ffb040" FontSize="10" FontWeight="SemiBold"
+                     AutomationProperties.HelpText="Stance: Forward — slight tilt toward attack."/>
         </Border>
         <Border IsVisible="{Binding Vitals.IsStanceNeutral}"
                 Background="#2a2a2a" CornerRadius="2" Padding="5,1" VerticalAlignment="Center"
                 ToolTip.Tip="Stance: Neutral — balanced offense and defense.">
-          <TextBlock Text="NEU" Foreground="#d8c060" FontSize="10" FontWeight="SemiBold"/>
+          <TextBlock Text="NEU" Foreground="#d8c060" FontSize="10" FontWeight="SemiBold"
+                     AutomationProperties.HelpText="Stance: Neutral — balanced offense and defense."/>
         </Border>
         <Border IsVisible="{Binding Vitals.IsStanceGuarded}"
                 Background="#1c3018" CornerRadius="2" Padding="5,1" VerticalAlignment="Center"
                 ToolTip.Tip="Stance: Guarded — slight tilt toward defense.">
-          <TextBlock Text="GRD" Foreground="#80c060" FontSize="10" FontWeight="SemiBold"/>
+          <TextBlock Text="GRD" Foreground="#80c060" FontSize="10" FontWeight="SemiBold"
+                     AutomationProperties.HelpText="Stance: Guarded — slight tilt toward defense."/>
         </Border>
         <Border IsVisible="{Binding Vitals.IsStanceDefensive}"
                 Background="#143a14" CornerRadius="2" Padding="5,1" VerticalAlignment="Center"
                 ToolTip.Tip="Stance: Defensive — maximum defense, minimum damage out.">
-          <TextBlock Text="DEF" Foreground="#40d060" FontSize="10" FontWeight="SemiBold"/>
+          <TextBlock Text="DEF" Foreground="#40d060" FontSize="10" FontWeight="SemiBold"
+                     AutomationProperties.HelpText="Stance: Defensive — maximum defense, minimum damage out."/>
         </Border>
 
         <StackPanel Orientation="Horizontal" Spacing="6">
@@ -1302,6 +1357,8 @@
                Field", "Whole Displacement") so the bar (in the next sub-group)
                doesn't crowd against the trailing letter. -->
           <TextBlock Text="{Binding Vitals.PreparedSpellLabel}"
+                     AutomationProperties.Name="{Binding Vitals.PreparedSpellLabel, StringFormat='Prepared spell: {0}'}"
+                     AutomationProperties.LiveSetting="Polite"
                      Foreground="#c8a8e0" FontSize="12" MinWidth="170"
                      VerticalAlignment="Center"/>
         </StackPanel>
@@ -1334,6 +1391,7 @@
           <Grid>
             <ProgressBar Value="{Binding Vitals.CastBarSecondsRemaining}"
                          Maximum="{Binding Vitals.CastBarSecondsTotal}"
+                         AutomationProperties.Name="Spell preparation"
                          Foreground="#D040C0" Background="#2a1024"
                          Height="14" CornerRadius="2"/>
             <TextBlock Text="{Binding Vitals.CastBarSecondsRemaining}"
@@ -1375,46 +1433,54 @@
           <Border IsVisible="{Binding Vitals.IsHidden}"
                   Background="#2a2a2a" CornerRadius="2" Padding="5,1"
                   ToolTip.Tip="You are hidden.">
-            <TextBlock Text="HIDE" Foreground="#8090a8" FontSize="10" FontWeight="SemiBold"/>
+            <TextBlock Text="HIDE" Foreground="#8090a8" FontSize="10" FontWeight="SemiBold"
+                       AutomationProperties.HelpText="You are hidden."/>
           </Border>
           <Border IsVisible="{Binding Vitals.IsInvisible}"
                   Background="#2a2a2a" CornerRadius="2" Padding="5,1"
                   ToolTip.Tip="You are invisible.">
-            <TextBlock Text="INVIS" Foreground="#6080a0" FontSize="10" FontWeight="SemiBold"/>
+            <TextBlock Text="INVIS" Foreground="#6080a0" FontSize="10" FontWeight="SemiBold"
+                       AutomationProperties.HelpText="You are invisible."/>
           </Border>
 
           <!-- Combat conditions -->
           <Border IsVisible="{Binding Vitals.IsStunned}"
                   Background="#3a2a20" CornerRadius="2" Padding="5,1"
                   ToolTip.Tip="You are stunned — input ignored.">
-            <TextBlock Text="STUN" Foreground="#ffa040" FontSize="10" FontWeight="SemiBold"/>
+            <TextBlock Text="STUN" Foreground="#ffa040" FontSize="10" FontWeight="SemiBold"
+                       AutomationProperties.HelpText="You are stunned — input ignored."/>
           </Border>
           <Border IsVisible="{Binding Vitals.IsWebbed}"
                   Background="#3a3020" CornerRadius="2" Padding="5,1"
                   ToolTip.Tip="You are webbed.">
-            <TextBlock Text="WEB" Foreground="#d0c060" FontSize="10" FontWeight="SemiBold"/>
+            <TextBlock Text="WEB" Foreground="#d0c060" FontSize="10" FontWeight="SemiBold"
+                       AutomationProperties.HelpText="You are webbed."/>
           </Border>
           <Border IsVisible="{Binding Vitals.IsJoined}"
                   Background="#202a3a" CornerRadius="2" Padding="5,1"
                   ToolTip.Tip="You are joined to someone.">
-            <TextBlock Text="JOIN" Foreground="#80a0d0" FontSize="10" FontWeight="SemiBold"/>
+            <TextBlock Text="JOIN" Foreground="#80a0d0" FontSize="10" FontWeight="SemiBold"
+                       AutomationProperties.HelpText="You are joined to someone."/>
           </Border>
 
           <!-- Health afflictions -->
           <Border IsVisible="{Binding Vitals.IsBleeding}"
                   Background="#3a1a20" CornerRadius="2" Padding="5,1"
                   ToolTip.Tip="You are bleeding.">
-            <TextBlock Text="BLEED" Foreground="#e04060" FontSize="10" FontWeight="SemiBold"/>
+            <TextBlock Text="BLEED" Foreground="#e04060" FontSize="10" FontWeight="SemiBold"
+                       AutomationProperties.HelpText="You are bleeding."/>
           </Border>
           <Border IsVisible="{Binding Vitals.IsPoisoned}"
                   Background="#1f3a20" CornerRadius="2" Padding="5,1"
                   ToolTip.Tip="You are poisoned.">
-            <TextBlock Text="POIS" Foreground="#60d060" FontSize="10" FontWeight="SemiBold"/>
+            <TextBlock Text="POIS" Foreground="#60d060" FontSize="10" FontWeight="SemiBold"
+                       AutomationProperties.HelpText="You are poisoned."/>
           </Border>
           <Border IsVisible="{Binding Vitals.IsDiseased}"
                   Background="#3a3a1a" CornerRadius="2" Padding="5,1"
                   ToolTip.Tip="You are diseased.">
-            <TextBlock Text="DIS" Foreground="#a0a040" FontSize="10" FontWeight="SemiBold"/>
+            <TextBlock Text="DIS" Foreground="#a0a040" FontSize="10" FontWeight="SemiBold"
+                       AutomationProperties.HelpText="You are diseased."/>
           </Border>
 
           <!-- Critical — bright + bold so it can't be missed at a glance -->
@@ -1470,6 +1536,8 @@
                           FontSize="10" Padding="3,0" MinWidth="0" MinHeight="0"
                           Background="Transparent" BorderThickness="0"
                           Foreground="#9ec59a"
+                          AutomationProperties.Name="Pause or resume script"
+                          AutomationProperties.HelpText="Pause / resume this script"
                           ToolTip.Tip="Pause / resume this script"
                           Command="{ReflectionBinding $parent[ItemsControl].DataContext.ScriptBar.PauseResumeCommand}"
                           CommandParameter="{Binding}"/>
@@ -1479,6 +1547,8 @@
                           Background="Transparent" BorderThickness="0"
                           Foreground="#c0a060"
                           IsVisible="{Binding !IsJavaScript}"
+                          AutomationProperties.Name="Cycle debug level"
+                          AutomationProperties.HelpText="Cycle this script's debug/trace level (0→1→5→10)"
                           ToolTip.Tip="Cycle this script's debug/trace level (0→1→5→10)"
                           Command="{ReflectionBinding $parent[ItemsControl].DataContext.ScriptBar.CycleDebugCommand}"
                           CommandParameter="{Binding}"/>
@@ -1486,6 +1556,8 @@
                           FontSize="10" Padding="3,0" MinWidth="0" MinHeight="0"
                           Background="Transparent" BorderThickness="0"
                           Foreground="#80a8c0"
+                          AutomationProperties.Name="Edit script"
+                          AutomationProperties.HelpText="Edit this script in the configured editor"
                           ToolTip.Tip="Edit this script in the configured editor"
                           Command="{ReflectionBinding $parent[ItemsControl].DataContext.ScriptBar.EditScriptCommand}"
                           CommandParameter="{Binding Name}"/>
@@ -1493,6 +1565,8 @@
                           FontSize="10" Padding="3,0" MinWidth="0" MinHeight="0"
                           Background="Transparent" BorderThickness="0"
                           Foreground="#d08080"
+                          AutomationProperties.Name="Stop script"
+                          AutomationProperties.HelpText="Stop this script (#stop)"
                           ToolTip.Tip="Stop this script (#stop)"
                           Command="{ReflectionBinding $parent[ItemsControl].DataContext.ScriptBar.StopScriptCommand}"
                           CommandParameter="{Binding Name}"/>
@@ -1519,6 +1593,7 @@
               ToolTip.Tip="Roundtime — your character can't act until this expires. Right-click Window → Roundtime Position to relocate."
               MinWidth="64">
         <TextBlock Foreground="#ffd0d0" FontWeight="SemiBold"
+                   AutomationProperties.Name="{Binding Vitals.RoundTimeSeconds, StringFormat='Roundtime: {0:F1} seconds'}"
                    HorizontalAlignment="Center" VerticalAlignment="Center"
                    FontSize="12">
           <Run Text="⏱ "/><Run Text="{Binding Vitals.RoundTimeSeconds, StringFormat={}{0:F1}s}"/>
@@ -1536,6 +1611,8 @@
               VerticalAlignment="Stretch"
               ToolTip.Tip="Type-ahead buffer — commands queued ahead of the game (filled = used, hollow = free). DR caps this per account: free 1, premium 2, +1 with the LTB line. Amber means the buffer is full.">
         <TextBlock FontWeight="SemiBold"
+                   AutomationProperties.Name="Type-ahead buffer"
+                   AutomationProperties.HelpText="Type-ahead buffer — commands queued ahead of the game (filled = used, hollow = free). DR caps this per account: free 1, premium 2, +1 with the LTB line. Amber means the buffer is full."
                    HorizontalAlignment="Center" VerticalAlignment="Center"
                    FontFamily="Consolas,Courier New,monospace" FontSize="12">
           <TextBlock.Text>
@@ -1555,6 +1632,9 @@
 
       <TextBox Grid.Column="2"
                x:Name="CommandInput"
+               AutomationProperties.Name="Command input"
+               AutomationProperties.AutomationId="CommandInput"
+               AutomationProperties.HelpText="Type game commands here and press Enter to send them to the game."
                Text="{Binding Command.CommandText}"
                Watermark="Enter command..."
                FontFamily="Consolas,Courier New,monospace"
@@ -1564,6 +1644,7 @@
         </TextBox.KeyBindings>
       </TextBox>
       <Button Grid.Column="3" Content="Send" Margin="4,0,0,0"
+              AutomationProperties.AutomationId="SendButton"
               Command="{Binding Command.SubmitCommand}"/>
     </Grid>
 

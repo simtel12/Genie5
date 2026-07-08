@@ -18,7 +18,7 @@
     <StackPanel Grid.Row="0" Spacing="6">
       <Grid ColumnDefinitions="110,*">
         <TextBlock Grid.Column="0" Text="Theme name" VerticalAlignment="Center"/>
-        <TextBox   Grid.Column="1" Text="{Binding ThemeName}"/>
+        <TextBox   Grid.Column="1" AutomationProperties.Name="Theme name" Text="{Binding ThemeName}"/>
       </Grid>
       <TextBlock Text="Built-in themes can't be overwritten — editing one saves a custom copy under this name (Config/Themes)."
                  FontSize="11" Foreground="{DynamicResource Theme.TextMuted}"
@@ -55,6 +55,7 @@
               <TextBlock Grid.Column="0" Text="{Binding Label}"
                          VerticalAlignment="Center" FontSize="12"/>
               <ColorPicker Grid.Column="1"
+                           AutomationProperties.Name="{Binding Label}"
                            Color="{Binding Value, Mode=TwoWay}"
                            IsAlphaEnabled="True" IsAlphaVisible="True"
                            HorizontalAlignment="Stretch"/>

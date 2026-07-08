@@ -199,19 +199,26 @@
                 IsVisible="{Binding Find.IsOpen}">
           <StackPanel Orientation="Horizontal" Spacing="4">
             <TextBox Text="{Binding Find.FindText}" Watermark="Find…"
+                     AutomationProperties.Name="Find in window"
                      Width="160" FontSize="11" MinHeight="0" Padding="4,2"
                      controls:FindInWindow.BoxModel="{Binding Find}"/>
             <TextBlock Text="{Binding Find.Status}" FontSize="10"
                        Foreground="{DynamicResource Theme.TextMuted}"
                        VerticalAlignment="Center"/>
             <Button Content="▲" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    AutomationProperties.Name="Find previous"
+                    AutomationProperties.HelpText="Older match (Enter)"
                     Command="{Binding Find.OlderCommand}"
                     ToolTip.Tip="Older match (Enter)"/>
             <Button Content="▼" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    AutomationProperties.Name="Find next"
+                    AutomationProperties.HelpText="Newer match (Shift+Enter)"
                     Command="{Binding Find.NewerCommand}"
                     ToolTip.Tip="Newer match (Shift+Enter)"/>
             <Button Content="✕" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
                     Background="Transparent" BorderThickness="0"
+                    AutomationProperties.Name="Close find bar"
+                    AutomationProperties.HelpText="Close (Esc)"
                     Command="{Binding Find.CloseCommand}"
                     ToolTip.Tip="Close (Esc)"/>
           </StackPanel>
@@ -225,24 +232,34 @@
         <StackPanel Spacing="6" Margin="8">
           <Grid ColumnDefinitions="55,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
             <TextBlock Grid.Row="0" Grid.Column="0" Text="Health"  Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
-            <ProgressBar Grid.Row="0" Grid.Column="1" Value="{Binding ViewModel.Health}"        Maximum="100" Foreground="{DynamicResource Theme.HealthBar}" Height="10"/>
+            <ProgressBar Grid.Row="0" Grid.Column="1" Value="{Binding ViewModel.Health}"        Maximum="100" Foreground="{DynamicResource Theme.HealthBar}" Height="10" AutomationProperties.Name="Health"/>
             <TextBlock Grid.Row="1" Grid.Column="0" Text="Mana"    Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
-            <ProgressBar Grid.Row="1" Grid.Column="1" Value="{Binding ViewModel.Mana}"          Maximum="100" Foreground="{DynamicResource Theme.ManaBar}" Height="10"/>
+            <ProgressBar Grid.Row="1" Grid.Column="1" Value="{Binding ViewModel.Mana}"          Maximum="100" Foreground="{DynamicResource Theme.ManaBar}" Height="10" AutomationProperties.Name="Mana"/>
             <TextBlock Grid.Row="2" Grid.Column="0" Text="Spirit"  Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
-            <ProgressBar Grid.Row="2" Grid.Column="1" Value="{Binding ViewModel.Spirit}"        Maximum="100" Foreground="{DynamicResource Theme.SpiritBar}" Height="10"/>
+            <ProgressBar Grid.Row="2" Grid.Column="1" Value="{Binding ViewModel.Spirit}"        Maximum="100" Foreground="{DynamicResource Theme.SpiritBar}" Height="10" AutomationProperties.Name="Spirit"/>
             <TextBlock Grid.Row="3" Grid.Column="0" Text="Stamina" Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
-            <ProgressBar Grid.Row="3" Grid.Column="1" Value="{Binding ViewModel.Stamina}"       Maximum="100" Foreground="{DynamicResource Theme.StaminaBar}" Height="10"/>
+            <ProgressBar Grid.Row="3" Grid.Column="1" Value="{Binding ViewModel.Stamina}"       Maximum="100" Foreground="{DynamicResource Theme.StaminaBar}" Height="10" AutomationProperties.Name="Stamina"/>
             <TextBlock Grid.Row="4" Grid.Column="0" Text="Conc"    Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
-            <ProgressBar Grid.Row="4" Grid.Column="1" Value="{Binding ViewModel.Concentration}" Maximum="100" Foreground="{DynamicResource Theme.ConcBar}" Height="10"/>
+            <ProgressBar Grid.Row="4" Grid.Column="1" Value="{Binding ViewModel.Concentration}" Maximum="100" Foreground="{DynamicResource Theme.ConcBar}" Height="10" AutomationProperties.Name="Concentration"/>
           </Grid>
           <Separator/>
-          <TextBlock Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11">
+          <TextBlock Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11"
+                     AutomationProperties.Name="{Binding ViewModel.RoundTimeSeconds, StringFormat='Roundtime: {0:F1} seconds'}">
             <Run Text="RT: "/><Run Text="{Binding ViewModel.RoundTimeSeconds, StringFormat={}{0:F1}s}"/>
           </TextBlock>
-          <TextBlock Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11">
+          <TextBlock Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11"
+                     AutomationProperties.Name="{Binding ViewModel.PreparedSpell, StringFormat='Prepared spell: {0}'}"
+                     AutomationProperties.LiveSetting="Polite">
             <Run Text="Spell: "/><Run Text="{Binding ViewModel.PreparedSpell}"/>
           </TextBlock>
-          <TextBlock Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11">
+          <TextBlock Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11"
+                     AutomationProperties.LiveSetting="Polite">
+            <AutomationProperties.Name>
+              <MultiBinding StringFormat="Left hand: {0}, right hand: {1}">
+                <Binding Path="ViewModel.LeftHand"/>
+                <Binding Path="ViewModel.RightHand"/>
+              </MultiBinding>
+            </AutomationProperties.Name>
             <Run Text="L: "/><Run Text="{Binding ViewModel.LeftHand}"/>
             <Run Text="   R: "/><Run Text="{Binding ViewModel.RightHand}"/>
           </TextBlock>
@@ -307,6 +324,8 @@
                         Padding="4,0" MinHeight="0" MinWidth="0"
                         Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Theme.SectionHeader}"
                         IsChecked="{Binding ViewModel.IsEditingIgnores}"
+                        AutomationProperties.Name="Edit ignore list"
+                        AutomationProperties.HelpText="Edit the ignore list (hide familiars, pets, …)"
                         ToolTip.Tip="Edit the ignore list (hide familiars, pets, …)"/>
         </Grid>
         <ScrollViewer Grid.Row="1">
@@ -350,6 +369,8 @@
                     <Button Grid.Column="1" Content="✕" FontSize="10"
                             Padding="4,0" MinHeight="0" MinWidth="0"
                             Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Theme.Danger}"
+                            AutomationProperties.Name="Remove pattern"
+                            AutomationProperties.HelpText="Remove this pattern"
                             Command="{Binding RemoveCommand}"
                             ToolTip.Tip="Remove this pattern"/>
                   </Grid>
@@ -537,6 +558,8 @@
           <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="4">
             <!-- Pop out (window-level action, separated from data-level cluster) -->
             <Button Grid.Column="0" Content="⬈" Padding="6,1" FontSize="11"
+                    AutomationProperties.Name="Pop out mapper"
+                    AutomationProperties.HelpText="Pop out to a separate window"
                     Command="{Binding ViewModel.FloatCommand}"
                     ToolTip.Tip="Pop out to a separate window"/>
             <!-- Zone selector — takes available width -->
@@ -551,16 +574,22 @@
             <TextBlock Grid.Column="2" Text="{Binding ViewModel.Level, StringFormat='L{0}'}"
                        Foreground="{DynamicResource Theme.TextPrimary}" VerticalAlignment="Center" FontSize="11"/>
             <Button Grid.Column="3" Content="▲" Padding="6,1" FontSize="10"
+                    AutomationProperties.Name="Z-level up"
                     Command="{Binding ViewModel.LevelUpCommand}"
                     ToolTip.Tip="Z-level up"/>
             <Button Grid.Column="4" Content="▼" Padding="6,1" FontSize="10"
+                    AutomationProperties.Name="Z-level down"
                     Command="{Binding ViewModel.LevelDownCommand}"
                     ToolTip.Tip="Z-level down"/>
             <!-- Zoom -->
             <Button Grid.Column="5" Content="−" Padding="8,1" FontSize="11"
+                    AutomationProperties.Name="Zoom out"
+                    AutomationProperties.HelpText="Zoom out (or mouse-wheel down over the map)"
                     Command="{Binding ViewModel.ZoomOutCommand}"
                     ToolTip.Tip="Zoom out (or mouse-wheel down over the map)"/>
             <Button Grid.Column="6" Content="+" Padding="8,1" FontSize="11"
+                    AutomationProperties.Name="Zoom in"
+                    AutomationProperties.HelpText="Zoom in (or mouse-wheel up over the map)"
                     Command="{Binding ViewModel.ZoomInCommand}"
                     ToolTip.Tip="Zoom in (or mouse-wheel up over the map)"/>
           </Grid>
@@ -580,6 +609,8 @@
                     ToolTip.Tip="Start a new, empty zone. Save writes it to the Maps directory."/>
             <Button Command="{Binding ViewModel.SaveMapCommand}"
                     Margin="0,0,8,0" Padding="6,1" FontSize="11"
+                    AutomationProperties.Name="Save zone"
+                    AutomationProperties.HelpText="Save the active zone to its XML file (Genie 4 compatible)."
                     ToolTip.Tip="Save the active zone to its XML file (Genie 4 compatible).">
               <StackPanel Orientation="Horizontal" Spacing="3">
                 <TextBlock Text="Save"/>
@@ -795,6 +826,8 @@
                   <ToggleButton Grid.Column="1" Content="📌"
                                 IsChecked="{Binding ViewModel.DetailsPinned}"
                                 FontSize="11" Padding="5,0" MinHeight="0"
+                                AutomationProperties.Name="Pin details panel"
+                                AutomationProperties.HelpText="Pin the Details panel open. When unpinned, it auto-hides to a strip when the pointer leaves."
                                 ToolTip.Tip="Pin the Details panel open. When unpinned, it auto-hides to a strip when the pointer leaves."/>
                 </Grid>
 
@@ -1025,19 +1058,26 @@
                 IsVisible="{Binding Find.IsOpen}">
           <StackPanel Orientation="Horizontal" Spacing="4">
             <TextBox Text="{Binding Find.FindText}" Watermark="Find…"
+                     AutomationProperties.Name="Find in window"
                      Width="160" FontSize="11" MinHeight="0" Padding="4,2"
                      controls:FindInWindow.BoxModel="{Binding Find}"/>
             <TextBlock Text="{Binding Find.Status}" FontSize="10"
                        Foreground="{DynamicResource Theme.TextMuted}"
                        VerticalAlignment="Center"/>
             <Button Content="▲" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    AutomationProperties.Name="Find previous"
+                    AutomationProperties.HelpText="Older match (Enter)"
                     Command="{Binding Find.OlderCommand}"
                     ToolTip.Tip="Older match (Enter)"/>
             <Button Content="▼" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    AutomationProperties.Name="Find next"
+                    AutomationProperties.HelpText="Newer match (Shift+Enter)"
                     Command="{Binding Find.NewerCommand}"
                     ToolTip.Tip="Newer match (Shift+Enter)"/>
             <Button Content="✕" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
                     Background="Transparent" BorderThickness="0"
+                    AutomationProperties.Name="Close find bar"
+                    AutomationProperties.HelpText="Close (Esc)"
                     Command="{Binding Find.CloseCommand}"
                     ToolTip.Tip="Close (Esc)"/>
           </StackPanel>
@@ -1088,19 +1128,26 @@
                 IsVisible="{Binding Find.IsOpen}">
           <StackPanel Orientation="Horizontal" Spacing="4">
             <TextBox Text="{Binding Find.FindText}" Watermark="Find…"
+                     AutomationProperties.Name="Find in window"
                      Width="160" FontSize="11" MinHeight="0" Padding="4,2"
                      controls:FindInWindow.BoxModel="{Binding Find}"/>
             <TextBlock Text="{Binding Find.Status}" FontSize="10"
                        Foreground="{DynamicResource Theme.TextMuted}"
                        VerticalAlignment="Center"/>
             <Button Content="▲" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    AutomationProperties.Name="Find previous"
+                    AutomationProperties.HelpText="Older match (Enter)"
                     Command="{Binding Find.OlderCommand}"
                     ToolTip.Tip="Older match (Enter)"/>
             <Button Content="▼" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    AutomationProperties.Name="Find next"
+                    AutomationProperties.HelpText="Newer match (Shift+Enter)"
                     Command="{Binding Find.NewerCommand}"
                     ToolTip.Tip="Newer match (Shift+Enter)"/>
             <Button Content="✕" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
                     Background="Transparent" BorderThickness="0"
+                    AutomationProperties.Name="Close find bar"
+                    AutomationProperties.HelpText="Close (Esc)"
                     Command="{Binding Find.CloseCommand}"
                     ToolTip.Tip="Close (Esc)"/>
           </StackPanel>
@@ -1147,6 +1194,132 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
         </ScrollViewer>
+      </DockPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="docking:AnalyticsTool">
+      <DockPanel>
+        <!-- Header: character picker, refresh, and inline recording settings.  -->
+        <!-- Settings write their #config values directly (density-slider idiom) -->
+        <!-- so the panel, the command line, and settings.cfg stay in sync.      -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,2" Spacing="6">
+          <TextBlock Text="Character" VerticalAlignment="Center" FontSize="11" Opacity="0.7"/>
+          <ComboBox Width="150" FontSize="11" VerticalAlignment="Center"
+                    AutomationProperties.Name="Analytics character"
+                    ItemsSource="{Binding ViewModel.Characters}"
+                    SelectedItem="{Binding ViewModel.SelectedCharacter, Mode=TwoWay}"/>
+          <Button Content="Refresh" FontSize="11" VerticalAlignment="Center"
+                  AutomationProperties.Name="Refresh analytics"
+                  Command="{Binding ViewModel.RefreshCommand}"/>
+          <CheckBox Content="Record" VerticalAlignment="Center" FontSize="11"
+                    AutomationProperties.Name="Record skill history"
+                    IsChecked="{Binding ViewModel.RecordingEnabled, Mode=TwoWay}"
+                    ToolTip.Tip="Record skill history locally (#config analytics). Local-only — never uploaded."/>
+          <TextBlock Text="Keep raw" VerticalAlignment="Center" FontSize="11" Opacity="0.7"/>
+          <NumericUpDown Width="110" FontSize="11" Minimum="0" Maximum="3650" Increment="30"
+                         AutomationProperties.Name="Raw history retention days"
+                         Value="{Binding ViewModel.RetentionDays, Mode=TwoWay}"
+                         ToolTip.Tip="Days of raw snapshots to keep before folding into permanent daily rollups (0 = forever). #config analyticsretentiondays"/>
+          <TextBlock Text="days" VerticalAlignment="Center" FontSize="11" Opacity="0.7"/>
+        </StackPanel>
+
+        <TabControl Margin="4,0,4,4">
+          <TabItem Header="This Session" FontSize="12">
+            <DockPanel Margin="4">
+              <TextBlock DockPanel.Dock="Top" Text="{Binding ViewModel.SessionHeadline}"
+                         FontSize="12" Margin="4,2,4,6" TextWrapping="Wrap"/>
+              <Grid RowDefinitions="*,Auto,*">
+                <controls:ChartCanvas Grid.Row="0" MinHeight="80"
+                                      Series="{Binding ViewModel.SessionBars}"
+                                      RenderTick="{Binding ViewModel.RenderTick}"
+                                      EmptyMessage="(no rank gains yet this session)"
+                                      AxisBrush="{DynamicResource GameBrush}"
+                                      GridBrush="{DynamicResource Theme.AccentBg}"
+                                      LabelBrush="{DynamicResource GameBrush}"/>
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="6" Margin="4,4">
+                  <TextBlock Text="Rank over time" VerticalAlignment="Center" FontSize="11" Opacity="0.7"/>
+                  <ComboBox Width="180" FontSize="11"
+                            AutomationProperties.Name="Session chart skill"
+                            ItemsSource="{Binding ViewModel.SessionSkills}"
+                            SelectedItem="{Binding ViewModel.SelectedSessionSkill, Mode=TwoWay}"/>
+                </StackPanel>
+                <controls:ChartCanvas Grid.Row="2" MinHeight="80" XIsTime="True"
+                                      Series="{Binding ViewModel.SessionLine}"
+                                      RenderTick="{Binding ViewModel.RenderTick}"
+                                      EmptyMessage="(pick a skill once data arrives)"
+                                      AxisBrush="{DynamicResource GameBrush}"
+                                      GridBrush="{DynamicResource Theme.AccentBg}"
+                                      LabelBrush="{DynamicResource GameBrush}"/>
+              </Grid>
+            </DockPanel>
+          </TabItem>
+
+          <TabItem Header="History" FontSize="12">
+            <DockPanel Margin="4">
+              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="4,2,4,6">
+                <TextBlock Text="Skill" VerticalAlignment="Center" FontSize="11" Opacity="0.7"/>
+                <ComboBox Width="180" FontSize="11"
+                          AutomationProperties.Name="History skill"
+                          ItemsSource="{Binding ViewModel.HistorySkills}"
+                          SelectedItem="{Binding ViewModel.SelectedHistorySkill, Mode=TwoWay}"/>
+                <TextBlock Text="Range" VerticalAlignment="Center" FontSize="11" Opacity="0.7"/>
+                <ComboBox Width="110" FontSize="11"
+                          AutomationProperties.Name="History range"
+                          SelectedIndex="{Binding ViewModel.HistoryRangeIndex, Mode=TwoWay}">
+                  <ComboBoxItem Content="7 days"/>
+                  <ComboBoxItem Content="30 days"/>
+                  <ComboBoxItem Content="90 days"/>
+                  <ComboBoxItem Content="All"/>
+                </ComboBox>
+              </StackPanel>
+              <controls:ChartCanvas XIsDate="True"
+                                    Series="{Binding ViewModel.HistorySeries}"
+                                    RenderTick="{Binding ViewModel.RenderTick}"
+                                    EmptyMessage="(no history in this range yet — analytics records as you play)"
+                                    AxisBrush="{DynamicResource GameBrush}"
+                                    GridBrush="{DynamicResource Theme.AccentBg}"
+                                    LabelBrush="{DynamicResource GameBrush}"/>
+            </DockPanel>
+          </TabItem>
+
+          <TabItem Header="Sessions" FontSize="12">
+            <Grid RowDefinitions="Auto,*,*" Margin="4">
+              <CheckBox Grid.Row="0" Content="Show replay sessions" FontSize="11" Margin="4,2"
+                        AutomationProperties.Name="Show replay sessions"
+                        IsChecked="{Binding ViewModel.ShowReplay, Mode=TwoWay}"
+                        ToolTip.Tip="Include DevReplay sessions (fake timestamps) in the list."/>
+              <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding ViewModel.Sessions}" Margin="4,0">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Grid ColumnDefinitions="24,130,70,70,70,140,90" Margin="0,1">
+                        <CheckBox Grid.Column="0"
+                                  AutomationProperties.Name="Compare session"
+                                  IsChecked="{Binding Compare, Mode=TwoWay}"
+                                  ToolTip.Tip="Compare up to 3 sessions on the chart below."/>
+                        <TextBlock Grid.Column="1" Text="{Binding Start}"      FontSize="11" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" Text="{Binding Duration}"   FontSize="11" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="3" Text="{Binding TotalGain}"  FontSize="11" VerticalAlignment="Center"
+                                   ToolTip.Tip="Total fractional ranks gained"/>
+                        <TextBlock Grid.Column="4" Text="{Binding GainPerHour}" FontSize="11" VerticalAlignment="Center"
+                                   ToolTip.Tip="Ranks per hour"/>
+                        <TextBlock Grid.Column="5" Text="{Binding TopSkill}"   FontSize="11" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="6" Text="{Binding Flags}"      FontSize="11" VerticalAlignment="Center" Opacity="0.6"/>
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+              <controls:ChartCanvas Grid.Row="2" MinHeight="90" XIsTime="True"
+                                    Series="{Binding ViewModel.CompareSeries}"
+                                    RenderTick="{Binding ViewModel.RenderTick}"
+                                    EmptyMessage="(tick up to 3 sessions above to compare their gain curves)"
+                                    AxisBrush="{DynamicResource GameBrush}"
+                                    GridBrush="{DynamicResource Theme.AccentBg}"
+                                    LabelBrush="{DynamicResource GameBrush}"/>
+            </Grid>
+          </TabItem>
+        </TabControl>
       </DockPanel>
     </DataTemplate>
 
@@ -1212,19 +1385,26 @@
                 IsVisible="{Binding Find.IsOpen}">
           <StackPanel Orientation="Horizontal" Spacing="4">
             <TextBox Text="{Binding Find.FindText}" Watermark="Find…"
+                     AutomationProperties.Name="Find in window"
                      Width="160" FontSize="11" MinHeight="0" Padding="4,2"
                      controls:FindInWindow.BoxModel="{Binding Find}"/>
             <TextBlock Text="{Binding Find.Status}" FontSize="10"
                        Foreground="{DynamicResource Theme.TextMuted}"
                        VerticalAlignment="Center"/>
             <Button Content="▲" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    AutomationProperties.Name="Find previous"
+                    AutomationProperties.HelpText="Older match (Enter)"
                     Command="{Binding Find.OlderCommand}"
                     ToolTip.Tip="Older match (Enter)"/>
             <Button Content="▼" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
+                    AutomationProperties.Name="Find next"
+                    AutomationProperties.HelpText="Newer match (Shift+Enter)"
                     Command="{Binding Find.NewerCommand}"
                     ToolTip.Tip="Newer match (Shift+Enter)"/>
             <Button Content="✕" FontSize="10" Padding="4,1" MinHeight="0" MinWidth="0"
                     Background="Transparent" BorderThickness="0"
+                    AutomationProperties.Name="Close find bar"
+                    AutomationProperties.HelpText="Close (Esc)"
                     Command="{Binding Find.CloseCommand}"
                     ToolTip.Tip="Close (Esc)"/>
           </StackPanel>

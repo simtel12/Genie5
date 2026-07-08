@@ -40,6 +40,16 @@ public sealed class ExperienceExtension : IGameExtension
     private IExtensionHost _host = null!;
     private bool _dirty;
 
+    /// <summary>A skill's (rank, percent, mindstate) actually changed —
+    /// (name, rank, percent, mindstate). Deduplicated (identical pulses don't
+    /// fire) and raised outside the internal lock on the connection read-loop
+    /// thread; handlers must be fast and non-throwing. Feeds the skill-history
+    /// recorder (Analytics).</summary>
+    public event Action<string, int, int, int>? SkillUpdated;
+
+    /// <summary>The TDP total was (re)reported — may repeat the same value.</summary>
+    public event Action<int>? TdpUpdated;
+
     private readonly Dictionary<string, SkillInfo> _skills = new(StringComparer.OrdinalIgnoreCase);
     private readonly record struct SkillInfo(int Rank, int Percent, int Mindstate);
 
@@ -118,7 +128,11 @@ public sealed class ExperienceExtension : IGameExtension
         if (sub.Equals("tdp", StringComparison.OrdinalIgnoreCase))
         {
             var m = DigitsRe.Match(inner);               // "TDPs:  3017"
-            if (m.Success) _host.Globals["TDPs"] = m.Value;
+            if (m.Success)
+            {
+                _host.Globals["TDPs"] = m.Value;
+                if (int.TryParse(m.Value, out var tdpVal)) TdpUpdated?.Invoke(tdpVal);
+            }
             return;
         }
         if (sub.Equals("rexp",  StringComparison.OrdinalIgnoreCase) ||
@@ -144,7 +158,11 @@ public sealed class ExperienceExtension : IGameExtension
                 Apply(m.Groups[1].Value.Trim(), m.Groups[2].Value, m.Groups[3].Value, m.Groups[4].Value);
 
         var tdp = TdpRe.Match(line);
-        if (tdp.Success) _host.Globals["TDPs"] = tdp.Groups[1].Value;
+        if (tdp.Success)
+        {
+            _host.Globals["TDPs"] = tdp.Groups[1].Value;
+            if (int.TryParse(tdp.Groups[1].Value, out var tdpVal)) TdpUpdated?.Invoke(tdpVal);
+        }
     }
 
     public void OnPrompt()
@@ -194,14 +212,17 @@ public sealed class ExperienceExtension : IGameExtension
         _host.Globals[$"{v}.LearningRateName"] = mindstateText;
 
         var info = new SkillInfo(rank, pct, mind);
+        bool changed;
         lock (_gate)
         {
             _sessionStart ??= DateTime.UtcNow;   // session clock starts at the first datum
             _baseline.TryAdd(name, (rank, pct));  // first-seen rank = session baseline (#144)
-            if (_skills.TryGetValue(name, out var prev) && prev == info) return;  // no display change
-            _skills[name] = info;
+            changed = !(_skills.TryGetValue(name, out var prev) && prev == info);  // no display change
+            if (changed) _skills[name] = info;
         }
+        if (!changed) return;
         _dirty = true;
+        SkillUpdated?.Invoke(name, rank, pct, mind);   // outside _gate — see event doc
     }
 
     /// <summary>Skill name → global-variable token (spaces → underscores), e.g.

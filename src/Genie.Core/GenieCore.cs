@@ -182,6 +182,9 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     // ScriptGlobalsSync mirrors live game state → script globals; it binds to the
     // per-connection parser + identity, so it is rebuilt per connect.
     private ScriptGlobalsSync? _globalsSync;
+    // Skill-history recorder (Analytics) — bound to the per-connection character
+    // identity + connection state, so it is rebuilt per connect like _globalsSync.
+    private Analytics.SkillHistoryRecorder? _skillHistory;
     private readonly Diagnostics.LiveAudit _liveAudit;
 
     /// <summary>Set when a room-defining event arrives (NavEvent or the
@@ -206,6 +209,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
     /// <summary>Connection lifecycle events.</summary>
     public IObservable<ConnectionEvent> ConnectionState => _connStateRelay;
+
+    /// <summary>The active skill-history recorder (Analytics window's data
+    /// source), or null when recording isn't active for this connection —
+    /// analytics off at connect, no character identity (LIST mode), or a
+    /// replay session without <c>#config analyticsreplay on</c>.</summary>
+    public Analytics.SkillHistoryRecorder? SkillHistory => _skillHistory;
 
     // ── Type-ahead (UI counter) ─────────────────────────────────────────────
     /// <summary>Commands sent to the game awaiting a prompt — the live
@@ -641,6 +650,30 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             characterName: cfg.CharacterName,
             accountName:   cfg.AccountName,
             clientVersion: HostVersionString);
+
+        // Skill-history recorder (Analytics). Needs a character identity to
+        // key its folder; skipped for LIST/anonymous sessions and for replay
+        // unless #config analyticsreplay is on (replay timestamps are fake).
+        // #config analytics off gates writes live inside the recorder.
+        _skillHistory?.Dispose();
+        _skillHistory = null;
+        if (!string.IsNullOrWhiteSpace(cfg.CharacterName)
+            && !string.IsNullOrWhiteSpace(cfg.AccountName)
+            && (cfg.Mode != ConnectionMode.DevReplay || Config.AnalyticsReplay))
+        {
+            var expExt = Scripts.Extensions.Extensions
+                .OfType<Extensions.Builtin.ExperienceExtension>()
+                .FirstOrDefault();
+            if (expExt is not null)
+            {
+                var histLog = _loggerFactory.CreateLogger("Genie.Core.Analytics");
+                _skillHistory = new Analytics.SkillHistoryRecorder(
+                    Config, expExt, connection.StateStream,
+                    cfg.CharacterName, cfg.AccountName,
+                    isReplay: cfg.Mode == ConnectionMode.DevReplay,
+                    log: msg => histLog.LogInformation("{Message}", msg));
+            }
+        }
 
         // ── Game event routing ─────────────────────────────────────────────────
         // Note: Scripts.OnGameLine already calls Extensions.DispatchGameLine internally —
@@ -1486,6 +1519,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         _gameHostSub?.Dispose();     _gameHostSub     = null;
         _connectedVarSub?.Dispose(); _connectedVarSub = null;
         _globalsSync?.Dispose();     _globalsSync     = null;
+        _skillHistory?.Dispose();    _skillHistory    = null;
         _mapperAdapter?.Dispose();   _mapperAdapter   = null;
         AiBuffer?.Dispose();         AiBuffer         = null;
         _stateEngine?.Dispose();     _stateEngine     = null;

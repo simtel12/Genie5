@@ -1,0 +1,63 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Genie.App.Views.TtsPanel">
+
+  <!-- Text-to-speech settings live on the global GenieConfig (settings.cfg),
+       the same keys #tts and #config edit, so this tab is profile-independent.
+       Everything applies live — the read-aloud dispatch and TtsService read
+       these values per utterance — so there is no Apply button. -->
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="4">
+    <StackPanel Margin="4" Spacing="4">
+
+      <!-- Scope banner — these settings are app-wide, shared by every profile. -->
+      <Border Background="{DynamicResource Theme.AccentBg}" CornerRadius="3" Padding="8,4" Margin="0,0,0,4">
+        <TextBlock Text="Text-to-speech settings are global (settings.cfg) — also scriptable via #tts and #config."
+                   Foreground="{DynamicResource Theme.Accent}" TextWrapping="Wrap"/>
+      </Border>
+
+      <CheckBox Name="ReadCheck" Content="Read game streams aloud"
+                AutomationProperties.Name="Read game streams aloud"
+                AutomationProperties.HelpText="Master switch for per-stream read-aloud. #speak and highlight/trigger speech work regardless."
+                ToolTip.Tip="Master switch for per-stream read-aloud. #speak and highlight/trigger speech work regardless."/>
+
+      <TextBlock Text="Streams" FontWeight="SemiBold" Margin="0,8,0,0"/>
+      <TextBlock Text="Choose which streams are spoken, and how urgently. High barges in mid-sentence; Low yields to everything else."
+                 Foreground="Gray" TextWrapping="Wrap"/>
+      <StackPanel Name="StreamRows" Spacing="2"/>
+
+      <TextBlock Text="Other streams:" Margin="0,4,0,0"/>
+      <TextBox Name="OtherStreamsBox"
+               AutomationProperties.Name="Other streams"
+               Watermark="(none — comma-separated custom stream ids)"
+               ToolTip.Tip="Custom or plugin stream ids to read aloud, comma-separated. Applied when the box loses focus."/>
+
+      <TextBlock Text="Voice" FontWeight="SemiBold" Margin="0,8,0,0"/>
+      <StackPanel Orientation="Horizontal" Spacing="4">
+        <ComboBox Name="VoiceCombo" Width="280"
+                  AutomationProperties.Name="Voice"
+                  ToolTip.Tip="Installed voices (folders under the voice directory). Install more with #tts install."/>
+        <Button Name="TestButton" Content="Test" Click="OnTest"
+                AutomationProperties.Name="Test voice"
+                AutomationProperties.HelpText="Speak a sample line with the selected voice."
+                ToolTip.Tip="Speak a sample line with the selected voice."/>
+      </StackPanel>
+      <TextBlock Name="VoiceHint" Foreground="Gray" FontStyle="Italic" TextWrapping="Wrap"/>
+
+      <Grid ColumnDefinitions="60,*,44" RowDefinitions="Auto,Auto" Margin="0,4,0,0">
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="Rate:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+        <Slider    Grid.Row="0" Grid.Column="1" Name="RateSlider" Minimum="0.5" Maximum="3" TickFrequency="0.25"
+                   AutomationProperties.Name="Speaking rate"
+                   ToolTip.Tip="Speaking speed multiplier — 1 is the voice's natural pace (0.5–3)."/>
+        <TextBlock Grid.Row="0" Grid.Column="2" Name="RateValue" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="Volume:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+        <Slider    Grid.Row="1" Grid.Column="1" Name="VolumeSlider" Minimum="0" Maximum="100" TickFrequency="5"
+                   AutomationProperties.Name="Volume"
+                   ToolTip.Tip="Output volume, 0–100% of the voice's full level."/>
+        <TextBlock Grid.Row="1" Grid.Column="2" Name="VolumeValue" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+      </Grid>
+
+      <TextBlock Name="StatusText" Foreground="Gray" FontStyle="Italic" Margin="0,4,0,0"/>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

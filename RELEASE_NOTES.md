@@ -1,3 +1,35 @@
+# Genie 5 — Unreleased
+
+<!-- Staged for the next release cut — rename this heading to the tag. -->
+
+## ✨ New
+
+- **Analytics window** — Window → Analytics opens a skill-history dashboard:
+  live **XP/hour** and per-skill gain bars for the current session, long-horizon
+  **skill-gain curves** (7/30/90 days/All), and a **session list with
+  compare-up-to-3** gain-curve overlay. History records locally as you play
+  (own character's skill table only, never uploaded — see PRIVACY.md); a
+  one-time notice at first connect explains the recording and offers to turn
+  it off. Configure via `#config analytics` / `analyticsinterval` /
+  `analyticsretentiondays`, or the panel's inline Record/retention controls.
+  Raw snapshots older than the retention window (default 90 days) fold into
+  permanent per-day rollups, so charts keep their history at ~1 KB/day.
+- **Screen-reader support (first pass)** — the command input, hands strips,
+  vitals bars, script bar, find bars, and the Connect / Configuration / import
+  / updates dialogs now carry accessibility names readable by NVDA and
+  Narrator; hand and prepared-spell changes announce politely. Windows has the
+  fullest support; macOS is partial and Linux screen readers aren't supported
+  by the UI framework yet — the built-in TTS (`#tts`) is the path there. See
+  `docs/accessibility.md`.
+- **Text-to-Speech settings tab** — Configuration → Text-to-Speech: master
+  read-aloud switch, a per-stream grid of **read + priority** controls, voice
+  picker with a **Test** button, and rate/volume sliders. All backed by the
+  same settings.cfg keys as `#tts`, so commands and UI stay in sync.
+- **`#tts priority`** — per-stream read-aloud urgency overrides
+  (`#tts priority <stream> <low|normal|high|default>`, new
+  `ttsstreampriority` config key). Defaults unchanged: whispers/deaths barge
+  in, logons/atmospherics/familiar yield, everything else is normal.
+
 # Genie 5 — v5.0.0-alpha.8.4
 
 Genie can now help improve its own parser: when the game sends an element it
