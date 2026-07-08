@@ -4,11 +4,22 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8.4 — Parser Gap Reporting
+## Latest: v5.0.0-alpha.8.5 — Analytics, Accessibility & Parity
+
+A skill-history **Analytics** dashboard, a first pass at **screen-reader** support with a Text-to-Speech settings tab, and a batch of Genie 4 parity: name-highlight colours, `#names` / `#preset` commands, eval + match-all triggers, and more.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.5** as a delta.
+
+- **Analytics window** — Window → Analytics: live XP/hour and per-skill gain bars for the session, 7/30/90-day skill-gain curves, and a session list with compare-up-to-3 overlay. History records locally (your own skills only, never uploaded — see [PRIVACY](https://github.com/GenieClient/Genie5/blob/main/PRIVACY.md)); a one-time first-connect notice explains it and lets you turn it off.
+- **Screen-reader support (first pass)** + **Text-to-Speech settings tab** — accessibility names across the main window and dialogs (NVDA / Narrator; Windows fullest, macOS partial), and a Configuration → Text-to-Speech tab with a per-stream read + priority grid, voice test, and rate/volume sliders.
+- **Name-highlight colours + `#names` ([#154](https://github.com/GenieClient/Genie5/issues/154), [#148](https://github.com/GenieClient/Genie5/issues/148))**, **`#preset` ([#149](https://github.com/GenieClient/Genie5/issues/149))**, **eval + match-all triggers ([#150](https://github.com/GenieClient/Genie5/issues/150), [#23](https://github.com/GenieClient/Genie5/issues/23))**, **Experience G4 layout ([#144](https://github.com/GenieClient/Genie5/issues/144))**, **Help ▸ Changelog ([#155](https://github.com/GenieClient/Genie5/issues/155))**, and **parity odds & ends ([#151](https://github.com/GenieClient/Genie5/issues/151))**.
+- **Fixed** — the Thoughts stream now renders in its palette colour, and name-highlight rules persist across restart.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.5)
+
+## v5.0.0-alpha.8.4 — Parser Gap Reporting
 
 When DragonRealms sends an element Genie's parser doesn't recognize yet, a one-click prompt drafts a pre-redacted GitHub issue for you to review and submit.
-
-> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.4** as a delta.
 
 - **Report parser gaps ([#152](https://github.com/GenieClient/Genie5/issues/152))** — if the game sends an element the parser doesn't handle yet, a slim notice offers to report it. One click opens a **pre-filled, pre-redacted** GitHub issue in your browser (other players' speech removed, your version attached); nothing is posted until you review and submit. Each unknown element asks once per session.
 

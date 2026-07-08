@@ -1,6 +1,4 @@
-# Genie 5 — Unreleased
-
-<!-- Staged for the next release cut — rename this heading to the tag. -->
+# Genie 5 — v5.0.0-alpha.8.5
 
 ## ✨ New
 
@@ -29,6 +27,43 @@
   (`#tts priority <stream> <low|normal|high|default>`, new
   `ttsstreampriority` config key). Defaults unchanged: whispers/deaths barge
   in, logons/atmospherics/familiar yield, everything else is normal.
+- **Name-list highlight colours + `#names` command
+  ([#154](https://github.com/GenieClient/Genie5/issues/154),
+  [#148](https://github.com/GenieClient/Genie5/issues/148))** — a name rule's
+  colour now actually paints on game and stream text (before, it only drove the
+  Name-List-Only filter). New typed `#names` / `#name` family — add / remove /
+  list / clear / save / load — so scripts and the command bar can manage the
+  names list without the dialog.
+- **`#preset` command ([#149](https://github.com/GenieClient/Genie5/issues/149))**
+  — set a token's colour from the command line or a script: `#preset {id} {fg}
+  [{bg}]` (known tokens only), plus list / save / load / reset. Preset overrides
+  now persist across restarts.
+- **Trigger `eval` + `matchall`
+  ([#150](https://github.com/GenieClient/Genie5/issues/150),
+  [#23](https://github.com/GenieClient/Genie5/issues/23))** — opt-in per rule.
+  `eval` evaluates `{…}` expression blocks in the action (math / functions /
+  variables) before it fires; `matchall` fires the action once per match on the
+  line (each with its own `$1..$n`) instead of once for the first match. Both
+  are keywords on `#trigger add` and checkboxes in the Triggers panel.
+- **Experience window — Genie 4 layout
+  ([#144](https://github.com/GenieClient/Genie5/issues/144))** — `#config
+  experienceg4layout` drops the "Learning Skills" summary to a footer beneath
+  the skill list (the classic EXPTracker look) instead of a header on top.
+- **Help ▸ Changelog ([#155](https://github.com/GenieClient/Genie5/issues/155))**
+  — read this build's release notes in-app, without opening the Releases page.
+- **Genie 4 parity odds & ends
+  ([#151](https://github.com/GenieClient/Genie5/issues/151))** — `#ignore` (an
+  alias for `#gag`), an `ignorescriptwarnings` toggle to silence non-fatal
+  script parse advisories, and the reserved script variables `$year` / `$month`
+  / `$spellstarttime`.
+
+## 🐛 Fixed
+
+- **Name highlight colours never rendered
+  ([#154](https://github.com/GenieClient/Genie5/issues/154))** — see above; name
+  rules also now save and reload across launches (they weren't persisting at all).
+- **Thoughts stream colour** — the Thoughts stream now shows its palette colour
+  (Cyan by default) instead of the default foreground.
 
 # Genie 5 — v5.0.0-alpha.8.4
 
