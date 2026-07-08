@@ -1,0 +1,50 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Genie.App.Views.ChangelogDialog"
+        Title="Changelog"
+        Width="680" Height="620"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+  <Grid RowDefinitions="Auto,*,Auto" Margin="16">
+
+    <TextBlock Grid.Row="0"
+               x:Name="HeaderText"
+               FontSize="15"
+               FontWeight="SemiBold"
+               Margin="0,0,0,10"/>
+
+    <!-- Release notes, read from the embedded RELEASE_NOTES.md. Selectable so a
+         user can copy a section; wraps so prose stays readable without a
+         horizontal scrollbar. -->
+    <Border Grid.Row="1"
+            BorderThickness="1"
+            BorderBrush="#40808080"
+            CornerRadius="3">
+      <ScrollViewer VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled"
+                    Padding="12">
+        <SelectableTextBlock x:Name="NotesText"
+                             TextWrapping="Wrap"
+                             FontSize="13"/>
+      </ScrollViewer>
+    </Border>
+
+    <StackPanel Grid.Row="2"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Margin="0,12,0,0"
+                Spacing="8">
+      <Button Content="Releases _Page…"
+              Click="OnReleases"
+              ToolTip.Tip="Open the full release history on GitHub in your browser."/>
+      <Button x:Name="CloseButton"
+              Content="_Close"
+              MinWidth="88"
+              IsDefault="True"
+              IsCancel="True"
+              Click="OnClose"/>
+    </StackPanel>
+
+  </Grid>
+</Window>

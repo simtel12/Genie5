@@ -595,6 +595,9 @@
         <MenuItem Header="_Latest Release Page"
                   Command="{Binding OpenLatestReleaseCommand}"
                   ToolTip.Tip="Open the Genie 5 releases page on GitHub — download the newest signed build for your platform."/>
+        <MenuItem Header="_Changelog"
+                  Command="{Binding ShowChangelogCommand}"
+                  ToolTip.Tip="Read this build's release notes in-app — what changed in this and previous versions."/>
         <Separator/>
         <MenuItem Header="Join _Discord"
                   Command="{Binding OpenDiscordCommand}"

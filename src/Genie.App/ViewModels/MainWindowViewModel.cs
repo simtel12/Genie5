@@ -165,6 +165,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     // ── Help menu (About) ───────────────────────────────────────────────────
     public ReactiveCommand<Unit, Unit>                    ShowAboutCommand         { get; }
     public Interaction<Unit, Unit>                        ShowAboutDialog          { get; } = new();
+    public ReactiveCommand<Unit, Unit>                    ShowChangelogCommand     { get; }
+    public Interaction<Unit, Unit>                        ShowChangelogDialog      { get; } = new();
 
     /// <summary>Fired on a session-ending disconnect (one that is NOT
     /// auto-reconnecting) when <see cref="DisplaySettings.ShowDisconnectPopup"/>
@@ -1458,6 +1460,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // Help → About — version, links, license, credits. No input/output.
         ShowAboutCommand = ReactiveCommand.CreateFromTask(async () =>
             await ShowAboutDialog.Handle(Unit.Default));
+
+        // Help → Changelog — read the bundled release notes in-app (#155).
+        ShowChangelogCommand = ReactiveCommand.CreateFromTask(async () =>
+            await ShowChangelogDialog.Handle(Unit.Default));
 
         // All Help-menu external links funnel through OpenUrl() (defined below),
         // which hands the URL to the OS shell. Ported from the Genie 4 Help menu;

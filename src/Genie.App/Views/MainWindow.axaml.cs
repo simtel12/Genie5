@@ -259,6 +259,12 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 ctx.SetOutput(System.Reactive.Unit.Default);
             }));
 
+            d(ViewModel!.ShowChangelogDialog.RegisterHandler(async ctx =>
+            {
+                await new ChangelogDialog().ShowDialog(this);
+                ctx.SetOutput(System.Reactive.Unit.Default);
+            }));
+
             d(ViewModel!.ShowDisconnectNotice.RegisterHandler(async ctx =>
             {
                 try
