@@ -53,6 +53,8 @@
                     Orientation="Horizontal" Spacing="16" Margin="0,2,0,4">
           <CheckBox Name="CaseSensitiveCheck" Content="Case sensitive"/>
           <CheckBox Name="EnabledCheck"       Content="Enabled" IsChecked="True"/>
+          <CheckBox Name="EvalCheck"          Content="Eval action"
+                    ToolTip.Tip="Evaluate {…} expression blocks in the action as script expressions before it runs (math / functions / variables)."/>
           <Button   Content="Save"  Click="OnSave"/>
           <Button   Content="Clear" Click="OnClear"/>
         </StackPanel>

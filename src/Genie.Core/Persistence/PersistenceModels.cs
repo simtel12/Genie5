@@ -17,6 +17,9 @@ public sealed class TriggerPersistenceModel
     public string SoundFile { get; set; } = string.Empty;
     /// <summary>Per-rule TTS: "" = off, "*" = speak the matched line, else the text to speak.</summary>
     public string Speak { get; set; } = string.Empty;
+    /// <summary>Opt-in script-expression evaluation of the action (#150): evaluate
+    /// <c>{…}</c> blocks before dispatch. Default off preserves existing triggers.</summary>
+    public bool Eval { get; set; }
 }
 
 public sealed class VariablePersistenceModel

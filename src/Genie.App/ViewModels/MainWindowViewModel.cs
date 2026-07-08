@@ -3060,7 +3060,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             {
                 core.Triggers.RemoveTrigger(m.Pattern);
                 core.Triggers.AddTrigger(m.Pattern, m.Action, m.CaseSensitive, m.IsEnabled, m.ClassName,
-                                         m.SoundFile, m.Speak);
+                                         m.SoundFile, m.Speak, m.Eval);
             }
         });
 

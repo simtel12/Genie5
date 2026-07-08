@@ -11,7 +11,7 @@ public sealed class TriggerRule
 
     public TriggerRule(string pattern, string action, bool caseSensitive = false,
                        bool isEnabled = true, string className = "", bool safe = true,
-                       string soundFile = "", string speak = "")
+                       string soundFile = "", string speak = "", bool eval = false)
     {
         Pattern       = pattern;
         Action        = action;
@@ -20,6 +20,7 @@ public sealed class TriggerRule
         ClassName     = className;
         SoundFile     = soundFile;
         Speak         = speak;
+        Eval          = eval;
         _cmp          = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
         Rebuild(safe);
     }
@@ -28,6 +29,12 @@ public sealed class TriggerRule
     public bool   CaseSensitive { get; }
     public bool   IsEnabled     { get; set; }
     public string ClassName     { get; set; }
+    /// <summary>Opt-in script-expression evaluation of the action (#150). When
+    /// true, <c>{…}</c> expression blocks in the action are evaluated (math /
+    /// functions / string ops, via the same evaluator as <c>#eval</c>) after
+    /// <c>$0..$n</c> capture substitution, before the action is dispatched.
+    /// Off = the action is dispatched as-is (current behaviour).</summary>
+    public bool   Eval          { get; set; }
     /// <summary>Optional sound played when this trigger fires (resolved against
     /// SoundDir). Empty = silent.</summary>
     public string SoundFile     { get; set; }

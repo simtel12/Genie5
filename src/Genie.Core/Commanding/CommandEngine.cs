@@ -1482,38 +1482,47 @@ public sealed class CommandEngine
 
         if (sub == "add")
         {
-            if (parts.Count < 4) { _host.Echo("Usage: #trigger add {pattern} {action} [{class}] [{sound}] [{speak: * = line, or text}]"); return; }
-            var pattern = parts[2];
-            var action  = parts[3];
-            var cls     = parts.Count > 4 ? parts[4] : "";
-            var sound   = parts.Count > 5 ? parts[5] : "";
-            var speak   = parts.Count > 6 ? parts[6] : "";
-            Triggers.RemoveTrigger(pattern);
-            try
-            {
-                Triggers.AddTrigger(pattern, action, false, true, cls, sound, speak);
-                _host.Echo($"Trigger added: {pattern} → {action}");
-            }
-            catch (ArgumentException) { _host.Echo($"Invalid regexp in trigger: {pattern}"); }
+            if (parts.Count < 4) { _host.Echo("Usage: #trigger add {pattern} {action} [{class}] [{sound}] [{speak: * = line, or text}] [eval]"); return; }
+            AddTriggerFromArgs(parts.Skip(2).ToList());
             return;
         }
 
-        // Implicit: #trigger {pattern} {action} [{class}] [{sound}] [{speak}]
+        // Implicit: #trigger {pattern} {action} [{class}] [{sound}] [{speak}] [eval]
         if (parts.Count >= 3)
+            AddTriggerFromArgs(parts.Skip(1).ToList());
+    }
+
+    /// <summary>Shared #trigger add / implicit-form handler. <paramref name="args"/>
+    /// is pattern, action, then optional class / sound / speak, plus an optional
+    /// bare <c>eval</c> keyword (anywhere after the action) that opts the rule into
+    /// script-expression evaluation of its action (#150).</summary>
+    private void AddTriggerFromArgs(List<string> args)
+    {
+        if (Triggers is null) return;
+        var eval    = ExtractEvalFlag(args);
+        var pattern = args[0];
+        var action  = args[1];
+        var cls     = args.Count > 2 ? args[2] : "";
+        var sound   = args.Count > 3 ? args[3] : "";
+        var speak   = args.Count > 4 ? args[4] : "";
+        Triggers.RemoveTrigger(pattern);
+        try
         {
-            var pattern = parts[1];
-            var action  = parts[2];
-            var cls     = parts.Count > 3 ? parts[3] : "";
-            var sound   = parts.Count > 4 ? parts[4] : "";
-            var speak   = parts.Count > 5 ? parts[5] : "";
-            Triggers.RemoveTrigger(pattern);
-            try
-            {
-                Triggers.AddTrigger(pattern, action, false, true, cls, sound, speak);
-                _host.Echo($"Trigger added: {pattern} → {action}");
-            }
-            catch (ArgumentException) { _host.Echo($"Invalid regexp in trigger: {pattern}"); }
+            Triggers.AddTrigger(pattern, action, false, true, cls, sound, speak, eval);
+            _host.Echo($"Trigger added: {pattern} → {action}{(eval ? " (eval)" : "")}");
         }
+        catch (ArgumentException) { _host.Echo($"Invalid regexp in trigger: {pattern}"); }
+    }
+
+    /// <summary>Remove and report a bare <c>eval</c> keyword among the post-action
+    /// args so it doesn't shift the positional class/sound/speak slots. Braced
+    /// values (a literal class/sound named "eval") are unaffected — only a plain
+    /// token matches.</summary>
+    private static bool ExtractEvalFlag(List<string> args)
+    {
+        for (int i = 2; i < args.Count; i++)
+            if (args[i].Equals("eval", StringComparison.OrdinalIgnoreCase)) { args.RemoveAt(i); return true; }
+        return false;
     }
 
     private void ListTriggers(string? filter)
@@ -1529,7 +1538,8 @@ public sealed class CommandEngine
                 t.Pattern.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0) continue;
             var flag = t.IsEnabled ? "" : " (disabled)";
             var cls  = string.IsNullOrEmpty(t.ClassName) ? "" : $" [{t.ClassName}]";
-            _host.Echo($"{t.Pattern} → {t.Action}{cls}{flag}");
+            var ev   = t.Eval ? " (eval)" : "";
+            _host.Echo($"{t.Pattern} → {t.Action}{cls}{ev}{flag}");
             shown++;
         }
         if (shown == 0) _host.Echo("None.");
@@ -1540,7 +1550,7 @@ public sealed class CommandEngine
         if (Triggers is null) return;
         var path  = Path.Combine(_config.ConfigProfileDir, "triggers.cfg");
         var lines = Triggers.Triggers.Select(t =>
-            $"#trigger add {ConfigPersistence.FormatArg(t.Pattern)} {ConfigPersistence.FormatArg(t.Action)} {ConfigPersistence.FormatArg(t.ClassName)} {ConfigPersistence.FormatArg(t.SoundFile)} {ConfigPersistence.FormatArg(t.Speak)}");
+            $"#trigger add {ConfigPersistence.FormatArg(t.Pattern)} {ConfigPersistence.FormatArg(t.Action)} {ConfigPersistence.FormatArg(t.ClassName)} {ConfigPersistence.FormatArg(t.SoundFile)} {ConfigPersistence.FormatArg(t.Speak)}{(t.Eval ? " eval" : "")}");
         if (ConfigPersistence.WriteLines(path, lines))
             _host.Echo("Triggers Saved");
         else

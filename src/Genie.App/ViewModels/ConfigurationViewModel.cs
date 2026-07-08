@@ -359,7 +359,7 @@ public class ConfigurationViewModel : ReactiveObject
         {
             foreach (var m in _persistence.LoadTriggers(path))
                 _draftTriggers.AddTrigger(m.Pattern, m.Action, m.CaseSensitive, m.IsEnabled, m.ClassName,
-                                          m.SoundFile, m.Speak);
+                                          m.SoundFile, m.Speak, m.Eval);
         }
         catch { }
         return _draftTriggers;

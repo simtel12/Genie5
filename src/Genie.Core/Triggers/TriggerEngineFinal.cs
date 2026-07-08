@@ -37,9 +37,9 @@ public sealed class TriggerEngineFinal
 
     public TriggerRule AddTrigger(string pattern, string action, bool caseSensitive = false,
                                   bool isEnabled = true, string className = "", string soundFile = "",
-                                  string speak = "")
+                                  string speak = "", bool eval = false)
     {
-        var trigger = new TriggerRule(pattern, action, caseSensitive, isEnabled, className, _safetyEnabled, soundFile, speak);
+        var trigger = new TriggerRule(pattern, action, caseSensitive, isEnabled, className, _safetyEnabled, soundFile, speak, eval);
         _triggers.Add(trigger);
         if (!string.IsNullOrEmpty(className)) Classes?.Ensure(className);
         return trigger;
@@ -74,6 +74,9 @@ public sealed class TriggerEngineFinal
                 _host?.Speak(trigger.Speak == "*" ? line : ExpandAction(trigger.Speak, match),
                              urgent: true);
             var expandedAction = ExpandAction(trigger.Action, match);
+            // Opt-in (#150): evaluate {…} expression blocks as script expressions
+            // after capture substitution, before dispatch.
+            if (trigger.Eval) expandedAction = EvalBraces(expandedAction);
             // Automated (game-text-driven) — not interactive, so a #var/#tvar in
             // the action sets silently instead of echoing "Variable set:".
             _commandEngine?.ProcessInput(expandedAction, interactive: false);
@@ -86,5 +89,33 @@ public sealed class TriggerEngineFinal
         for (var i = match.Groups.Count - 1; i >= 0; i--)
             result = result.Replace("$" + i, match.Groups[i].Value);
         return result;
+    }
+
+    /// <summary>
+    /// Evaluate <c>{…}</c> expression blocks in a trigger action (#150). Resolves
+    /// innermost-first so nested blocks compute inside-out, and expands any
+    /// <c>$variables</c> inside a block (via the host) before evaluating — the
+    /// same order as <c>#eval</c> (variables first, then the expression). A block
+    /// that fails to evaluate is left as its literal inner text (braces dropped)
+    /// rather than aborting the whole action. Runs only for eval-flagged rules.
+    /// </summary>
+    private string EvalBraces(string action)
+    {
+        // Bounded loop: each pass collapses one innermost {…}; the guard caps
+        // pathological input (unbalanced braces stop the loop naturally).
+        for (int guard = 0; guard < 100; guard++)
+        {
+            int close = action.IndexOf('}');
+            if (close < 0) break;
+            int open = action.LastIndexOf('{', close);
+            if (open < 0) break;                     // stray '}' — leave the rest literal
+            var inner    = action.Substring(open + 1, close - open - 1);
+            var expanded = _host?.ExpandVariables(inner) ?? inner;
+            string value;
+            try   { value = Scripting.ScriptExpression.EvalString(expanded, new Scripting.ScriptInstance()); }
+            catch { value = expanded; }              // malformed expr → literal inner text
+            action = action[..open] + value + action[(close + 1)..];
+        }
+        return action;
     }
 }
