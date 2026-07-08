@@ -69,6 +69,9 @@ public sealed class CommandEngine
     /// <summary>Player-name highlight rules. Backs <c>#names</c> / <c>#name</c>.</summary>
     public NameHighlightEngine? Names       { get; set; }
 
+    /// <summary>Preset colour palette (roomdesc, speech, …). Backs <c>#preset</c>.</summary>
+    public Presets.PresetEngine? Presets    { get; set; }
+
     /// <summary>Trigger rules (auto-fire actions on game text). Backs <c>#trigger</c>.</summary>
     public TriggerEngineFinal?  Triggers    { get; set; }
 
@@ -691,6 +694,10 @@ public sealed class CommandEngine
                 {
                     if (Names.Remove(parts[1])) _host.Echo($"Name removed: {parts[1]}");
                 }
+                break;
+            case "preset":
+            case "presets":
+                HandlePreset(parts);
                 break;
             case "trigger":
             case "triggers":
@@ -1434,6 +1441,85 @@ public sealed class CommandEngine
         Names?.Clear();
         foreach (var line in lines) ProcessInput(line);
         _host.Echo("Names Loaded");
+    }
+
+    // ── #preset / #presets — token colour palette (#149) ─────────────────────
+    // Genie 4 parity (Command.cs "preset"): list / filtered-list, save / load /
+    // reset, and `#preset {id} {fg} [{bg}]` to override a KNOWN token's colour.
+    // Unknown ids are rejected (the palette is a fixed vocabulary, not free-form).
+    private void HandlePreset(IReadOnlyList<string> parts)
+    {
+        if (Presets is null) { _host.Echo("#preset is unavailable."); return; }
+
+        if (parts.Count == 1) { ListPresets(null); return; }
+
+        var sub = parts[1].ToLowerInvariant();
+        if (parts.Count == 2)
+        {
+            switch (sub)
+            {
+                case "load":         LoadPresetsFile(); return;
+                case "save":         SavePresetsFile(); return;
+                case "reset":
+                case "clear":        Presets.ResetToDefaults(); _host.Echo("Presets reset to defaults"); return;
+                default:             ListPresets(parts[1]); return;   // #preset speech → filtered list
+            }
+        }
+
+        // #preset {id} {fg} [{bg}] — override a known token. Foreground is the
+        // colour string ("Silver", "#FF8000", "Default"); background optional and
+        // otherwise preserved, along with the token's HighlightLine flag.
+        var id = parts[1];
+        if (Presets.Get(id) is not { } existing) { _host.Echo($"Invalid #preset keyword: {id}"); return; }
+        var fg = parts[2];
+        var bg = parts.Count > 3 ? parts[3] : existing.BackgroundColor;
+        Presets.Apply(new Presets.PresetRule
+        {
+            Id              = existing.Id,   // canonical-cased id from the palette
+            ForegroundColor = fg,
+            BackgroundColor = bg,
+            HighlightLine   = existing.HighlightLine,
+        });
+        _host.Echo($"Preset {existing.Id} → {fg}{(string.IsNullOrEmpty(bg) ? "" : $"/{bg}")}");
+    }
+
+    private void ListPresets(string? filter)
+    {
+        if (Presets is null) return;
+        _host.Echo("");
+        _host.Echo("Presets: ");
+        if (!string.IsNullOrEmpty(filter)) _host.Echo($"Filter: {filter}");
+        int shown = 0;
+        foreach (var r in Presets.Presets.Values.OrderBy(r => r.Id, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!string.IsNullOrEmpty(filter) &&
+                r.Id.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0) continue;
+            var bg = string.IsNullOrEmpty(r.BackgroundColor) ? "" : $"/{r.BackgroundColor}";
+            _host.Echo($"{r.Id} → {r.ForegroundColor}{bg}");
+            shown++;
+        }
+        if (shown == 0) _host.Echo("None.");
+    }
+
+    private void SavePresetsFile()
+    {
+        if (Presets is null) return;
+        var path  = Path.Combine(_config.ConfigProfileDir, "presets.cfg");
+        var lines = Presets.Presets.Values.Select(r =>
+            $"#preset {ConfigPersistence.FormatArg(r.Id)} {ConfigPersistence.FormatArg(r.ForegroundColor)} {ConfigPersistence.FormatArg(r.BackgroundColor)}");
+        if (ConfigPersistence.WriteLines(path, lines))
+            _host.Echo("Presets Saved");
+        else
+            _host.Echo($"Failed to save presets: {path}");
+    }
+
+    private void LoadPresetsFile()
+    {
+        var path  = Path.Combine(_config.ConfigProfileDir, "presets.cfg");
+        var lines = ConfigPersistence.ReadLines(path);
+        if (lines is null) { _host.Echo($"No presets file: {path}"); return; }
+        foreach (var line in lines) ProcessInput(line);
+        _host.Echo("Presets Loaded");
     }
 
     private static HighlightMatchType ParseMatchType(string token) => token.ToLowerInvariant() switch

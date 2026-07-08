@@ -172,8 +172,10 @@ public class ConfigurationViewModel : ReactiveObject
 
     public void OnPresetsChanged()
     {
+        var engine = PresetEngine;
+        if (engine is not null)
+            TrySave(() => _persistence.SavePresets(PathFor("presets.json"), engine));   // #149
         if (EditingConnected) UserHighlights.NotifyRulesChanged();
-        // TODO: presets.json persistence
     }
 
     public void OnTriggersChanged()

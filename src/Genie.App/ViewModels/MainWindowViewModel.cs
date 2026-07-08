@@ -3054,6 +3054,16 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 core.NameHighlights.Add(m.Name, m.ForegroundColor, m.BackgroundColor);   // Add upserts (#154/#148)
         });
 
+        SafeLoad(Pick("presets.json"), path =>
+        {
+            foreach (var m in p.LoadPresets(path))   // #149 — override the seeded default for each saved token
+                core.Presets.Apply(new Genie.Core.Presets.PresetRule
+                {
+                    Id = m.Id, ForegroundColor = m.ForegroundColor,
+                    BackgroundColor = m.BackgroundColor, HighlightLine = m.HighlightLine,
+                });
+        });
+
         SafeLoad(Pick("triggers.json"), path =>
         {
             foreach (var m in p.LoadTriggers(path))

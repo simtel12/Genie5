@@ -380,6 +380,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         Commands.Names = NameHighlights;     // wire #names command → engine
 
         Presets = new PresetEngine();   // seeded with Wrayth defaults
+        Commands.Presets = Presets;     // wire #preset command → engine
 
         Substitutes    = new SubstituteEngine();
         Substitutes.Classes = Classes;
