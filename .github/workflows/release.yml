@@ -66,6 +66,32 @@ jobs:
           path: RELEASE_BODY.md
           if-no-files-found: error
 
+  # Create the GitHub Release exactly ONCE, before any platform job runs (#159).
+  # The per-platform jobs below each call softprops/action-gh-release, which does
+  # a create-OR-update; when several run in parallel and the Release doesn't exist
+  # yet, two can both take the "create" branch and leave a DUPLICATE empty Release
+  # for the tag — after which every job's update fails `already_exists: tag_name`
+  # and some platforms' assets never attach. Creating it here first means every
+  # platform job only ever finds-and-updates the single existing Release.
+  create-release:
+    name: Create the GitHub Release (once)
+    runs-on: ubuntu-latest
+    needs: notes
+    permissions:
+      contents: write
+    steps:
+      - name: Download extracted release body
+        uses: actions/download-artifact@v4
+        with:
+          name: release-body
+      - name: Create (or update) the Release — no assets yet
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          prerelease: true
+          body_path: RELEASE_BODY.md
+          generate_release_notes: false
+
   publish:
     name: Publish self-contained win-x64
     runs-on: windows-latest
@@ -97,9 +123,9 @@ jobs:
           if-no-files-found: error
 
   velopack:
-    name: Velopack package + upload to Release
+    name: Velopack package — Windows (upload to Release)
     runs-on: windows-latest
-    needs: [publish, notes]
+    needs: [publish, notes, create-release]
     permissions:
       contents: write
     steps:
@@ -183,7 +209,7 @@ jobs:
   velopack-linux:
     name: Velopack package — Linux x64
     runs-on: ubuntu-latest
-    needs: notes
+    needs: [notes, create-release]
     permissions:
       contents: write
     steps:
@@ -257,7 +283,7 @@ jobs:
   velopack-osx-arm64:
     name: Velopack package — macOS Apple Silicon (arm64)
     runs-on: macos-latest
-    needs: notes
+    needs: [notes, create-release]
     permissions:
       contents: write
     steps:
@@ -356,7 +382,7 @@ jobs:
   velopack-osx-x64:
     name: Velopack package — macOS Intel (x64)
     runs-on: macos-latest
-    needs: notes
+    needs: [notes, create-release]
     permissions:
       contents: write
     steps:
@@ -543,7 +569,7 @@ jobs:
   release:
     name: Attach signed binary to GitHub Release
     runs-on: ubuntu-latest
-    needs: sign
+    needs: [sign, create-release]
     # Skips with the sign job (see above) until ENABLE_RELEASE_SIGNING=true.
     if: vars.ENABLE_RELEASE_SIGNING == 'true'
     steps:
