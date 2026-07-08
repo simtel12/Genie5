@@ -729,9 +729,13 @@ public sealed class CommandEngine
                 break;
             case "gag":
             case "gags":
+            case "ignore":     // Genie 4 synonym for #gag (#151)
+            case "ignores":
                 HandleGag(parts);
                 break;
             case "ungag":
+            case "unignore":   // Genie 4 synonym for #ungag (#151)
+            case "unignores":
                 if (parts.Count > 1 && Gags is not null)
                 {
                     Gags.RemoveRule(parts[1]);

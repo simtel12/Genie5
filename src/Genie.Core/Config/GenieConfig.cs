@@ -129,6 +129,10 @@ public sealed class GenieConfig
     public bool PlaySounds { get; set; } = true;
     public bool KeepInput { get; set; }
     public bool AbortDupeScript { get; set; } = true;
+    /// <summary>Suppress non-fatal script-engine warnings (bad-condition / malformed-if
+    /// advisories) — Genie 4 <c>ignorescriptwarnings</c> (#151). Default off (warnings
+    /// shown). Hard errors and script-abort notices are always shown.</summary>
+    public bool IgnoreScriptWarnings { get; set; }
     public bool ParseGameOnly { get; set; }
     public bool AutoMapper { get; set; } = true;
     public int AutoMapperAlpha { get; set; } = 255;
@@ -421,6 +425,7 @@ public sealed class GenieConfig
         ("sizeinputtogame", SizeInputToGame.ToString()),
         ("muted", (!PlaySounds).ToString()),
         ("abortdupescript", AbortDupeScript.ToString()),
+        ("ignorescriptwarnings", IgnoreScriptWarnings.ToString()),
         ("parsegameonly", ParseGameOnly.ToString()),
         ("autowalkpauseonunfocus", AutoWalkPauseOnUnfocus.ToString()),
         ("autowalkunfocusseconds", AutoWalkUnfocusSeconds.ToString()),
@@ -478,7 +483,7 @@ public sealed class GenieConfig
         ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines" }),
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
-        ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "scripttimeout", "maxgosubdepth", "abortdupescript", "scriptextension", "editor" }),
+        ("Scripting",        new[] { "scriptchar", "separatorchar", "commandchar", "mycommandchar", "triggeroninput", "scripttimeout", "maxgosubdepth", "abortdupescript", "ignorescriptwarnings", "scriptextension", "editor" }),
         ("Mapper",           new[] { "automapper", "automapperalpha", "updatemapperscripts" }),
         ("Auto-Walk",        new[] { "autowalkpauseonunfocus", "autowalkunfocusseconds" }),
         ("Sound / TTS",      new[] { "muted", "ttsvoice", "ttsvoicedir", "ttsread", "ttsreadstreams", "ttsrate", "ttsvolume" }),
@@ -567,6 +572,7 @@ public sealed class GenieConfig
                 case "muted": PlaySounds = !ToBool(value); Notify(ConfigFieldUpdated.Muted); break;
                 case "keepinputtext": KeepInput = ToBool(value); Notify(ConfigFieldUpdated.KeepInput); break;
                 case "abortdupescript": AbortDupeScript = ToBool(value); break;
+                case "ignorescriptwarnings": IgnoreScriptWarnings = ToBool(value); break;
                 case "parsegameonly": ParseGameOnly = ToBool(value); break;
                 case "automapper": AutoMapper = ToBool(value); Notify(ConfigFieldUpdated.AutoMapper); break;
                 case "automapperalpha": AutoMapperAlpha = ClampAlpha(value); Notify(ConfigFieldUpdated.AutoMapper); break;

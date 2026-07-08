@@ -78,6 +78,16 @@ public sealed class ScriptEngine
     /// variable counts up. 0 when no spell is prepared.</summary>
     public Func<int>? SpellTimeSeconds { get; set; }
 
+    /// <summary>Unix-epoch seconds of when the current spell was prepared (Genie 4
+    /// <c>$spellstarttime</c>). Set by the host; 0 when no spell is prepared.</summary>
+    public Func<long>? SpellStartTimeEpoch { get; set; }
+
+    /// <summary>Live read of <c>#config ignorescriptwarnings</c> (#151). When it
+    /// returns true, non-fatal parse advisories (bad-condition / malformed-if) are
+    /// suppressed. Read on each warning so a mid-session toggle takes effect at
+    /// once. Null → warnings shown (default). Hard errors / aborts are never gated.</summary>
+    public Func<bool>? WarningsSuppressed { get; set; }
+
     /// <summary>
     /// Schedule a <see cref="Tick"/> call after the given delay. Set by the
     /// UI layer (e.g. a DispatcherTimer) so that time-based unblocks (delay,
@@ -1098,10 +1108,13 @@ public sealed class ScriptEngine
                     // #135: the usual cause is a quote typo — an odd number of
                     // " makes the quote-aware then-scanner read the tail of the
                     // line (including the real `then`) as string content.
-                    int quotes = 0;
-                    foreach (var ch in rest) if (ch == '"') quotes++;
-                    var hint = quotes % 2 == 1 ? " (unbalanced \" quotes?)" : "";
-                    _echo($"[script] {inst.Name}:{lineNo} '{lower}' missing 'then'{hint}");
+                    if (WarningsSuppressed?.Invoke() != true)   // #151 ignorescriptwarnings
+                    {
+                        int quotes = 0;
+                        foreach (var ch in rest) if (ch == '"') quotes++;
+                        var hint = quotes % 2 == 1 ? " (unbalanced \" quotes?)" : "";
+                        _echo($"[script] {inst.Name}:{lineNo} '{lower}' missing 'then'{hint}");
+                    }
                     return true;
                 }
                 var condText  = rest[..thenIdx].Trim();
@@ -1742,7 +1755,8 @@ public sealed class ScriptEngine
     /// </summary>
     private void WarnBadCondition(ScriptInstance inst, string where, string condText, Exception ex)
     {
-        if (!inst.WarnedBadConditions.Add(where)) return;
+        if (!inst.WarnedBadConditions.Add(where)) return;   // dedupe even when suppressed
+        if (WarningsSuppressed?.Invoke() == true) return;   // #151 ignorescriptwarnings
         _echo($"[script] {inst.Name} {where}: bad condition '{condText}' — " +
               $"{ex.Message}; treated as false");
     }
@@ -2314,6 +2328,10 @@ public sealed class ScriptEngine
             // (no stored snapshot).
             if (name.Equals("spelltime", StringComparison.OrdinalIgnoreCase))
             { value = (SpellTimeSeconds?.Invoke() ?? 0).ToString(CultureInfo.InvariantCulture); return true; }
+            // $spellstarttime — Unix-epoch seconds of when the spell was prepared,
+            // "0" when none (Genie 4). Computed live from the host, before globals.
+            if (name.Equals("spellstarttime", StringComparison.OrdinalIgnoreCase))
+            { value = (SpellStartTimeEpoch?.Invoke() ?? 0).ToString(CultureInfo.InvariantCulture); return true; }
             if (Globals.TryGetValue(name, out var gv))
             { value = gv ?? string.Empty; return true; }
             // Persistent user variables (#var). Resolved after live-state globals
@@ -2377,6 +2395,11 @@ public sealed class ScriptEngine
             "militarytime" => now.ToString("HHmm",         CultureInfo.InvariantCulture).Trim(),
             "dayofmonth"   => now.ToString("dd",           CultureInfo.InvariantCulture).Trim(),
             "dayofyear"    => now.DayOfYear.ToString(CultureInfo.InvariantCulture),
+            // $year / $month (#151). Genie 4's Globals.cs uses "yyyy"/"mm" — but
+            // "mm" is MINUTES in .NET, a Genie 4 bug that makes $month useless;
+            // we deliberately use "MM" (2-digit month) so $month means the month.
+            "year"         => now.ToString("yyyy",         CultureInfo.InvariantCulture),
+            "month"        => now.ToString("MM",           CultureInfo.InvariantCulture),
             "unixtime"     => DateTimeOffset.Now.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture),
             _              => string.Empty,
         };

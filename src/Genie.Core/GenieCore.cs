@@ -454,6 +454,10 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         Scripts.RoundTimeRemainingSeconds = () => (int)Math.Ceiling(_state.Combat.RoundTimeRemaining);
         // $spelltime — seconds since the current spell was prepared (Genie 4).
         Scripts.SpellTimeSeconds          = () => (int)_state.Combat.SpellTimeSeconds;
+        // $spellstarttime — epoch seconds of when the spell was prepared, 0 if none (#151).
+        Scripts.SpellStartTimeEpoch       = () => _state.Combat.SpellTimeStart?.ToUnixTimeSeconds() ?? 0;
+        // #config ignorescriptwarnings — suppress non-fatal script parse advisories (#151).
+        Scripts.WarningsSuppressed        = () => Config.IgnoreScriptWarnings;
         Scripts.EchoTo                   = (msg, win, color) => EchoToWindow?.Invoke(msg, win, color);
         Scripts.EchoStyled               = (msg, color, mono) => EchoStyledLine?.Invoke(msg, color, mono);
         // Named-window seam for the built-in trackers (Spell Timer / Experience /
