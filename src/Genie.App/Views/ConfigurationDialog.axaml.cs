@@ -42,7 +42,7 @@ public partial class ConfigurationDialog : ReactiveWindow<ConfigurationViewModel
             HighlightsPanelCtrl.Initialize(
                 highlights, names, presets,
                 onHighlightsChanged: vm.OnHighlightsChanged,
-                onNamesChanged:      vm.OnHighlightsChanged,
+                onNamesChanged:      vm.OnNamesChanged,
                 onPresetsChanged:    vm.OnPresetsChanged,
                 config:              vm.ScriptConfig,          // #131 MonsterBold toggle
                 onConfigChanged:     vm.OnScriptSettingsChanged);

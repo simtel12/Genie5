@@ -162,6 +162,14 @@ public class ConfigurationViewModel : ReactiveObject
         if (EditingConnected) UserHighlights.NotifyRulesChanged();
     }
 
+    public void OnNamesChanged()
+    {
+        var engine = NameHighlightEngine;
+        if (engine is null) return;
+        TrySave(() => _persistence.SaveNames(PathFor("names.json"), engine.Rules));
+        if (EditingConnected) UserHighlights.NotifyRulesChanged();   // #154 repaint visible lines
+    }
+
     public void OnPresetsChanged()
     {
         if (EditingConnected) UserHighlights.NotifyRulesChanged();

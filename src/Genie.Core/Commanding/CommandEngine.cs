@@ -66,6 +66,9 @@ public sealed class CommandEngine
     /// <summary>Highlight rules. Backs <c>#highlight</c>.</summary>
     public HighlightEngine?     Highlights  { get; set; }
 
+    /// <summary>Player-name highlight rules. Backs <c>#names</c> / <c>#name</c>.</summary>
+    public NameHighlightEngine? Names       { get; set; }
+
     /// <summary>Trigger rules (auto-fire actions on game text). Backs <c>#trigger</c>.</summary>
     public TriggerEngineFinal?  Triggers    { get; set; }
 
@@ -677,6 +680,16 @@ public sealed class CommandEngine
                 {
                     Highlights.RemoveRule(parts[1]);
                     _host.Echo($"Highlight removed: {parts[1]}");
+                }
+                break;
+            case "name":
+            case "names":
+                HandleNames(parts);
+                break;
+            case "unname":
+                if (parts.Count > 1 && Names is not null)
+                {
+                    if (Names.Remove(parts[1])) _host.Echo($"Name removed: {parts[1]}");
                 }
                 break;
             case "trigger":
@@ -1330,6 +1343,97 @@ public sealed class CommandEngine
         Highlights?.Clear();
         foreach (var line in lines) ProcessInput(line);
         _host.Echo("Highlights Loaded");
+    }
+
+    // ── #names / #name — player-name highlight list (#148) ───────────────────
+    // Typed parity for the Names config tab: add / remove / list / clear plus
+    // save / load. Colour rendering of these rules is #154 (DefaultHighlights).
+    private void HandleNames(IReadOnlyList<string> parts)
+    {
+        if (Names is null) { _host.Echo("#names is unavailable."); return; }
+
+        if (parts.Count == 1) { ListNames(null); return; }
+
+        var sub = parts[1].ToLowerInvariant();
+        if (parts.Count == 2)
+        {
+            switch (sub)
+            {
+                case "load":  LoadNamesFile(); return;
+                case "save":  SaveNamesFile(); return;
+                case "clear": Names.Clear(); _host.Echo("Names Cleared"); return;
+                default:      ListNames(parts[1]); return;   // #names Fred → filtered list
+            }
+        }
+
+        if (sub == "remove" || sub == "delete")
+        {
+            if (Names.Remove(parts[2])) _host.Echo($"Name removed: {parts[2]}");
+            return;
+        }
+
+        if (sub == "add")
+        {
+            // #names add {name} [{fg}] [{bg}]
+            var name = parts[2];
+            var fg   = parts.Count > 3 ? parts[3] : "";
+            var bg   = parts.Count > 4 ? parts[4] : "";
+            Names.Add(name, fg, bg);                          // Add upserts by name
+            EchoNameAdded(name, fg, bg);
+            return;
+        }
+
+        // Implicit positional: #names {name} {fg} [{bg}] (needs a colour, else
+        // the count==2 branch above treats a lone token as a list filter).
+        var pName = parts[1];
+        var pFg   = parts[2];
+        var pBg   = parts.Count > 3 ? parts[3] : "";
+        Names.Add(pName, pFg, pBg);
+        EchoNameAdded(pName, pFg, pBg);
+    }
+
+    private void EchoNameAdded(string name, string fg, string bg) =>
+        _host.Echo($"Name added: {name}{(string.IsNullOrEmpty(fg) ? "" : $" fg={fg}")}{(string.IsNullOrEmpty(bg) ? "" : $" bg={bg}")}");
+
+    private void ListNames(string? filter)
+    {
+        if (Names is null) return;
+        _host.Echo("");
+        _host.Echo("Names: ");
+        if (!string.IsNullOrEmpty(filter)) _host.Echo($"Filter: {filter}");
+        int shown = 0;
+        foreach (var r in Names.Rules.OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!string.IsNullOrEmpty(filter) &&
+                r.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0) continue;
+            var fg = string.IsNullOrEmpty(r.ForegroundColor) ? "Default" : r.ForegroundColor;
+            var bg = string.IsNullOrEmpty(r.BackgroundColor) ? "" : $"/{r.BackgroundColor}";
+            _host.Echo($"{r.Name} → {fg}{bg}");
+            shown++;
+        }
+        if (shown == 0) _host.Echo("None.");
+    }
+
+    private void SaveNamesFile()
+    {
+        if (Names is null) return;
+        var path  = Path.Combine(_config.ConfigProfileDir, "names.cfg");
+        var lines = Names.Rules.Select(r =>
+            $"#names add {ConfigPersistence.FormatArg(r.Name)} {ConfigPersistence.FormatArg(r.ForegroundColor)} {ConfigPersistence.FormatArg(r.BackgroundColor)}");
+        if (ConfigPersistence.WriteLines(path, lines))
+            _host.Echo("Names Saved");
+        else
+            _host.Echo($"Failed to save names: {path}");
+    }
+
+    private void LoadNamesFile()
+    {
+        var path  = Path.Combine(_config.ConfigProfileDir, "names.cfg");
+        var lines = ConfigPersistence.ReadLines(path);
+        if (lines is null) { _host.Echo($"No names file: {path}"); return; }
+        Names?.Clear();
+        foreach (var line in lines) ProcessInput(line);
+        _host.Echo("Names Loaded");
     }
 
     private static HighlightMatchType ParseMatchType(string token) => token.ToLowerInvariant() switch

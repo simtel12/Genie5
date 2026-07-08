@@ -148,6 +148,16 @@ public static class DefaultHighlights
     /// </summary>
     public static Genie.Core.Presets.PresetEngine? PresetEngine { get; set; }
 
+    /// <summary>
+    /// Active session's player-name highlight engine (#154). Set by
+    /// <c>MainWindowViewModel</c> at connect, like <see cref="PresetEngine"/>.
+    /// When set, <see cref="Tokenize"/> paints each name rule's foreground /
+    /// background over its match positions as its own colour layer. Null when no
+    /// session is connected. Repaint of already-visible lines is driven by
+    /// <see cref="UserHighlights.RulesChanged"/> (the Names panel fires it).
+    /// </summary>
+    public static NameHighlightEngine? NameEngine { get; set; }
+
     /// <summary>Map an XML preset id to its palette key. The lookup is
     /// case-insensitive (so <c>roomDesc</c>→<c>roomdesc</c>, <c>roomName</c>→
     /// <c>roomname</c> resolve directly); only <c>whisper</c> needs remapping to
@@ -183,6 +193,12 @@ public static class DefaultHighlights
         // Build a per-char color map. Null = use the default TextBlock foreground.
         var brushes = new IBrush?[text.Length];
 
+        // Parallel per-char BACKGROUND map. Null = transparent (default). A
+        // highlight/preset may set a background independently of its foreground,
+        // so this tracks its own first-write-wins layer and splits runs alongside
+        // foreground + bold in EmitStyledRange.
+        var backgrounds = new IBrush?[text.Length];
+
         // Parallel per-char bold mask. Set true for every character that
         // falls inside a BoldSpan. Bold splits runs alongside color so a
         // partly-bold colored phrase emits two runs with the same brush
@@ -216,17 +232,23 @@ public static class DefaultHighlights
                     if (!rule.IsEnabled) continue;
                     if (engine.Classes is { } classes && !classes.IsActive(rule.ClassName)) continue;
 
-                    // A rule may carry a colour, a sound, or both — so we detect
-                    // the match even with no brush (sound-only highlight).
+                    // A rule may carry a foreground, a background, a sound, or
+                    // any mix — so we detect the match even with no brush at all
+                    // (sound/TTS-only highlight) and paint each colour channel
+                    // independently (foreground-only, background-only, or both).
                     var ruleBrush = GetUserBrush(rule.ForegroundColor);
+                    var ruleBg    = GetUserBrush(rule.BackgroundColor);
                     var matched   = false;
                     foreach (var (start, length) in rule.GetMatchPositions(text))
                     {
                         matched = true;
-                        if (ruleBrush is null) continue;   // no colour → match-only (for sound)
+                        if (ruleBrush is null && ruleBg is null) continue; // match-only (sound/TTS)
                         var end = Math.Min(start + length, text.Length);
                         for (int i = start; i < end; i++)
-                            if (brushes[i] is null) brushes[i] = ruleBrush;
+                        {
+                            if (ruleBrush is not null && brushes[i]     is null) brushes[i]     = ruleBrush;
+                            if (ruleBg    is not null && backgrounds[i] is null) backgrounds[i] = ruleBg;
+                        }
                     }
                     // Optional per-highlight SFX, once per matching line.
                     if (matched && !string.IsNullOrEmpty(rule.SoundFile))
@@ -242,6 +264,30 @@ public static class DefaultHighlights
                 metrics.Time(PipelineStage.Highlights, ApplyUserHighlights);
             else
                 ApplyUserHighlights();
+        }
+
+        // ── Player-name highlights (#154) ─────────────────────────────
+        // Name rules are their own colour layer (Genie 4 semantics). They paint
+        // AFTER the user string highlights above — so an explicit highlight rule
+        // still wins on the rare overlap — but BEFORE the built-in defaults and
+        // presets below, so a named player beats the generic auto-colouring
+        // (directions, all-caps, numbers, …). First-write-wins, foreground and
+        // background painted independently, exactly like the user-rule pass.
+        // MatchAll yields non-overlapping matches, longest-name-first.
+        if (NameEngine is { Rules.Count: > 0 } nameEngine)
+        {
+            foreach (var (rule, start, length) in nameEngine.MatchAll(text))
+            {
+                var nameFg = GetUserBrush(rule.ForegroundColor);
+                var nameBg = GetUserBrush(rule.BackgroundColor);
+                if (nameFg is null && nameBg is null) continue;  // filter-only rule
+                var end = Math.Min(start + length, text.Length);
+                for (int i = start; i < end; i++)
+                {
+                    if (nameFg is not null && brushes[i]     is null) brushes[i]     = nameFg;
+                    if (nameBg is not null && backgrounds[i] is null) backgrounds[i] = nameBg;
+                }
+            }
         }
 
         // ── Built-in default highlights (room titles, currencies, …) ──
@@ -285,11 +331,17 @@ public static class DefaultHighlights
             foreach (var span in presetSpans)
             {
                 if (span.Length <= 0) continue;
-                var brush = GetUserBrush(presets.GetForeground(MapPresetKey(span.PresetId)));
-                if (brush is null) continue;
+                var key   = MapPresetKey(span.PresetId);
+                var brush = GetUserBrush(presets.GetForeground(key));
+                var bg    = GetUserBrush(presets.GetBackground(key));
+                if (brush is null && bg is null) continue;
                 var ps = Math.Max(0, span.Start);
                 var pe = Math.Min(text.Length, span.Start + span.Length);
-                for (int i = ps; i < pe; i++) brushes[i] ??= brush;
+                for (int i = ps; i < pe; i++)
+                {
+                    if (brush is not null) brushes[i]     ??= brush;
+                    if (bg    is not null) backgrounds[i] ??= bg;
+                }
             }
         }
 
@@ -325,7 +377,7 @@ public static class DefaultHighlights
                 : text.Length;
 
             // Emit styled (non-link) runs up to nextLinkStart.
-            EmitStyledRange(text, brushes, bolds, cursor, nextLinkStart, inlines);
+            EmitStyledRange(text, brushes, backgrounds, bolds, cursor, nextLinkStart, inlines);
             cursor = nextLinkStart;
 
             if (sortedLinks is null || linkIdx >= sortedLinks.Count) break;
@@ -345,35 +397,40 @@ public static class DefaultHighlights
     /// <summary>
     /// Emit a styled sequence of <see cref="Run"/>s for <paramref name="text"/>
     /// from <paramref name="start"/> (inclusive) to <paramref name="end"/>
-    /// (exclusive). Runs break on EITHER a brush change OR a bold flip so a
-    /// partly-bold colored phrase emits two runs (same color, different
-    /// weight). Brush and bold combine orthogonally.
+    /// (exclusive). Runs break on a foreground change, a background change, OR a
+    /// bold flip, so a partly-styled phrase emits separate runs. Foreground,
+    /// background, and bold combine orthogonally.
     /// </summary>
-    private static void EmitStyledRange(string text, IBrush?[] brushes, bool[] bolds,
-                                        int start, int end, List<Inline> inlines)
+    private static void EmitStyledRange(string text, IBrush?[] brushes, IBrush?[] backgrounds,
+                                        bool[] bolds, int start, int end, List<Inline> inlines)
     {
         if (start >= end) return;
         int runStart = start;
         IBrush? currentBrush = brushes[start];
+        IBrush? currentBg    = backgrounds[start];
         bool    currentBold  = bolds[start];
         for (int i = start + 1; i < end; i++)
         {
-            if (!ReferenceEquals(brushes[i], currentBrush) || bolds[i] != currentBold)
+            if (!ReferenceEquals(brushes[i], currentBrush)
+                || !ReferenceEquals(backgrounds[i], currentBg)
+                || bolds[i] != currentBold)
             {
-                inlines.Add(MakeRun(text.AsSpan(runStart, i - runStart).ToString(), currentBrush, currentBold));
+                inlines.Add(MakeRun(text.AsSpan(runStart, i - runStart).ToString(), currentBrush, currentBg, currentBold));
                 runStart     = i;
                 currentBrush = brushes[i];
+                currentBg    = backgrounds[i];
                 currentBold  = bolds[i];
             }
         }
-        inlines.Add(MakeRun(text[runStart..end], currentBrush, currentBold));
+        inlines.Add(MakeRun(text[runStart..end], currentBrush, currentBg, currentBold));
     }
 
-    private static Run MakeRun(string text, IBrush? brush, bool bold = false)
+    private static Run MakeRun(string text, IBrush? brush, IBrush? background = null, bool bold = false)
     {
         var run = new Run(text);
-        if (brush is not null) run.Foreground = brush;
-        if (bold)              run.FontWeight = FontWeight.Bold;
+        if (brush is not null)      run.Foreground = brush;
+        if (background is not null) run.Background = background;
+        if (bold)                   run.FontWeight = FontWeight.Bold;
         return run;
     }
 

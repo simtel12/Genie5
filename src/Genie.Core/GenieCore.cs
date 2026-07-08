@@ -377,6 +377,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         Commands.Highlights = Highlights;    // wire #highlight command → engine
 
         NameHighlights = new NameHighlightEngine();
+        Commands.Names = NameHighlights;     // wire #names command → engine
 
         Presets = new PresetEngine();   // seeded with Wrayth defaults
 

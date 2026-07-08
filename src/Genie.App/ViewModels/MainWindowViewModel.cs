@@ -3048,6 +3048,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             }
         });
 
+        SafeLoad(Pick("names.json"), path =>
+        {
+            foreach (var m in p.LoadNames(path))
+                core.NameHighlights.Add(m.Name, m.ForegroundColor, m.BackgroundColor);   // Add upserts (#154/#148)
+        });
+
         SafeLoad(Pick("triggers.json"), path =>
         {
             foreach (var m in p.LoadTriggers(path))
@@ -3788,7 +3794,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // is per-connect — LoadSavedConfiguration runs in ConnectAsync). The engines
         // persist, so the renderer holds them for the whole session.
         UserHighlights.Engine  = _core.Highlights;
-        Highlighting.DefaultHighlights.PresetEngine = _core.Presets;  // preset colours (#19)
+        Highlighting.DefaultHighlights.PresetEngine = _core.Presets;      // preset colours (#19)
+        Highlighting.DefaultHighlights.NameEngine   = _core.NameHighlights; // name colours (#154)
 
         // ── Performance / safety ──────────────────────────────────────────────
         // Push the user's current safety choices onto the engines (defaults ON).
