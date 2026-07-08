@@ -160,10 +160,18 @@ public static class DefaultHighlights
 
     /// <summary>Map an XML preset id to its palette key. The lookup is
     /// case-insensitive (so <c>roomDesc</c>→<c>roomdesc</c>, <c>roomName</c>→
-    /// <c>roomname</c> resolve directly); only <c>whisper</c> needs remapping to
-    /// the plural palette key <c>whispers</c>.</summary>
-    private static string MapPresetKey(string xmlId) =>
-        string.Equals(xmlId, "whisper", StringComparison.OrdinalIgnoreCase) ? "whispers" : xmlId;
+    /// <c>roomname</c> resolve directly). DR emits a few preset ids in the
+    /// singular while <see cref="Genie.Core.Presets.PresetEngine"/> keys them in
+    /// the plural — <c>whisper</c>→<c>whispers</c> and <c>thought</c>→
+    /// <c>thoughts</c> — so those two are remapped here. Without the thought
+    /// mapping the thoughts stream rendered with the default colour instead of
+    /// its palette colour.</summary>
+    private static string MapPresetKey(string xmlId) => xmlId.ToLowerInvariant() switch
+    {
+        "whisper" => "whispers",
+        "thought" => "thoughts",
+        _         => xmlId,
+    };
 
     /// <summary>
     /// Split <paramref name="text"/> into a sequence of styled <see cref="Inline"/>s.
