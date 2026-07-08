@@ -215,12 +215,36 @@ public static class DefaultHighlights
             }
         }
 
+        // ── Player-name highlights (#154) — SUPREME layer ─────────────
+        // Name rules are the top colour layer (Genie 4 semantics): they paint
+        // FIRST, before user string highlights and the built-in defaults, so a
+        // named player always shows their name colour even where another rule
+        // would also match those characters. First-write-wins, foreground and
+        // background painted independently. MatchAll yields non-overlapping
+        // matches, longest-name-first.
+        if (NameEngine is { Rules.Count: > 0 } nameEngine)
+        {
+            foreach (var (rule, start, length) in nameEngine.MatchAll(text))
+            {
+                var nameFg = GetUserBrush(rule.ForegroundColor);
+                var nameBg = GetUserBrush(rule.BackgroundColor);
+                if (nameFg is null && nameBg is null) continue;  // filter-only rule
+                var end = Math.Min(start + length, text.Length);
+                for (int i = start; i < end; i++)
+                {
+                    if (nameFg is not null && brushes[i]     is null) brushes[i]     = nameFg;
+                    if (nameBg is not null && backgrounds[i] is null) backgrounds[i] = nameBg;
+                }
+            }
+        }
+
         // ── User-defined highlights from the live HighlightEngine ─────
-        // User rules paint FIRST so they win over the built-in defaults on
-        // overlap (#143) — Genie 4 semantics, where the user's own highlight
-        // config is supreme. A user rule on the room title or on EXP numbers
-        // now beats the built-in RoomTitle/Number colours; the defaults below
-        // fill only the characters no user rule claimed.
+        // User rules paint after names but before the built-in defaults: they win
+        // over the built-ins on overlap (#143) — Genie 4 semantics, where the
+        // user's own highlight config beats the auto-colouring — yet yield to a
+        // name rule on the same characters (names are supreme, above). A user rule
+        // on the room title or on EXP numbers still beats the built-in RoomTitle/
+        // Number colours; the defaults below fill only the characters nothing claimed.
         // Timed into the Highlights stage (no-op overhead when the overlay is
         // hidden). This is the render-path cost of user highlight rules.
         if (UserHighlights.Engine is { Enabled: true } engine)
@@ -264,30 +288,6 @@ public static class DefaultHighlights
                 metrics.Time(PipelineStage.Highlights, ApplyUserHighlights);
             else
                 ApplyUserHighlights();
-        }
-
-        // ── Player-name highlights (#154) ─────────────────────────────
-        // Name rules are their own colour layer (Genie 4 semantics). They paint
-        // AFTER the user string highlights above — so an explicit highlight rule
-        // still wins on the rare overlap — but BEFORE the built-in defaults and
-        // presets below, so a named player beats the generic auto-colouring
-        // (directions, all-caps, numbers, …). First-write-wins, foreground and
-        // background painted independently, exactly like the user-rule pass.
-        // MatchAll yields non-overlapping matches, longest-name-first.
-        if (NameEngine is { Rules.Count: > 0 } nameEngine)
-        {
-            foreach (var (rule, start, length) in nameEngine.MatchAll(text))
-            {
-                var nameFg = GetUserBrush(rule.ForegroundColor);
-                var nameBg = GetUserBrush(rule.BackgroundColor);
-                if (nameFg is null && nameBg is null) continue;  // filter-only rule
-                var end = Math.Min(start + length, text.Length);
-                for (int i = start; i < end; i++)
-                {
-                    if (nameFg is not null && brushes[i]     is null) brushes[i]     = nameFg;
-                    if (nameBg is not null && backgrounds[i] is null) backgrounds[i] = nameBg;
-                }
-            }
         }
 
         // ── Built-in default highlights (room titles, currencies, …) ──
