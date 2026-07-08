@@ -111,10 +111,11 @@ public class ExperienceDensityTests
     private sealed class FakeHost : IExtensionHost
     {
         private readonly Dictionary<string, string> _config;
-        public FakeHost(int density = 0, bool trackGain = false) => _config = new()
+        public FakeHost(int density = 0, bool trackGain = false, bool g4Layout = false) => _config = new()
         {
             ["experiencedensity"]   = density.ToString(),
             ["experiencetrackgain"] = trackGain.ToString(),
+            ["experienceg4layout"]  = g4Layout.ToString(),
         };
         public string Window = "";
         public IDictionary<string, string> Globals { get; } = new Dictionary<string, string>();
@@ -139,9 +140,39 @@ public class ExperienceDensityTests
         ext.OnGameEvent(Exp("Attunement", "550 73% dabbling"));
         ext.OnPrompt();
 
-        Assert.Contains("Learning: 1", host.Window);
+        Assert.Contains("Learning Skills: 1", host.Window);
         Assert.Contains("Session ", host.Window);   // clock starts at first datum
         Assert.Contains("Attunement", host.Window);
+        // Default (G5) layout: summary is the header, above the skill row.
+        Assert.True(host.Window.IndexOf("Learning Skills:", StringComparison.Ordinal)
+                  < host.Window.IndexOf("Attunement", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Render_G4Layout_MovesSummaryBelowTheList()
+    {
+        var host = new FakeHost(g4Layout: true);
+        var ext  = new ExperienceExtension();
+        ext.Initialize(host);
+
+        ext.OnGameEvent(Exp("Attunement", "550 73% dabbling"));
+        ext.OnPrompt();
+
+        // G4 EXPTracker look: the "Learning Skills" summary sits below the skill list.
+        Assert.Contains("Learning Skills: 1", host.Window);
+        Assert.True(host.Window.IndexOf("Attunement", StringComparison.Ordinal)
+                  < host.Window.IndexOf("Learning Skills:", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("True", true)]
+    [InlineData("False", false)]
+    [InlineData("", false)]                  // unset defaults off (keep G5 layout)
+    public void Config_ExperienceG4Layout_RoundTrips(string input, bool expected)
+    {
+        var cfg = new GenieConfig(new LocalDirectoryService("Genie5Test", AppContext.BaseDirectory));
+        cfg.SetSetting("experienceg4layout", input, showException: false);
+        Assert.Equal(expected, cfg.ExperienceG4Layout);
     }
 
     [Fact]

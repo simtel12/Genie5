@@ -228,6 +228,12 @@ public sealed class ExperienceExtension : IGameExtension
     /// settings.cfg all drive one value.</summary>
     private bool TrackGain() => bool.TryParse(_host.GetConfig("experiencetrackgain"), out var b) && b;
 
+    /// <summary>Whether to use the Genie 4 EXPTracker layout — summary line as a footer
+    /// beneath the skill list — instead of the default G5 header. Read live from
+    /// <c>#config experienceg4layout</c> so the panel checkbox, command line, and
+    /// settings.cfg all drive one value.</summary>
+    private bool G4Layout() => bool.TryParse(_host.GetConfig("experienceg4layout"), out var b) && b;
+
     /// <summary>Render one learning row at the given density. 0 = Full (rank, %,
     /// learning word, count); 1 = drop the <c>(n/34)</c> count; 2 = numbers only
     /// (rank + % + numeric mindstate); 3 = short skill name + rank + % + numeric
@@ -301,14 +307,26 @@ public sealed class ExperienceExtension : IGameExtension
 
         var density   = Density();
         var trackGain = TrackGain();
+        var g4        = G4Layout();
+
+        // Summary: count of skills currently absorbing experience (Genie 4 EXPTracker's
+        // "Learning Skills: N" — a glance tells you if training is off, e.g. 44 when you
+        // expect 46), plus mind-locked count and session clock (#144). Placed as the top
+        // header in the default G5 layout, or as a footer beneath the list in the G4
+        // layout (#config experienceg4layout) to match the classic EXPTracker window.
+        var summary = new StringBuilder();
+        summary.Append("Learning Skills: ").Append(learning.Count);
+        if (locked > 0)     summary.Append("   Locked: ").Append(locked);
+        if (start is { } s) summary.Append("   Session ").Append(FormatElapsed(DateTime.UtcNow - s));
+
+        const string Rule = "──────────────────────────────────────";
 
         var sb = new StringBuilder();
-        // Header: skills learning (#144), plus mind-locked count and session clock.
-        sb.Append("Learning: ").Append(learning.Count);
-        if (locked > 0)     sb.Append("   Locked: ").Append(locked);
-        if (start is { } s) sb.Append("   Session ").Append(FormatElapsed(DateTime.UtcNow - s));
-        sb.Append('\n');
-        sb.Append("──────────────────────────────────────\n");
+        if (!g4)
+        {
+            sb.Append(summary).Append('\n');
+            sb.Append(Rule).Append('\n');
+        }
 
         foreach (var (name, info) in learning)
         {
@@ -319,6 +337,12 @@ public sealed class ExperienceExtension : IGameExtension
         }
         if (learning.Count == 0)
             sb.Append("(nothing learning — train a skill, or type 'exp')\n");
+
+        if (g4)
+        {
+            sb.Append(Rule).Append('\n');
+            sb.Append(summary).Append('\n');
+        }
         if (trackGain && start is not null)
             sb.Append("Total gained: ").Append(FormatGain(totalGain)).Append(" ranks\n");
         return sb.ToString().TrimEnd();

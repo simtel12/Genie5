@@ -1125,6 +1125,9 @@
           <CheckBox Content="Track gain" VerticalAlignment="Center" FontSize="11"
                     IsChecked="{Binding ViewModel.TrackGain, Mode=TwoWay}"
                     ToolTip.Tip="Show ranks gained this session per skill, plus a session total."/>
+          <CheckBox Content="G4 layout" VerticalAlignment="Center" FontSize="11"
+                    IsChecked="{Binding ViewModel.G4Layout, Mode=TwoWay}"
+                    ToolTip.Tip="Genie 4 EXPTracker look: 'Learning Skills' summary as a footer below the list instead of a header on top."/>
         </StackPanel>
         <!-- One SelectableTextBlock per row (via Lines/Inlines) so user highlights -->
         <!-- fire on the Experience window (#144). No wrapping: keep columns aligned; -->
