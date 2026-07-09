@@ -746,6 +746,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                     // Room arrival without a NavEvent (e.g. "(**)" no-uid rooms).
                     _roomChangedSincePrompt = true;
                     break;
+
+                case FlagsReportEvent fr:
+                    // Connect-time `flags` probe result (issue #29): warn if any
+                    // stream-affecting flag is in an untested state.
+                    HandleFlagsReport(fr);
+                    break;
             }
         });
 
@@ -763,6 +769,9 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // and connect script never run (issues #126/#127). Lich's detachable
         // listener only accepts clients after login completes, so TCP
         // Connected IS the ready signal in this mode.
+        // Flags probe (issue #29) needs the XML stream — skip it in Wizard mode.
+        _flagsProbeEligible = cfg.ClientMode != GameClientMode.Wizard;
+
         if (cfg.ClientMode == GameClientMode.Wizard)
         {
             _settingsInfoSub = connection.StateStream
@@ -1088,8 +1097,63 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             if (lichAttach)
                 await _connection.SendCommandAsync(",eq respond \"GENIE5-IDENT \" + XMLData.name")
                                  .ConfigureAwait(false);
+
+            // Flag-state probe (issue #29): silently read the DR `flags` verb and
+            // warn if any stream-affecting flag is in a state the parser wasn't
+            // verified against. Arm the parser's suppression window FIRST so the
+            // response never displays, then send. Skipped in Wizard/plain-text
+            // mode and when #config flagscheck is off.
+            if (Config.FlagsCheck && _flagsProbeEligible && _parser is not null)
+            {
+                _parser.BeginFlagsCaptureWindow();
+                await _connection.SendCommandAsync("flags").ConfigureAwait(false);
+            }
         }
         catch { /* connection dropped during the seed — nothing to do */ }
+    }
+
+    /// <summary>False in Wizard/plain-text mode (no XML stream to verify against);
+    /// set per connect in <see cref="BuildConnection"/>. Gates the connect-time
+    /// flags probe together with <see cref="GenieConfig.FlagsCheck"/>.</summary>
+    private bool _flagsProbeEligible;
+
+    /// <summary>The stream-affecting DR flags and the state the parser is verified
+    /// against (issue #29 — captured from a live StormFront session 2026-07-09).
+    /// A connect-time probe warns when any of these differs; the other ~24 flags
+    /// are cosmetic/social and don't change the XML the parser reads. Keyed
+    /// case-insensitively on DR's own spelling.</summary>
+    private static readonly IReadOnlyDictionary<string, bool> VerifiedFlagBaseline =
+        new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["RoomNames"]       = true,    // room title component present
+            ["Description"]     = true,    // room-desc <preset> present
+            ["RoomBrief"]       = false,   // full (not brief) room text
+            ["BattleBrief"]     = true,
+            ["CombatBrief"]     = true,
+            ["MonsterBold"]     = true,    // creatures wrapped in <pushBold> (ties to #160)
+            ["StatusPrompt"]    = true,    // status prepended to the prompt line
+            ["ConciseThoughts"] = false,
+            ["HidePreStrings"]  = false,   // other players' titles shown in room LOOKs
+            ["HidePostStrings"] = false,
+            ["ShowRoomID"]      = true,    // room IDs shown on LOOK
+        };
+
+    /// <summary>Compare a <see cref="FlagsReportEvent"/> against
+    /// <see cref="VerifiedFlagBaseline"/> and echo one advisory line listing any
+    /// stream-affecting flag in an untested state. Silent when everything matches.</summary>
+    private void HandleFlagsReport(FlagsReportEvent report)
+    {
+        var deviations = new List<string>();
+        foreach (var (flag, expected) in VerifiedFlagBaseline)
+        {
+            if (report.Flags.TryGetValue(flag, out var actual) && actual != expected)
+                deviations.Add($"{flag} is {(actual ? "ON" : "OFF")} (verified {(expected ? "ON" : "OFF")})");
+        }
+        if (deviations.Count == 0) return;   // all stream-affecting flags as expected — stay quiet
+
+        EchoLine?.Invoke(
+            $"[genie] flags check — parser input differs from the tested baseline: {string.Join("; ", deviations)}. " +
+            "Room/combat/prompt parsing may misbehave; use FLAG <name> ON|OFF to restore, or #config flagscheck off to silence.");
     }
 
     /// <summary>Apply the settings.cfg tracker toggles (spelltimer / showexperience /

@@ -134,6 +134,13 @@ public sealed class GenieConfig
     /// shown). Hard errors and script-abort notices are always shown.</summary>
     public bool IgnoreScriptWarnings { get; set; }
     public bool ParseGameOnly { get; set; }
+
+    /// <summary>Silently probe the DR <c>flags</c> verb once at connect and warn
+    /// if any stream-affecting flag differs from the parser's verified baseline
+    /// (issue #29). Default on; the probe is suppressed from display and skipped
+    /// in Wizard/plain-text mode. Toggle with <c>#config flagscheck on|off</c>.</summary>
+    public bool FlagsCheck { get; set; } = true;
+
     public bool AutoMapper { get; set; } = true;
     public int AutoMapperAlpha { get; set; } = 255;
 
@@ -524,6 +531,7 @@ public sealed class GenieConfig
         ("abortdupescript", AbortDupeScript.ToString()),
         ("ignorescriptwarnings", IgnoreScriptWarnings.ToString()),
         ("parsegameonly", ParseGameOnly.ToString()),
+        ("flagscheck", FlagsCheck.ToString()),
         ("autowalkpauseonunfocus", AutoWalkPauseOnUnfocus.ToString()),
         ("autowalkunfocusseconds", AutoWalkUnfocusSeconds.ToString()),
         ("showlinks", ShowLinks.ToString()),
@@ -685,6 +693,7 @@ public sealed class GenieConfig
                 case "abortdupescript": AbortDupeScript = ToBool(value); break;
                 case "ignorescriptwarnings": IgnoreScriptWarnings = ToBool(value); break;
                 case "parsegameonly": ParseGameOnly = ToBool(value); break;
+                case "flagscheck": FlagsCheck = ToBool(value); break;
                 case "automapper": AutoMapper = ToBool(value); Notify(ConfigFieldUpdated.AutoMapper); break;
                 case "automapperalpha": AutoMapperAlpha = ClampAlpha(value); Notify(ConfigFieldUpdated.AutoMapper); break;
                 case "conndebug": ConnDebug = ToBool(value); break;

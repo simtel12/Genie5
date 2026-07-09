@@ -291,6 +291,16 @@ public sealed record CharacterNameEvent(string Name) : GameEvent;
 /// </summary>
 public sealed record SettingsInfoEvent() : GameEvent;
 
+/// <summary>
+/// Parsed result of a <c>flags</c> verb probe (issue #29): flag name — as DR
+/// spells it (e.g. "RoomBrief") — mapped to true (ON) / false (OFF). Emitted
+/// ONLY for the connect-time silent probe, whose response is suppressed from
+/// display; a user-typed <c>flags</c> renders normally and emits no event.
+/// GenieCore compares the stream-affecting flags against a verified baseline
+/// and warns on any deviation (untested parser input state).
+/// </summary>
+public sealed record FlagsReportEvent(IReadOnlyDictionary<string, bool> Flags) : GameEvent;
+
 // ── Inventory containers ─────────────────────────────────────────────────────
 
 /// <summary>

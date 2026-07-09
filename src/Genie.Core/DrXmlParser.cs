@@ -150,6 +150,128 @@ public sealed class DrXmlParser : IDisposable
     public void BeginSilentHealthWindow(TimeSpan? timeout = null) =>
         _silentHealthDeadline = DateTimeOffset.UtcNow + (timeout ?? TimeSpan.FromSeconds(5));
 
+    // ── Silent `flags` window (connect-time flag-state probe, issue #29) ──────
+    // The `flags` verb prints a plain-text mono table (no dedicated XML element):
+    //   Usage / FLAG {flag_name} {on|off} / Example …           ← preamble
+    //   Flag            Status  Behavior for this setting        ← header
+    //   RoomBrief          OFF  Display the full text …          ← one row per flag
+    //   …
+    //   For other setting options, see AVOID, SET, and TOGGLE.   ← footer
+    // When the core probes at connect it arms this window first: the response is
+    // parsed into a FlagsReportEvent (name → ON/OFF) and NOT emitted as text, so
+    // the login stays quiet. Only lines that are recognisable flags-report lines
+    // (a known flag name + ON/OFF, or one of the fixed boilerplate/header/footer
+    // strings) are suppressed — an interleaved game line can never be eaten.
+    // Valves: the footer completes it; a deadline and a runaway line count are
+    // backstops. User-TYPED `flags` is untouched (the window is only armed by the
+    // probe) and displays normally.
+    private DateTimeOffset _flagsCaptureDeadline = DateTimeOffset.MinValue;
+    private bool _flagsCaptureActive;
+    private int  _flagsCaptureLines;
+    private Dictionary<string, bool>? _flagsCaptured;
+    private const int FlagsCaptureMaxLines = 80;
+
+    /// <summary>The flag names DR's <c>flags</c> verb reports, as it spells them
+    /// (case-insensitive match). A line is only treated as a flag row when its
+    /// first token is one of these — the safety guard that stops the capture
+    /// window from ever suppressing ordinary game text. Verified against a live
+    /// capture 2026-07-09 (35 flags; the wiki's stale 32-list was wrong).</summary>
+    internal static readonly IReadOnlySet<string> KnownFlagNames =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "LogOn", "LogOff", "Disconnect", "ShowDeaths", "RoomNames",
+            "Description", "RoomBrief", "BattleBrief", "CombatBrief",
+            "MonsterBold", "Inactivity", "Portrait", "StatusPrompt",
+            "AvoidJoiners", "AvoidHolders", "AvoidDancers", "AvoidWhispers",
+            "AvoidDraggers", "AvoidTeachers", "AvoidSinging", "NoHarnessShare",
+            "HarnessWarning", "HarnessVerbose", "AutoSneak", "ConciseThoughts",
+            "HideLogin", "DeathLocation", "HidePreStrings", "HidePostStrings",
+            "HideMyCusLogin", "HideOtCusLogin", "HideTrivia", "SkinKills",
+            "LootKills", "ShowRoomID",
+        };
+
+    private static readonly System.Text.RegularExpressions.Regex _flagRowRe =
+        new(@"^\s*(?<name>[A-Za-z]{3,20})\s+(?<state>ON|OFF)\b",
+            System.Text.RegularExpressions.RegexOptions.Compiled
+          | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>Arm silent capture for the next <c>flags</c> response (the
+    /// connect-time probe). Call immediately before sending <c>flags</c>.</summary>
+    public void BeginFlagsCaptureWindow(TimeSpan? timeout = null)
+    {
+        _flagsCaptureDeadline = DateTimeOffset.UtcNow + (timeout ?? TimeSpan.FromSeconds(8));
+        _flagsCaptureActive   = false;
+        _flagsCaptureLines    = 0;
+        _flagsCaptured        = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Consume one line while a flags-probe window is armed. Returns
+    /// true if the line belonged to the flags report (suppress it); false to let
+    /// it display normally. Recognises the report by its known flag names and its
+    /// fixed boilerplate, so interleaved game text is never swallowed. On the
+    /// footer / deadline / line-cap it finalises and emits the FlagsReportEvent.</summary>
+    private bool TryCaptureFlagsLine(string stripped)
+    {
+        if (DateTimeOffset.UtcNow >= _flagsCaptureDeadline
+            || ++_flagsCaptureLines > FlagsCaptureMaxLines)
+        {
+            FinishFlagsCapture();
+            return false;
+        }
+
+        var trimmed = stripped.TrimStart();
+
+        // Footer — always the last line of the report. Complete and suppress.
+        if (trimmed.StartsWith("For other setting options", StringComparison.OrdinalIgnoreCase))
+        {
+            FinishFlagsCapture();
+            return true;
+        }
+
+        // A flag row: "<Name>   ON|OFF   <behavior>". Only when the first token
+        // is a known flag name (guards against the "FLAG LOGON ON" example line,
+        // whose first token is "FLAG", and against ordinary prose).
+        var m = _flagRowRe.Match(trimmed);
+        if (m.Success && KnownFlagNames.Contains(m.Groups["name"].Value))
+        {
+            _flagsCaptured![m.Groups["name"].Value] =
+                m.Groups["state"].Value.Equals("ON", StringComparison.OrdinalIgnoreCase);
+            _flagsCaptureActive = true;
+            return true;
+        }
+
+        // Boilerplate/header that frames the rows (Usage, the "FLAG …" syntax
+        // lines, "Flag names may be abbreviated", "Example", the column header).
+        // Suppress these too so the probe leaves no trace. Anchored to literals.
+        if (trimmed.Equals("Usage", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("FLAG ", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("Flag names may be abbreviated", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("Example", StringComparison.OrdinalIgnoreCase)
+            || (trimmed.StartsWith("Flag", StringComparison.OrdinalIgnoreCase)
+                && trimmed.Contains("Status", StringComparison.OrdinalIgnoreCase)
+                && trimmed.Contains("Behavior", StringComparison.OrdinalIgnoreCase)))
+        {
+            _flagsCaptureActive = true;
+            return true;
+        }
+
+        // Not a flags-report line. If we'd already started capturing, the report
+        // ended without its footer (truncated / reordered) — finalise now and let
+        // this genuine game line display.
+        if (_flagsCaptureActive) FinishFlagsCapture();
+        return false;
+    }
+
+    private void FinishFlagsCapture()
+    {
+        var captured = _flagsCaptured;
+        _flagsCaptureDeadline = DateTimeOffset.MinValue;
+        _flagsCaptureActive   = false;
+        _flagsCaptured        = null;
+        if (captured is { Count: > 0 })
+            _events.OnNext(new FlagsReportEvent(captured));
+    }
+
     // ── Lich-attach room seed (public issue #126) ─────────────────────────────
     // A Lich detachable attach happens AFTER Lich performed the login, so the
     // login block — the only unprompted source of <component id='room …'>
@@ -406,6 +528,15 @@ public sealed class DrXmlParser : IDisposable
             _events.OnNext(new PromptEvent(DateTimeOffset.MinValue, promptCandidate));
             return;
         }
+
+        // Silent `flags` window (issue #29): while a connect-time probe is armed,
+        // fold the flags-report lines into a FlagsReportEvent and swallow them so
+        // the probe leaves no visible output. Only recognisable report lines are
+        // consumed; anything else (and every line once the window is disarmed)
+        // falls through to display normally.
+        if (DateTimeOffset.UtcNow < _flagsCaptureDeadline && _activeStream == "main"
+            && TryCaptureFlagsLine(stripped))
+            return;
 
         // Guild detection from the `info` first line. Fire alongside the
         // TextEvent (the line still displays) so GameState + the title can
@@ -757,7 +888,7 @@ public sealed class DrXmlParser : IDisposable
     // Keep <see cref="_handledTags"/> in sync with the HandleElement switch.
     private static readonly HashSet<string> _handledTags = new(StringComparer.OrdinalIgnoreCase)
     {
-        "a", "casttime", "clearstream", "compass", "component", "container",
+        "a", "b", "casttime", "clearstream", "compass", "component", "container",
         "d", "dialogdata", "dir", "endsetup", "image", "indicator", "inv",
         "left", "nav", "openwindow", "output", "popbold", "popstream",
         "preset", "progressbar", "prompt", "pushbold", "pushstream",
@@ -1049,6 +1180,18 @@ public sealed class DrXmlParser : IDisposable
                 {
                     _log.LogDebug("Unmatched <popBold/> (no open bold on stack).");
                 }
+                break;
+
+            // ── Paired HTML-style bold ──────────────────────────────────────
+            // <b>…</b> is a real open/close element (DR uses it for header
+            // emphasis in help text such as PROFILE HELP), NOT the self-closing
+            // pushBold/popBold marker pair. Same span mechanism, opened here and
+            // closed in HandleEndElement. A stray self-closing <b/> wraps no
+            // text — ignore it so it can't leave a dangling entry on the stack.
+            case "b":
+                if (r.IsEmptyElement) break;
+                if (_inComponent) _componentBoldStack.Push(_componentBuffer.Length);
+                else              _boldStack.Push(_textLineBuffer.Length);
                 break;
 
             // ── Inventory item line ──────────────────────────────────────────
@@ -1499,6 +1642,31 @@ public sealed class DrXmlParser : IDisposable
             case "dialogdata":
                 _inInjuriesDialog = false;
                 break;
+
+            case "b":
+            {
+                // Close the paired <b>…</b> bold span opened in HandleElement
+                // (mirrors popBold). Record over the text accumulated since the
+                // open so EmitLine attaches it to the resulting TextEvent.
+                if (_inComponent)
+                {
+                    if (_componentBoldStack.TryPop(out var cbStart))
+                    {
+                        var cbLen = _componentBuffer.Length - cbStart;
+                        if (cbLen > 0) _componentBoldSpans.Add(new BoldSpan(cbStart, cbLen));
+                    }
+                }
+                else if (_boldStack.TryPop(out var bStart))
+                {
+                    var bLen = _textLineBuffer.Length - bStart;
+                    if (bLen > 0) _pendingBoldSpans.Add(new BoldSpan(bStart, bLen));
+                }
+                else
+                {
+                    _log.LogDebug("Unmatched </b> (no open bold on stack).");
+                }
+                break;
+            }
         }
     }
 
