@@ -528,7 +528,15 @@ public class MapCanvas : Control
 
         // ── Pass 5: colour legend (#157) ──────────────────────────────────
         if (ShowLegend)
-            DrawLegend(context);
+        {
+            // Screen bounds of the drawn rooms, so the legend can pick a viewport
+            // corner that's clear of them (never covers a room).
+            var contentRect = new Rect(
+                Padding, Padding,
+                (maxX - minX) * GridSize + GridSize,
+                (maxY - minY) * GridSize + GridSize);
+            DrawLegend(context, contentRect);
+        }
     }
 
     // Legend entries — the swatch must match how the map ACTUALLY draws each
@@ -553,7 +561,7 @@ public class MapCanvas : Control
     /// busy top-left where the rooms are, and doesn't slide as the map scrolls.
     /// A trailing "*" on a label marks colours the user can change (AutoMapper
     /// Settings); the rest are fixed.</summary>
-    private void DrawLegend(DrawingContext context)
+    private void DrawLegend(DrawingContext context, Rect contentRect)
     {
         const double pad = 8, row = 16, sw = 12, gap = 8;
         var typeface = new Typeface("Segoe UI, Consolas, monospace");
@@ -572,17 +580,27 @@ public class MapCanvas : Control
         double w = pad + sw + gap + maxText + pad;
         double h = pad + LegendItems.Length * row + pad;
 
-        // Pin to the BOTTOM-LEFT of the visible viewport (not the canvas origin,
-        // which is where the rooms are and where the key would cover them, #157
-        // follow-up). Offset by the parent ScrollViewer so it stays put as the
-        // map scrolls; fall back to the control's own bottom-left when unscrolled.
-        double vx = 6, vy = Bounds.Height - h - 6;
-        if (this.FindAncestorOfType<ScrollViewer>() is { } sv)
+        // Place the key in whichever VIEWPORT corner is clear of the drawn rooms,
+        // so it never covers a room (#157 follow-up). Anchored in canvas coords to
+        // the visible region (parent ScrollViewer offset) + repainted on scroll,
+        // so it stays in a clear corner as the map pans. Falls back to bottom-left
+        // when every corner has rooms (dense zoom) — the panel is semi-transparent.
+        var viewport = this.FindAncestorOfType<ScrollViewer>() is { } sv
+            ? new Rect(sv.Offset.X, sv.Offset.Y, sv.Viewport.Width, sv.Viewport.Height)
+            : new Rect(Bounds.Size);
+
+        const double m = 8;
+        var bottomLeft = new Rect(viewport.Left + m,      viewport.Bottom - h - m, w, h);
+        var candidates = new[]
         {
-            vx = sv.Offset.X + 6;
-            vy = sv.Offset.Y + sv.Viewport.Height - h - 6;
-        }
-        var panel = new Rect(vx, Math.Max(6, vy), w, h);
+            new Rect(viewport.Right - w - m, viewport.Bottom - h - m, w, h),  // bottom-right
+            new Rect(viewport.Right - w - m, viewport.Top + m,        w, h),  // top-right
+            bottomLeft,                                                       // bottom-left
+            new Rect(viewport.Left + m,      viewport.Top + m,        w, h),  // top-left
+        };
+        var panel = bottomLeft;
+        foreach (var c in candidates)
+            if (!c.Intersects(contentRect)) { panel = c; break; }
 
         context.FillRectangle(new SolidColorBrush(Color.FromArgb(0xCC, 0xff, 0xff, 0xff)), panel, 4);
         context.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)), 1.0), panel, 4, 4);
