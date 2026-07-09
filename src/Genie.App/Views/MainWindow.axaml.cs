@@ -265,6 +265,18 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 ctx.SetOutput(System.Reactive.Unit.Default);
             }));
 
+            d(ViewModel!.ShowMapperSettingsDialog.RegisterHandler(async ctx =>
+            {
+                // Needs the live config (created at connect); pre-connect, point
+                // the user at connecting rather than opening an inert dialog.
+                if (ViewModel!.Core?.Config is { } cfg)
+                    await new MapperSettingsDialog(cfg, ViewModel!.Mapper).ShowDialog(this);
+                else
+                    await new NoticeDialog("AutoMapper Settings",
+                        "Connect first — the AutoMapper settings load with your session.").ShowDialog(this);
+                ctx.SetOutput(System.Reactive.Unit.Default);
+            }));
+
             d(ViewModel!.ShowDisconnectNotice.RegisterHandler(async ctx =>
             {
                 try

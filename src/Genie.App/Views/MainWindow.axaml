@@ -682,6 +682,9 @@
         <MenuItem Header="_Float Mapper Window"
                   Command="{Binding Mapper.FloatCommand}"
                   ToolTip.Tip="Pop the Mapper out into its own OS window. Drag its title bar back over Genie to re-dock."/>
+        <MenuItem Header="AutoMapper _Settings..."
+                  Command="{Binding ShowMapperSettingsCommand}"
+                  ToolTip.Tip="AutoMapper on/off, map overlay opacity, auto-walk pause-on-unfocus, and map colours — in one place."/>
         <Separator/>
         <MenuItem Header="_Update from Official Repo..."
                   Command="{Binding Mapper.UpdateMapsCommand}"

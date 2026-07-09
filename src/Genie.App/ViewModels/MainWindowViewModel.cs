@@ -172,6 +172,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public Interaction<Unit, Unit>                        ShowAboutDialog          { get; } = new();
     public ReactiveCommand<Unit, Unit>                    ShowChangelogCommand     { get; }
     public Interaction<Unit, Unit>                        ShowChangelogDialog      { get; } = new();
+    public ReactiveCommand<Unit, Unit>                    ShowMapperSettingsCommand{ get; }
+    public Interaction<Unit, Unit>                        ShowMapperSettingsDialog { get; } = new();
 
     /// <summary>Fired on a session-ending disconnect (one that is NOT
     /// auto-reconnecting) when <see cref="DisplaySettings.ShowDisconnectPopup"/>
@@ -1475,6 +1477,10 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // Help → Changelog — read the bundled release notes in-app (#155).
         ShowChangelogCommand = ReactiveCommand.CreateFromTask(async () =>
             await ShowChangelogDialog.Handle(Unit.Default));
+
+        // Maps → AutoMapper Settings (#147) — slim consolidation dialog.
+        ShowMapperSettingsCommand = ReactiveCommand.CreateFromTask(async () =>
+            await ShowMapperSettingsDialog.Handle(Unit.Default));
 
         // All Help-menu external links funnel through OpenUrl() (defined below),
         // which hands the URL to the OS shell. Ported from the Genie 4 Help menu;
