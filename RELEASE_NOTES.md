@@ -1,6 +1,51 @@
+# Genie 5 — v5.0.0-alpha.8.6
+
+A Genie 4 parity and polish pass: a connect-time **flags check** that warns when
+DragonRealms' `flags` settings would confuse the parser, the **Show in Main
+Window** stream toggle on the right-click menu, `#lc` Lich shortcuts, and a batch
+of parser and travel fixes.
+
+## ✨ New
+
+- **`flags` check at connect ([#29](https://github.com/GenieClient/Genie5/issues/29))**
+  — Genie silently reads DragonRealms' `flags` settings once when you connect and
+  warns if any of them would change what the parser sees (e.g. `RoomBrief`,
+  `MonsterBold`, `ShowRoomID`, `StatusPrompt`). If a flag is in an untested state,
+  a single advisory line tells you which one and how to restore it — so
+  "my room window looks wrong" has an answer instead of silent misparsing. The
+  probe never displays; a `flags` you type yourself still shows normally. Turn it
+  off with `#config flagscheck off`.
+- **"Show in Main Window" on the stream right-click menu** — every stream window
+  (Logons, Talk, Combat, …) now has a **Show in Main Window** toggle in its
+  right-click menu, matching the Configuration → Layout checkbox. It's **on by
+  default**, so streams mirror into the main game window until you opt one out —
+  turn it off for a stream you only want in its own panel.
+- **`#lc` / `#lconnect` / `#ls` Lich shortcuts** — Genie 4's short aliases for
+  `#lichconnect` (`#lc`, `#lconnect`) and a `#ls` / `#lichsettings` command that
+  prints the Lich configuration. New **opt-in Lich auto-launch** (off by default):
+  set `#config lichpath {…}` and `#config lichautolaunch on` and a Lich-proxy
+  connect will start Lich for you if it isn't already running, then connect. With
+  it off (the default) these verbs attach to an already-running Lich exactly as
+  before.
+
+## 🐛 Fixed
+
+- **Paired `<b>` bold text ([#160](https://github.com/GenieClient/Genie5/issues/160))**
+  — help text that uses HTML-style `<b>…</b>` for emphasis (e.g. `PROFILE HELP`)
+  now renders bold instead of leaking the raw tags.
+- **`#goto` while already walking ([#96](https://github.com/GenieClient/Genie5/issues/96))**
+  — a new `#goto` now interrupts the walk in progress and starts the new one,
+  instead of being silently rejected. Scripts that `matchwait` on the second
+  `#goto` no longer hang forever.
+- **Stream menu / Layout-tab desync** — a stream's "Show in Main Window" (and
+  Time Stamp / Name List Only / Word Wrap) right-click checkmark now matches its
+  saved setting after connect, instead of showing the built-in default.
+
 # Genie 5 — v5.0.0-alpha.8.5
 
 ## ✨ New
+
+- **Analytics window** — Window → Analytics opens a skill-history dashboard:
 
 - **Analytics window** — Window → Analytics opens a skill-history dashboard:
   live **XP/hour** and per-skill gain bars for the current session, long-horizon

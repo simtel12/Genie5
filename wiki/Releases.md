@@ -4,11 +4,22 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8.5 — Analytics, Accessibility & Parity
+## Latest: v5.0.0-alpha.8.6 — Genie 4 Parity & Polish
+
+A connect-time **`flags` check** that warns when DragonRealms' settings would confuse the parser, the **Show in Main Window** toggle on every stream's right-click menu, Genie 4's **`#lc`** Lich shortcuts, and parser + travel fixes.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.6** as a delta.
+
+- **`flags` check at connect ([#29](https://github.com/GenieClient/Genie5/issues/29))** — Genie reads DragonRealms' `flags` once at connect and warns if any would change what the parser sees (`RoomBrief`, `MonsterBold`, `ShowRoomID`, `StatusPrompt`, …), with the fix to apply. Silent otherwise; `#config flagscheck off` to disable.
+- **"Show in Main Window" stream toggle** — the right-click menu on every stream window now has a Show in Main Window toggle (matching Configuration → Layout), on by default so streams still mirror into Main until you opt one out.
+- **`#lc` / `#lconnect` / `#ls` + opt-in Lich auto-launch** — Genie 4's short Lich-connect aliases, a `#ls` settings dump, and an off-by-default option (`#config lichautolaunch on`) to have Genie start Lich for you before connecting.
+- **Fixed** — paired `<b>` bold in help text ([#160](https://github.com/GenieClient/Genie5/issues/160)); `#goto` while already walking now interrupts instead of hanging scripts ([#96](https://github.com/GenieClient/Genie5/issues/96)); stream right-click checkmarks match their saved settings after connect.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.6)
+
+## v5.0.0-alpha.8.5 — Analytics, Accessibility & Parity
 
 A skill-history **Analytics** dashboard, a first pass at **screen-reader** support with a Text-to-Speech settings tab, and a batch of Genie 4 parity: name-highlight colours, `#names` / `#preset` commands, eval + match-all triggers, and more.
-
-> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.5** as a delta.
 
 - **Analytics window** — Window → Analytics: live XP/hour and per-skill gain bars for the session, 7/30/90-day skill-gain curves, and a session list with compare-up-to-3 overlay. History records locally (your own skills only, never uploaded — see [PRIVACY](https://github.com/GenieClient/Genie5/blob/main/PRIVACY.md)); a one-time first-connect notice explains it and lets you turn it off.
 - **Screen-reader support (first pass)** + **Text-to-Speech settings tab** — accessibility names across the main window and dialogs (NVDA / Narrator; Windows fullest, macOS partial), and a Configuration → Text-to-Speech tab with a per-stream read + priority grid, voice test, and rate/volume sliders.
