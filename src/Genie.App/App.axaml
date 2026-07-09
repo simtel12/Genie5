@@ -126,6 +126,12 @@
                       ToggleType="CheckBox"
                       IsChecked="{Binding WindowMenu.IsNameListOnlyOn, Mode=TwoWay}"
                       IsVisible="{Binding WindowMenu.ShowNameListOnly}" />
+            <!-- Stream windows only (ShowEchoToMain is false for this primary
+                 game document, so it stays hidden here). -->
+            <MenuItem Header="Show in Main Window"
+                      ToggleType="CheckBox"
+                      IsChecked="{Binding WindowMenu.IsEchoToMainOn, Mode=TwoWay}"
+                      IsVisible="{Binding WindowMenu.ShowEchoToMain}" />
             <MenuItem Header="Word Wrap"
                       ToggleType="CheckBox"
                       IsChecked="{Binding WindowMenu.IsWordWrapOn, Mode=TwoWay}"

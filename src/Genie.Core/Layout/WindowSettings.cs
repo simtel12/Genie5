@@ -57,14 +57,16 @@ public sealed class WindowSettings
     /// <summary>
     /// Genie 4 "also show in Main" — when true, lines routed to this stream
     /// window are <b>additionally</b> echoed into the main game window (the
-    /// stream's own panel keeps showing them too). Off by default so nothing
-    /// changes until the user opts a stream in. Only consulted for the text
+    /// stream's own panel keeps showing them too). <b>On by default</b>: every
+    /// stream mirrors into Main even when its own window is open, so nothing is
+    /// hidden from the main feed until the user opts a stream <i>out</i> (via the
+    /// window right-click menu or the Layout tab). Only consulted for the text
     /// stream windows (Combat, Talk, Whispers, Thoughts, Familiar, Deaths,
     /// Logons, Assess, Atmospherics, ItemLog); a no-op for other dockables.
     /// Distinct from <see cref="IfClosed"/>, which only fires when the panel
     /// is <i>closed</i>.
     /// </summary>
-    public bool    EchoToMain   { get; set; } = false;
+    public bool    EchoToMain   { get; set; } = true;
 
     /// <summary>
     /// Per-window word wrap (#120). On (the default) long lines wrap to the

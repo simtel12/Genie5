@@ -3166,6 +3166,24 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         {
             foreach (var m in p.LoadWindowSettings(path))
                 WindowSettings.Apply(m);
+
+            // The dock (StreamTools + their right-click window menus) was built
+            // in the constructor, before this connect-time load, so each menu
+            // cached its Show-in-Main / Time Stamp / Name List Only / Word Wrap
+            // checkmark from the build-time DEFAULT. Apply() mutates the fields
+            // silently (no Changed), leaving those checkmarks stale — e.g. a
+            // persisted "Show in Main = off" leaves the menu stuck showing "on",
+            // disagreeing with the Layout tab which reads the live value. Fire
+            // Changed on every registered window so the menus (and each
+            // StreamTool's ApplySettings) resync to the loaded values. Marshal to
+            // the UI thread — the subscribers touch bound properties, and this
+            // load can run off the UI thread on the connect path. Mirrors the
+            // Display-change notify loop in the constructor.
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                foreach (var s in WindowSettings.All.Values)
+                    s.NotifyChanged();
+            });
         });
     }
 

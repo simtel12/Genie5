@@ -960,6 +960,23 @@ public class GenieDockFactory : Factory
         // the first line, not only after the menu is first opened.
         ApplyNameListOnly(dockable, settings.NameListOnly);
 
+        // "Show in Main Window" (EchoToMain) — stream windows only; the main
+        // game window echoing into itself is meaningless, so GameTextDocument
+        // gets no toggle (ShowEchoToMain stays false → the item hides). On by
+        // default: every stream mirrors into Main until the user opts out here.
+        bool          echoInit   = false;
+        Action<bool>? echoToggle = null;
+        if (dockable is StreamTool)
+        {
+            echoInit   = settings.EchoToMain;
+            echoToggle = on =>
+            {
+                settings.EchoToMain = on;
+                settings.NotifyChanged();   // StreamTabsViewModel reads this live
+                _vm.SaveWindowSettings();
+            };
+        }
+
         // Pause Scrolling — toggles the dockable's reactive IsScrollPaused, which
         // the ScrollViewer binds via AutoScrollBehavior.Paused. Transient.
         (bool pausedInit, Action<bool>? pauseToggle) = dockable switch
@@ -994,7 +1011,9 @@ public class GenieDockFactory : Factory
             saveAs:                saveAs,
             find:                  find,
             wordWrapOn:            wrapInit,
-            onWordWrapToggled:     wrapToggle);
+            onWordWrapToggled:     wrapToggle,
+            echoToMainOn:          echoInit,
+            onEchoToMainToggled:   echoToggle);
 
         // Keep the checkmarks in sync if the same settings are edited elsewhere
         // (e.g. the Configuration → Layout tab's Time Stamp checkbox).
@@ -1003,6 +1022,7 @@ public class GenieDockFactory : Factory
             menu.SyncTimestamp(settings.Timestamp);
             menu.SyncNameListOnly(settings.NameListOnly);
             menu.SyncWordWrap(settings.WordWrap);
+            menu.SyncEchoToMain(settings.EchoToMain);
         };
 
         return menu;

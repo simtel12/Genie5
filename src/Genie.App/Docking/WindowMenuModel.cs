@@ -27,11 +27,13 @@ public sealed class WindowMenuModel : ReactiveObject
 {
     private bool _isTimestampOn;
     private bool _isNameListOnlyOn;
+    private bool _isEchoToMainOn;
     private bool _isScrollPaused;
     private bool _isWordWrapOn;
     private bool _isFloating;
     private readonly Action<bool>? _onTimestampToggled;
     private readonly Action<bool>? _onNameListOnlyToggled;
+    private readonly Action<bool>? _onEchoToMainToggled;
     private readonly Action<bool>? _onScrollPauseToggled;
     private readonly Action<bool>? _onWordWrapToggled;
     private readonly Func<bool>?   _floatStateProbe;
@@ -51,7 +53,9 @@ public sealed class WindowMenuModel : ReactiveObject
         ICommand?     saveAs                = null,
         ICommand?     find                  = null,
         bool          wordWrapOn            = true,
-        Action<bool>? onWordWrapToggled     = null)
+        Action<bool>? onWordWrapToggled     = null,
+        bool          echoToMainOn          = true,
+        Action<bool>? onEchoToMainToggled   = null)
     {
         ClearCommand           = clear;
         CloseCommand           = close;
@@ -62,6 +66,8 @@ public sealed class WindowMenuModel : ReactiveObject
         _onTimestampToggled    = onTimestampToggled;
         _isNameListOnlyOn      = nameListOnlyOn;
         _onNameListOnlyToggled = onNameListOnlyToggled;
+        _isEchoToMainOn        = echoToMainOn;
+        _onEchoToMainToggled   = onEchoToMainToggled;
         _isScrollPaused        = scrollPausedOn;
         _onScrollPauseToggled  = onScrollPauseToggled;
         _isWordWrapOn          = wordWrapOn;
@@ -100,6 +106,7 @@ public sealed class WindowMenuModel : ReactiveObject
     public bool ShowFind         => FindCommand           is not null;
     public bool ShowTimestamp    => _onTimestampToggled   is not null;
     public bool ShowNameListOnly => _onNameListOnlyToggled is not null;
+    public bool ShowEchoToMain   => _onEchoToMainToggled  is not null;
     public bool ShowPauseScroll  => _onScrollPauseToggled is not null;
     public bool ShowWordWrap     => _onWordWrapToggled    is not null;
     public bool ShowFloat        => ToggleFloatCommand    is not null;
@@ -109,8 +116,8 @@ public sealed class WindowMenuModel : ReactiveObject
     /// dangling leading separator).</summary>
     public bool ShowCloseSeparator =>
         ShowClose && (ShowCopyAll || ShowClear || ShowSaveAs || ShowFind
-                      || ShowTimestamp || ShowNameListOnly || ShowPauseScroll
-                      || ShowWordWrap || ShowFloat);
+                      || ShowTimestamp || ShowNameListOnly || ShowEchoToMain
+                      || ShowPauseScroll || ShowWordWrap || ShowFloat);
 
     /// <summary>Time Stamp checkbox state. Set by the TwoWay menu binding —
     /// flipping it runs the toggle handler (which updates the window's
@@ -135,6 +142,21 @@ public sealed class WindowMenuModel : ReactiveObject
             if (_isNameListOnlyOn == value) return;
             this.RaiseAndSetIfChanged(ref _isNameListOnlyOn, value);
             _onNameListOnlyToggled?.Invoke(value);
+        }
+    }
+
+    /// <summary>"Show in Main Window" checkbox state — mirrors
+    /// <c>WindowSettings.EchoToMain</c>. On by default: the stream also echoes
+    /// into the main game window. Flipping it off opts this stream out of Main
+    /// (it still shows in its own panel). See <see cref="IsTimestampOn"/>.</summary>
+    public bool IsEchoToMainOn
+    {
+        get => _isEchoToMainOn;
+        set
+        {
+            if (_isEchoToMainOn == value) return;
+            this.RaiseAndSetIfChanged(ref _isEchoToMainOn, value);
+            _onEchoToMainToggled?.Invoke(value);
         }
     }
 
@@ -193,6 +215,11 @@ public sealed class WindowMenuModel : ReactiveObject
     /// <summary>Mirror an external Name List Only change into the checkmark.</summary>
     public void SyncNameListOnly(bool value) =>
         this.RaiseAndSetIfChanged(ref _isNameListOnlyOn, value, nameof(IsNameListOnlyOn));
+
+    /// <summary>Mirror an external "Show in Main Window" change (e.g. the Layout
+    /// tab) into the checkmark without re-invoking the toggle handler.</summary>
+    public void SyncEchoToMain(bool value) =>
+        this.RaiseAndSetIfChanged(ref _isEchoToMainOn, value, nameof(IsEchoToMainOn));
 
     /// <summary>Mirror an external Word Wrap change into the checkmark.</summary>
     public void SyncWordWrap(bool value) =>

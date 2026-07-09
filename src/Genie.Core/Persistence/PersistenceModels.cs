@@ -166,7 +166,10 @@ public sealed class WindowSettingsPersistenceModel
     public string  Background   { get; set; } = string.Empty;
     public bool    Timestamp    { get; set; }
     public bool    NameListOnly { get; set; }
-    public bool    EchoToMain   { get; set; }
+    /// <summary>Defaults true so streams mirror into the Main window unless the
+    /// user opts out; a pre-existing windows.json with no field (or the old
+    /// default-off era) picks up the new always-echo behaviour on load.</summary>
+    public bool    EchoToMain   { get; set; } = true;
     /// <summary>Defaults true so pre-#120 windows.json files (no field) keep
     /// the shipped always-wrap behaviour.</summary>
     public bool    WordWrap     { get; set; } = true;
