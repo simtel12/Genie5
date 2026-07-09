@@ -531,17 +531,20 @@ public class MapCanvas : Control
             DrawLegend(context);
     }
 
-    // Legend entries: (swatch brush, is-a-line, label). Line entries draw a short
-    // stroke; the rest draw a filled swatch. "*" marks the user-configurable ones.
-    private static readonly (IBrush brush, bool line, string label)[] LegendItems =
+    // Legend entries — the swatch must match how the map ACTUALLY draws each
+    // thing (#157 follow-up). style: 0 = filled room box (white fill + thin black
+    // border); 1 = OUTLINED box (the colour is a border/ring, like cross-zone's
+    // blue border and the current-room red ring — NOT a fill); 2 = a coloured
+    // line (edges + exit stub). "*" marks a user-configurable colour.
+    private static readonly (int style, IBrush brush, string label)[] LegendItems =
     {
-        (DefaultNodeFill,               false, "Room"),
-        (new SolidColorBrush(Colors.Blue),   false, "Cross-zone room"),
-        (CurrentStroke,                 false, "Current room *"),
-        (new SolidColorBrush(Colors.Black),  true,  "Path"),
-        (new SolidColorBrush(Colors.Blue),   true,  "Go / secret"),
-        (new SolidColorBrush(Color.FromRgb(0x00, 0x80, 0x00)), true, "Climb / requires skill"),
-        (StubBrush,                     true,  "Exit (neighbour not mapped)"),
+        (0, DefaultNodeFill,                                      "Room"),
+        (1, new SolidColorBrush(Colors.Blue),                    "Cross-zone room"),
+        (1, CurrentStroke,                                       "Current room *"),
+        (2, new SolidColorBrush(Colors.Black),                   "Path"),
+        (2, new SolidColorBrush(Colors.Blue),                    "Go / secret"),
+        (2, new SolidColorBrush(Color.FromRgb(0x00, 0x80, 0x00)), "Climb / requires skill"),
+        (2, StubBrush,                                           "Exit (neighbour not mapped)"),
     };
 
     /// <summary>Draw a compact colour key in the top-left of the canvas (#157).
@@ -586,16 +589,19 @@ public class MapCanvas : Control
 
         for (int i = 0; i < LegendItems.Length; i++)
         {
-            var (brush, isLine, _) = LegendItems[i];
+            var (style, brush, _) = LegendItems[i];
             double cy = panel.Y + pad + i * row + row / 2;
             double x0 = panel.X + pad;
-            if (isLine)
+            if (style == 2)
                 context.DrawLine(new Pen(brush, 2.0), new Point(x0, cy), new Point(x0 + sw, cy));
             else
             {
+                // Every room box is drawn white-filled; style 0 gets the plain
+                // thin black node border, style 1 gets the colour AS a 2px border
+                // (matching the map's cross-zone box / current-room ring).
                 var swatch = new Rect(x0, cy - sw / 2, sw, sw);
-                context.FillRectangle(brush, swatch);
-                context.DrawRectangle(NodePen, swatch);
+                context.FillRectangle(DefaultNodeFill, swatch);
+                context.DrawRectangle(style == 0 ? NodePen : new Pen(brush, 2.0), swatch);
             }
             var ft = texts[i];
             context.DrawText(ft, new Point(panel.X + pad + sw + gap, cy - ft.Height / 2));
