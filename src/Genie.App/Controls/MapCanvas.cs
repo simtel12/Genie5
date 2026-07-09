@@ -545,8 +545,10 @@ public class MapCanvas : Control
     };
 
     /// <summary>Draw a compact colour key in the top-left of the canvas (#157).
-    /// Screen-anchored to the canvas origin (it scrolls with the map). A trailing
-    /// "*" on a label marks colours the user can change (View / AutoMapper
+    /// Pinned to the bottom-left of the visible viewport (via the parent
+    /// ScrollViewer's offset + a scroll-repaint hook) so it stays out of the
+    /// busy top-left where the rooms are, and doesn't slide as the map scrolls.
+    /// A trailing "*" on a label marks colours the user can change (AutoMapper
     /// Settings); the rest are fixed.</summary>
     private void DrawLegend(DrawingContext context)
     {
@@ -566,9 +568,20 @@ public class MapCanvas : Control
 
         double w = pad + sw + gap + maxText + pad;
         double h = pad + LegendItems.Length * row + pad;
-        var panel = new Rect(6, 6, w, h);
 
-        context.FillRectangle(new SolidColorBrush(Color.FromArgb(0xE0, 0xff, 0xff, 0xff)), panel, 4);
+        // Pin to the BOTTOM-LEFT of the visible viewport (not the canvas origin,
+        // which is where the rooms are and where the key would cover them, #157
+        // follow-up). Offset by the parent ScrollViewer so it stays put as the
+        // map scrolls; fall back to the control's own bottom-left when unscrolled.
+        double vx = 6, vy = Bounds.Height - h - 6;
+        if (this.FindAncestorOfType<ScrollViewer>() is { } sv)
+        {
+            vx = sv.Offset.X + 6;
+            vy = sv.Offset.Y + sv.Viewport.Height - h - 6;
+        }
+        var panel = new Rect(vx, Math.Max(6, vy), w, h);
+
+        context.FillRectangle(new SolidColorBrush(Color.FromArgb(0xCC, 0xff, 0xff, 0xff)), panel, 4);
         context.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)), 1.0), panel, 4, 4);
 
         for (int i = 0; i < LegendItems.Length; i++)
@@ -701,6 +714,32 @@ public class MapCanvas : Control
         // the dock chrome's separate per-window menu never opens over the map —
         // one menu, not two.
         e.Handled = true;
+    }
+
+    private ScrollViewer? _legendScroller;
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        // The legend (#157) is drawn pinned to the viewport's bottom-left, but the
+        // canvas doesn't otherwise repaint on scroll — so it would appear to slide
+        // with the map. Repaint on scroll so it stays put.
+        _legendScroller = this.FindAncestorOfType<ScrollViewer>();
+        if (_legendScroller is not null)
+            _legendScroller.ScrollChanged += OnScrollerScrollChanged;
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        if (_legendScroller is not null)
+            _legendScroller.ScrollChanged -= OnScrollerScrollChanged;
+        _legendScroller = null;
+        base.OnDetachedFromVisualTree(e);
+    }
+
+    private void OnScrollerScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        if (ShowLegend) InvalidateVisual();
     }
 
     /// <summary>Start a grab-scroll pan: cache the parent ScrollViewer and the
