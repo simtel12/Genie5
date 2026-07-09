@@ -150,12 +150,18 @@ public sealed class AutoWalkService : ReactiveObject
     private DispatcherTimer? _pacingTimer;
 
     // Issue #5 auto-stand: a posture block (sitting/kneeling/prone) only clears
-    // when the character stands. The walker sends `stand` itself ONCE per block
-    // — typing it would trip SendCommand's "typed command cancels the walk"
-    // guard, killing the very walk that's waiting to stand. This latches true
-    // after we send `stand` so the 0.5s retry poll doesn't spam the verb; it
-    // re-arms whenever the movability gate next clears.
-    private bool _autoStoodForBlock;
+    // when the character stands. The walker sends `stand` itself — typing it
+    // would trip SendCommand's "typed command cancels the walk" guard, killing
+    // the very walk that's waiting to stand.
+    //
+    // A single `stand` isn't enough: wounds/imbalance can bounce it ("You are so
+    // unbalanced you cannot manage to stand. Roundtime: 2 sec.") — balance
+    // recovers over a few seconds, so we retry once per posture-block poll up to
+    // MaxAutoStandAttempts, each after the failed stand's roundtime clears. Only
+    // one `stand` is sent per poll (not per tick) so we don't spam the verb; the
+    // counter re-arms whenever the movability gate next clears.
+    private int _autoStandAttempts;
+    private const int MaxAutoStandAttempts = 4;
 
     // Issue #130 auto-retreat: DR refuses a movement verb while the character
     // is engaged in melee/pole combat, replying "You are engaged to a X in
@@ -348,7 +354,7 @@ public sealed class AutoWalkService : ReactiveObject
         IsCurrentPaused = false;
         // Seed the departure room so the first dispatched move is gated
         // against the origin, not against a stale id from a prior walk (#69).
-        _autoStoodForBlock     = false;
+        _autoStandAttempts     = 0;
         _retreatCount          = 0;
         _departureNodeId       = origin.Id;
         _departureServerRoomId = _mapEngine.CurrentServerRoomId;
@@ -371,7 +377,7 @@ public sealed class AutoWalkService : ReactiveObject
         FlashStatus(Current.StatusMessage);
         _sessionChanges.OnNext(Current);
         Current = null;
-        _autoStoodForBlock = false;
+        _autoStandAttempts = 0;
         _retreatCount = 0;
         _departureNodeId = null;
         _departureServerRoomId = null;
@@ -637,11 +643,12 @@ public sealed class AutoWalkService : ReactiveObject
             // the moves use (not the typed-command path, so no self-cancel).
             // Passive blocks (roundtime / stunned / webbed) clear on their own —
             // just wait those out.
-            if (IsPostureBlock(blockReason) && !_autoStoodForBlock)
+            if (IsPostureBlock(blockReason) && _autoStandAttempts < MaxAutoStandAttempts)
             {
-                _autoStoodForBlock    = true;
+                _autoStandAttempts++;
+                var attemptNote = _autoStandAttempts > 1 ? $" (attempt {_autoStandAttempts})" : "";
                 Current.StatusMessage =
-                    $"Walking to {Current.Destination.Title} — standing up to continue · Esc to cancel";
+                    $"Walking to {Current.Destination.Title} — standing up to continue{attemptNote} · Esc to cancel";
                 _sessionChanges.OnNext(Current);
                 _core.Commands.ProcessInput("stand");
                 ScheduleMovabilityRetry(TimeSpan.FromMilliseconds(750));  // let the stand (+ its RT) resolve
@@ -654,7 +661,7 @@ public sealed class AutoWalkService : ReactiveObject
             ScheduleMovabilityRetry(retryIn);
             return;
         }
-        _autoStoodForBlock = false;   // gate passed — re-arm auto-stand for any later posture block
+        _autoStandAttempts = 0;   // gate passed — re-arm auto-stand for any later posture block
 
         var step = Current.Plan[Current.StepsCompleted];
 
