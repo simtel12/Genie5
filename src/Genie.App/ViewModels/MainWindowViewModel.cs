@@ -3430,6 +3430,23 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Highlighting.DefaultHighlights.MonsterBoldEnabled = _core.Config.MonsterBold;   // #131
         _core.ConnectionVerboseDiag = _core.Config.ConnDebug;
 
+        // Genie 4 #lc parity: optionally start Lich for the user before connecting
+        // through it. Opt-in (Config.LichAutoLaunch) and idempotent — if Lich is
+        // already listening on the proxy port this attaches without launching, so
+        // a manually-started Lich still works. A hard launch failure aborts the
+        // connect (a doomed LichProxy connect would only fail with a vaguer error).
+        if (coreCfg.Mode == ConnectionMode.LichProxy && _core.Config.LichAutoLaunch)
+        {
+            var lich = await Genie.Core.Connection.LichLauncher.EnsureRunningAsync(
+                coreCfg.LichProxyHost, coreCfg.LichProxyPort,
+                _core.Config.LichRubyPath, _core.Config.LichPath, _core.Config.LichArguments,
+                _core.Config.LichStartPause,
+                progress: msg => GameText.AddSystemLine(msg));
+            GameText.AddSystemLine(lich.Message);
+            if (lich.Outcome == Genie.Core.Connection.LichLaunchOutcome.Failed)
+                return;   // don't attempt a connect we know can't reach Lich
+        }
+
         await _core.ConnectAsync(coreCfg, reloadRules: reloadRules, clearPerCharacter: charSwitch);
     }
 
@@ -5245,12 +5262,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         if (parts.Count == 0) return false;
 
         var verb = parts[0].ToLowerInvariant();
-        if (verb is not ("connect" or "reconnect" or "lichconnect")) return false;
+        if (verb is not ("connect" or "reconnect" or "lichconnect" or "lconnect" or "lc")) return false;
 
         IReadOnlyList<string> args = verb == "reconnect"
             ? System.Array.Empty<string>()
             : parts.Skip(1).ToList();
-        var req = new Genie.Core.Commanding.ConnectRequest(args, IsLich: verb == "lichconnect");
+        var req = new Genie.Core.Commanding.ConnectRequest(
+            args, IsLich: verb is "lichconnect" or "lconnect" or "lc");
         Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = HandleConnectRequest(req));
         return true;
     }

@@ -214,6 +214,44 @@ public sealed class GenieConfig
     /// </summary>
     public string FrontEndIdentifier { get; set; } = "GENIE";
 
+    // ── Lich auto-launch (#lc / #lconnect / #lichconnect) ────────────────────
+    // Genie 4 parity: its #lc / #lichconnect starts the Lich Ruby proxy for you
+    // (cmd → ruby → lich.rbw), waits, then connects. Genie 5's #lichconnect
+    // historically only *attached* to an already-running Lich. These keys add
+    // the "start Lich for me" half — opt-in and idempotent: with the toggle on,
+    // a LichProxy connect launches Lich ONLY if the proxy port isn't already
+    // listening (so a manually-started Lich is just attached to, unchanged).
+
+    /// <summary>Master opt-in for auto-starting Lich on a <c>#lc</c> /
+    /// <c>#lconnect</c> / <c>#lichconnect</c> connect. Default OFF — with it off,
+    /// those verbs behave as before (attach to an already-running Lich). When on,
+    /// the connect launches Lich (via <see cref="LichRubyPath"/> +
+    /// <see cref="LichPath"/> + <see cref="LichArguments"/>) if nothing is already
+    /// listening on the proxy host/port, waits up to <see cref="LichStartPause"/>
+    /// seconds for it to come up, then connects. <c>#config lichautolaunch on</c>.</summary>
+    public bool LichAutoLaunch { get; set; }
+
+    /// <summary>Path to the Ruby executable used to run Lich. Empty = rely on
+    /// <c>ruby</c> being on the system PATH (the common case on macOS/Linux).
+    /// Only validated (must exist) when non-empty. <c>#config lichruby {path}</c>.</summary>
+    public string LichRubyPath { get; set; } = string.Empty;
+
+    /// <summary>Path to the Lich script to launch (e.g. <c>lich.rbw</c> on
+    /// Windows, <c>lich.rb</c> elsewhere). Required for auto-launch. Genie 4's
+    /// <c>LichPath</c>. <c>#config lichpath {path}</c>.</summary>
+    public string LichPath { get; set; } = string.Empty;
+
+    /// <summary>Extra arguments passed to Lich after the script path (e.g.
+    /// <c>--login MyChar --without-frontend --detachable-client=8000</c>).
+    /// Genie 4's <c>LichArguments</c>. <c>#config lichargs {args}</c>.</summary>
+    public string LichArguments { get; set; } = string.Empty;
+
+    /// <summary>Maximum seconds to wait for the Lich proxy port to open after
+    /// launching it, before giving up. Clamped 1–120. Genie 4's
+    /// <c>LichStartPause</c> (a fixed sleep); Genie 5 polls the port and returns
+    /// as soon as it's up, so this is an upper bound. <c>#config lichstartpause N</c>.</summary>
+    public int LichStartPause { get; set; } = 8;
+
     public string ScriptDirRaw { get; set; } = "Scripts";
     public string SoundDirRaw { get; set; } = "Sounds";
     public string TtsVoiceDirRaw { get; set; } = "Voices";
@@ -539,6 +577,11 @@ public sealed class GenieConfig
         ("showimages", ShowImages.ToString()),
         ("weblinksafety", WebLinkSafety.ToString()),
         ("connectscript", ConnectScript),
+        ("lichautolaunch", LichAutoLaunch.ToString()),
+        ("lichruby", LichRubyPath),
+        ("lichpath", LichPath),
+        ("lichargs", LichArguments),
+        ("lichstartpause", LichStartPause.ToString()),
         ("autoupdate", AutoUpdate.ToString()),
         ("checkforupdates", CheckForUpdates.ToString()),
         ("scriptextension", ScriptExtension),
@@ -585,6 +628,7 @@ public sealed class GenieConfig
     public static readonly IReadOnlyList<(string Category, string[] Keys)> ConfigCategories = new (string, string[])[]
     {
         ("Connection",       new[] { "classicconnect", "conndebug", "connectscript", "frontend", "reconnect" }),
+        ("Lich",             new[] { "lichautolaunch", "lichruby", "lichpath", "lichargs", "lichstartpause" }),
         ("Window / Input",   new[] { "alwaysontop", "ignoreclosealert", "keepinputtext", "sizeinputtogame", "scrollbacklines" }),
         ("Display / Parser", new[] { "spelltimer", "showexperience", "experiencedensity", "experiencetrackgain", "experienceg4layout", "showtimetracker", "prompt", "promptbreak", "promptforce", "condensed", "monstercountignorelist", "parsegameonly", "roundtimeoffset", "showlinks", "showimages", "weblinksafety" }),
         ("Master Toggles",   new[] { "highlights", "triggers", "substitutes", "gags", "aliases" }),
@@ -709,6 +753,11 @@ public sealed class GenieConfig
                     AutoWalkUnfocusSeconds = Math.Max(60, (int)UtilityCore.StringToDouble(value));
                     break;
                 case "connectscript": ConnectScript = value; break;
+                case "lichautolaunch": LichAutoLaunch = ToBool(value); break;
+                case "lichruby": LichRubyPath = value.Trim(); break;
+                case "lichpath": LichPath = value.Trim(); break;
+                case "lichargs": LichArguments = value.Trim(); break;
+                case "lichstartpause": LichStartPause = Math.Clamp((int)UtilityCore.StringToDouble(value), 1, 120); break;
                 case "autoupdate": AutoUpdate = ToBool(value); Notify(ConfigFieldUpdated.AutoUpdate); break;
                 case "checkforupdates": CheckForUpdates = ToBool(value); Notify(ConfigFieldUpdated.CheckForUpdates); break;
                 case "scriptextension": ScriptExtension = string.IsNullOrWhiteSpace(value) ? "cmd" : value; break;

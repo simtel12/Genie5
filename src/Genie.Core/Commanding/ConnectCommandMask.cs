@@ -40,7 +40,7 @@ public static class ConnectCommandMask
         if (parts.Count < 5) return commandLine;
 
         var verb = parts[0].ToLowerInvariant();
-        if (verb is not ("connect" or "lichconnect")) return commandLine;
+        if (verb is not ("connect" or "lichconnect" or "lconnect" or "lc")) return commandLine;
 
         var masked = parts.ToArray();
         masked[2] = Masked;   // 0 = verb, 1 = account, 2 = password

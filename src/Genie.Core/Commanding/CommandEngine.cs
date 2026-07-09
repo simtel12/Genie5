@@ -597,11 +597,26 @@ public sealed class CommandEngine
                 _host.Connect(new ConnectRequest(parts.Skip(1).ToList(), IsLich: false));
                 break;
             case "lichconnect":
+            case "lconnect":
+            case "lc":   // Genie 4 aliases for #lichconnect
                 _host.Connect(new ConnectRequest(parts.Skip(1).ToList(), IsLich: true));
                 break;
             case "reconnect":
                 // Always reconnect the last session, regardless of any tokens.
                 _host.Connect(new ConnectRequest(Array.Empty<string>(), IsLich: false));
+                break;
+            case "lichsettings":
+            case "ls":   // Genie 4 #ls — dump the Lich auto-launch config
+                _host.Echo("Lich Settings");
+                _host.Echo("----------------------------------------------------");
+                _host.Echo($"Auto-launch:\t {(_config.LichAutoLaunch ? "on" : "off")}");
+                _host.Echo($"Ruby Path:\t {(_config.LichRubyPath.Length == 0 ? "(from PATH)" : _config.LichRubyPath)}");
+                _host.Echo($"Lich Path:\t {(_config.LichPath.Length == 0 ? "(not set)" : _config.LichPath)}");
+                _host.Echo($"Lich Args:\t {(_config.LichArguments.Length == 0 ? "(none)" : _config.LichArguments)}");
+                _host.Echo($"Start Pause:\t {_config.LichStartPause}s");
+                if (!_config.LichAutoLaunch)
+                    _host.Echo("Auto-launch is off — #lc / #lichconnect attach to an already-running Lich. " +
+                               "Set #config lichpath {path} and #config lichautolaunch on to have Genie start it.");
                 break;
             case "class":
             case "classes":
