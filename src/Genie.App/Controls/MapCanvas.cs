@@ -69,6 +69,11 @@ public class MapCanvas : Control
     private static readonly Pen     EdgePenCardinal = new(new SolidColorBrush(Colors.Black), EdgeWidth);
     private static readonly Pen     EdgePenGo       = new(new SolidColorBrush(Colors.Blue),  EdgeWidth);
     private static readonly Pen     EdgePenClimb    = new(new SolidColorBrush(Color.FromRgb(0x00, 0x80, 0x00)), EdgeWidth);
+    // Directional exit stub (#157) — a short cyan tick out of a room's edge for a
+    // cardinal exit whose neighbour isn't drawn, so you can still see which ways
+    // leave the room (Genie 4 mapper behaviour).
+    private static readonly IBrush  StubBrush       = new SolidColorBrush(Color.FromRgb(0x00, 0xC8, 0xE8)); // cyan
+    private static readonly Pen     StubPen         = new(StubBrush, EdgeWidth);
 
     // On-map label text — Genie 4 paints <label> elements in the panel's
     // foreground colour (black on the PaleGoldenrod canvas).
@@ -162,6 +167,12 @@ public class MapCanvas : Control
         AvaloniaProperty.Register<MapCanvas, int>(nameof(AutoMapperAlpha), defaultValue: 255,
             coerce: (_, v) => Math.Clamp(v, 0, 255));
 
+    /// <summary>Draw the on-map colour legend (#157) — a small screen-space key
+    /// for the node/edge/stub colours. Bound to the mapper VM (config
+    /// <c>mapperlegend</c>); default on.</summary>
+    public static readonly StyledProperty<bool> ShowLegendProperty =
+        AvaloniaProperty.Register<MapCanvas, bool>(nameof(ShowLegend), defaultValue: true);
+
     // ── Editor styled properties (Genie 4 AutoMapper edit toolbar) ─────────
 
     /// <summary>When true, left-click selects a node and drag moves it
@@ -226,6 +237,7 @@ public class MapCanvas : Control
     public IBrush?   MapBackgroundBrush { get => GetValue(MapBackgroundBrushProperty); set => SetValue(MapBackgroundBrushProperty, value); }
     public IBrush?   LabelTextBrush     { get => GetValue(LabelTextBrushProperty);     set => SetValue(LabelTextBrushProperty, value); }
     public int       AutoMapperAlpha    { get => GetValue(AutoMapperAlphaProperty);    set => SetValue(AutoMapperAlphaProperty, value); }
+    public bool      ShowLegend         { get => GetValue(ShowLegendProperty);         set => SetValue(ShowLegendProperty, value); }
     public ICommand? EditExitCommand    { get => GetValue(EditExitCommandProperty);    set => SetValue(EditExitCommandProperty, value); }
 
     // ── Hover state (internal, drives the tooltip paint) ──────────────────
@@ -269,7 +281,7 @@ public class MapCanvas : Control
         // Any of these changing means we need to repaint AND recompute size.
         AffectsRender<MapCanvas>(ZoneProperty, CurrentNodeProperty, LevelProperty, RenderTickProperty,
                                  ZoomProperty, CurrentRoomBrushProperty, MapBackgroundBrushProperty,
-                                 LabelTextBrushProperty, AutoMapperAlphaProperty,
+                                 LabelTextBrushProperty, AutoMapperAlphaProperty, ShowLegendProperty,
                                  EditModeProperty, SelectedNodeProperty, FullLabelsProperty);
         AffectsMeasure<MapCanvas>(ZoneProperty, LevelProperty, RenderTickProperty, ZoomProperty);
 
@@ -428,16 +440,21 @@ public class MapCanvas : Control
 
             foreach (var exit in node.Exits)
             {
-                if (!exit.DestinationId.HasValue) continue;
-                if (!Zone.Nodes.TryGetValue(exit.DestinationId.Value, out var dest)) continue;
-                if (dest.Z != Level) continue;
-
-                // Draw each edge only once — pick the side where source.Id < dest.Id.
-                if (node.Id > dest.Id) continue;
-
-                // Pen by exit type, matching the Genie 4 line palette.
-                var toCenter = NodeCenter(dest, minX, minY);
-                context.DrawLine(EdgePenFor(exit), fromCenter, toCenter);
+                if (exit.DestinationId is int destId
+                    && Zone.Nodes.TryGetValue(destId, out var dest)
+                    && dest.Z == Level)
+                {
+                    // Neighbour is drawn on this level → full edge (once, from the
+                    // lower id side). Pen by exit type, matching Genie 4's palette.
+                    if (node.Id > dest.Id) continue;
+                    context.DrawLine(EdgePenFor(exit), fromCenter, NodeCenter(dest, minX, minY));
+                }
+                else
+                {
+                    // Neighbour isn't drawn (no dest, off-level, or unrecorded) →
+                    // a short cyan stub in the exit's cardinal direction (#157).
+                    DrawExitStub(context, fromCenter, exit.Direction);
+                }
             }
         }
 
@@ -508,6 +525,68 @@ public class MapCanvas : Control
         // ── Pass 4: hover badge ───────────────────────────────────────────
         if (_hoveredNode is { } hovered)
             DrawHoverBadge(context, hovered);
+
+        // ── Pass 5: colour legend (#157) ──────────────────────────────────
+        if (ShowLegend)
+            DrawLegend(context);
+    }
+
+    // Legend entries: (swatch brush, is-a-line, label). Line entries draw a short
+    // stroke; the rest draw a filled swatch. "*" marks the user-configurable ones.
+    private static readonly (IBrush brush, bool line, string label)[] LegendItems =
+    {
+        (DefaultNodeFill,               false, "Room"),
+        (new SolidColorBrush(Colors.Blue),   false, "Cross-zone room"),
+        (CurrentStroke,                 false, "Current room *"),
+        (new SolidColorBrush(Colors.Black),  true,  "Path"),
+        (new SolidColorBrush(Colors.Blue),   true,  "Go / secret"),
+        (new SolidColorBrush(Color.FromRgb(0x00, 0x80, 0x00)), true, "Climb / requires skill"),
+        (StubBrush,                     true,  "Exit (neighbour not mapped)"),
+    };
+
+    /// <summary>Draw a compact colour key in the top-left of the canvas (#157).
+    /// Screen-anchored to the canvas origin (it scrolls with the map). A trailing
+    /// "*" on a label marks colours the user can change (View / AutoMapper
+    /// Settings); the rest are fixed.</summary>
+    private void DrawLegend(DrawingContext context)
+    {
+        const double pad = 8, row = 16, sw = 12, gap = 8;
+        var typeface = new Typeface("Segoe UI, Consolas, monospace");
+        const double fontSize = 11;
+
+        // Measure the widest label to size the panel.
+        double maxText = 0;
+        var texts = new FormattedText[LegendItems.Length];
+        for (int i = 0; i < LegendItems.Length; i++)
+        {
+            texts[i] = new FormattedText(LegendItems[i].label, System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight, typeface, fontSize, RoomLabelBrush);
+            if (texts[i].Width > maxText) maxText = texts[i].Width;
+        }
+
+        double w = pad + sw + gap + maxText + pad;
+        double h = pad + LegendItems.Length * row + pad;
+        var panel = new Rect(6, 6, w, h);
+
+        context.FillRectangle(new SolidColorBrush(Color.FromArgb(0xE0, 0xff, 0xff, 0xff)), panel, 4);
+        context.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)), 1.0), panel, 4, 4);
+
+        for (int i = 0; i < LegendItems.Length; i++)
+        {
+            var (brush, isLine, _) = LegendItems[i];
+            double cy = panel.Y + pad + i * row + row / 2;
+            double x0 = panel.X + pad;
+            if (isLine)
+                context.DrawLine(new Pen(brush, 2.0), new Point(x0, cy), new Point(x0 + sw, cy));
+            else
+            {
+                var swatch = new Rect(x0, cy - sw / 2, sw, sw);
+                context.FillRectangle(brush, swatch);
+                context.DrawRectangle(NodePen, swatch);
+            }
+            var ft = texts[i];
+            context.DrawText(ft, new Point(panel.X + pad + sw + gap, cy - ft.Height / 2));
+        }
     }
 
     // ── Input ─────────────────────────────────────────────────────────────
@@ -1024,6 +1103,25 @@ public class MapCanvas : Control
     }
 
     // ── Geometry helpers (instance so they pick up live Zoom) ─────────────
+
+    /// <summary>Draw a short cyan tick out of a room's edge in <paramref name="dir"/>'s
+    /// direction (#157). Only the eight 2-D cardinals get a stub — up/down/out/in
+    /// have no on-map direction. The grid Δ maps straight to screen space (grid Y
+    /// and screen Y both grow downward), normalised so diagonals aren't longer.</summary>
+    private void DrawExitStub(DrawingContext ctx, Point center, Direction dir)
+    {
+        if (!DirectionHelper.Delta.TryGetValue(dir, out var d)) return;
+        if (d.dz != 0 || (d.dx == 0 && d.dy == 0)) return;
+
+        var len  = Math.Sqrt(d.dx * (double)d.dx + d.dy * (double)d.dy);
+        var ux   = d.dx / len;
+        var uy   = d.dy / len;
+        var half = NodeSize / 2;
+        var stub = NodeSize * 0.7;
+        var start = new Point(center.X + ux * half,          center.Y + uy * half);
+        var end   = new Point(center.X + ux * (half + stub), center.Y + uy * (half + stub));
+        ctx.DrawLine(StubPen, start, end);
+    }
 
     private Point NodeCenter(MapNode node, int minX, int minY)
     {

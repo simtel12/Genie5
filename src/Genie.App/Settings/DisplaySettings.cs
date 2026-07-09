@@ -62,6 +62,9 @@ public sealed class DisplaySettings : ReactiveObject
     /// </summary>
     [Reactive] public string MapTextHex { get; set; } = "#000000";
 
+    /// <summary>Show the on-map colour legend (#157). Default on.</summary>
+    [Reactive] public bool   ShowMapLegend { get; set; } = true;
+
     /// <summary>
     /// Whether the Wrayth-style horizontal status bar (health/mana/stamina/spirit/
     /// concentration) is shown below the command bar. Independent of the dockable

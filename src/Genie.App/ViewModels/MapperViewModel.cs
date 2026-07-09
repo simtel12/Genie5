@@ -161,6 +161,21 @@ public class MapperViewModel : ReactiveObject
     /// <c>MapCanvas.AutoMapperAlpha</c>. 0 = single-level view.</summary>
     [Reactive] public int     AutoMapperAlpha { get; private set; } = 255;
 
+    /// <summary>On-map colour legend toggle (#157) — two-way. Persists to
+    /// display.json and drives <c>MapCanvas.ShowLegend</c>. Defaults on until a
+    /// DisplaySettings is attached.</summary>
+    public bool ShowMapLegend
+    {
+        get => _display?.ShowMapLegend ?? true;
+        set
+        {
+            if (_display is null || _display.ShowMapLegend == value) return;
+            _display.ShowMapLegend = value;
+            try { if (!string.IsNullOrEmpty(_displayPath)) _display.Save(_displayPath); } catch { /* best effort */ }
+            this.RaisePropertyChanged();
+        }
+    }
+
     /// <summary>
     /// Scale factor for the map canvas, bound to <c>MapCanvas.Zoom</c>.
     /// Coerced to [0.4, 4.0] inside the control; we let the user push freely
@@ -729,6 +744,7 @@ public class MapperViewModel : ReactiveObject
     {
         _display     = display;
         _displayPath = displayPath;
+        this.RaisePropertyChanged(nameof(ShowMapLegend));   // reflect the stored value (#157)
 
         // One-time migration: the old default canvas was dark (#1A1A1A). Genie 4's
         // AutoMapper uses a PaleGoldenrod (tan) canvas, which the map palette

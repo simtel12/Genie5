@@ -766,6 +766,7 @@
                                     MapBackgroundBrush="{Binding ViewModel.MapBackgroundBrush}"
                                     LabelTextBrush="{Binding ViewModel.MapTextBrush}"
                                     AutoMapperAlpha="{Binding ViewModel.AutoMapperAlpha}"
+                                    ShowLegend="{Binding ViewModel.ShowMapLegend}"
                                     NodeClickedCommand="{Binding ViewModel.GotoNodeCommand}"
                                     EditExitCommand="{Binding ViewModel.EditExitCommand}"
                                     EditMode="{Binding ViewModel.EditMode}"

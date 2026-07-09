@@ -685,6 +685,10 @@
         <MenuItem Header="AutoMapper _Settings..."
                   Command="{Binding ShowMapperSettingsCommand}"
                   ToolTip.Tip="AutoMapper on/off, map overlay opacity, auto-walk pause-on-unfocus, and map colours — in one place."/>
+        <MenuItem Header="Show Map _Legend"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding Mapper.ShowMapLegend, Mode=TwoWay}"
+                  ToolTip.Tip="Show the on-map colour key (room / path / exit-stub colours) in the top-left of the map."/>
         <Separator/>
         <MenuItem Header="_Update from Official Repo..."
                   Command="{Binding Mapper.UpdateMapsCommand}"
