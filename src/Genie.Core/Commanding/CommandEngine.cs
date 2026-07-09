@@ -572,9 +572,11 @@ public sealed class CommandEngine
             }
             case "mapper":
             {
-                // #mapper reset — re-resolve the current room (Genie 3/4 parity).
-                // Unknown/empty subcommands echo usage rather than reaching the
-                // game, so a stray "#mapper foo" never leaks to the server.
+                // #mapper subcommands (Genie 3/4 parity, #75 + #146). `reset`
+                // re-resolves the current room via the shared engine (works in
+                // Console too); everything else forwards to the App mapper host,
+                // which echoes usage for anything unknown. Either way a stray
+                // "#mapper foo" never reaches the game.
                 var sub = parts.Count > 1 ? parts[1].ToLowerInvariant() : "";
                 if (sub == "reset")
                 {
@@ -582,7 +584,7 @@ public sealed class CommandEngine
                     _host.MapperReset();
                 }
                 else
-                    _host.Echo("Usage: #mapper reset");
+                    _host.MapperCommand(string.Join(" ", parts.Skip(1)));
                 break;
             }
             // Genie 4 parity (#connect / #reconnect / #lichconnect). Args are

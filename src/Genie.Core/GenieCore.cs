@@ -1314,6 +1314,23 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         AutoMapper.Reset();
     }
 
+    void ICommandHost.MapperCommand(string args)
+    {
+        // save / load / clear / zone / color / allowdupes / record touch the
+        // App's MapperViewModel (zone files, canvas colours, UI state), so —
+        // unlike reset — they round-trip to the App handler (#146). Console
+        // builds with no handler get a diagnostic.
+        if (MapperCommandRequested is null)
+            EchoLine?.Invoke("[mapper] no mapper host wired (Console build).");
+        else
+            MapperCommandRequested.Invoke(args);
+    }
+
+    /// <summary>Raised by the non-<c>reset</c> <c>#mapper</c> subcommands (#146),
+    /// from the command bar or a script. Carries the text after <c>#mapper</c>;
+    /// the App parses the subcommand, drives the mapper, and echoes the result.</summary>
+    public event Action<string>? MapperCommandRequested;
+
     /// <summary>
     /// Raised by <c>#goto</c> / <c>#go2</c> from the command bar or a script.
     /// Carries the raw destination argument (numeric id, note label, or title

@@ -458,6 +458,43 @@ public class MapperViewModel : ReactiveObject
         }
     }
 
+    // ── #mapper subcommand helpers (#146) ────────────────────────────────────
+
+    /// <summary>Reload the active zone from disk, discarding unsaved in-memory
+    /// changes (<c>#mapper load</c>). Returns the zone display name, or null when
+    /// nothing is loaded.</summary>
+    public string? ReloadActiveZone()
+    {
+        if (string.IsNullOrEmpty(SelectedZoneFile)) return null;
+        LoadSelectedZone(SelectedZoneFile);     // re-reads the file into the engine
+        return ZoneName;
+    }
+
+    /// <summary>Clear the active zone's rooms + labels in memory, keeping its
+    /// name/id (<c>#mapper clear</c>). Not written until <c>#mapper save</c>, so
+    /// an accidental clear is recoverable with <c>#mapper load</c>.</summary>
+    public void ClearActiveZone()
+    {
+        if (_engine is null) return;
+        var cur = _engine.ActiveZone;
+        _engine.LoadZone(new Genie.Core.Mapper.MapZone { Name = cur.Name, Genie4Id = cur.Genie4Id });
+        LoadStatus = "Zone cleared (in memory — #mapper save to persist).";
+        RenderTick++;
+    }
+
+    /// <summary>Switch the loaded zone to one whose file matches <paramref name="idOrName"/>
+    /// (<c>#mapper zone &lt;id|name&gt;</c>) — exact filename first, then a
+    /// case-insensitive contains. Returns false when nothing matches.</summary>
+    public bool SwitchZone(string idOrName)
+    {
+        if (string.IsNullOrWhiteSpace(idOrName)) return false;
+        var match = AvailableZones.FirstOrDefault(z => z.Equals(idOrName, StringComparison.OrdinalIgnoreCase))
+                 ?? AvailableZones.FirstOrDefault(z => z.IndexOf(idOrName, StringComparison.OrdinalIgnoreCase) >= 0);
+        if (match is null) return false;
+        SelectedZoneFile = match;               // triggers LoadSelectedZone via WhenAnyValue
+        return true;
+    }
+
     /// <summary>
     /// server-room-id → zone-file (no extension). Populated in the background
     /// by <see cref="RebuildServerIdIndexAsync"/> after Attach and after every

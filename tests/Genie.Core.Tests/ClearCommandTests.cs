@@ -137,6 +137,7 @@ public class ClearCommandTests : IDisposable
         public void PluginCommand(string args) { }
         public void ConfigCommand(string args) { }
         public void MapperGoto(string args) { }
+        public void MapperCommand(string args) { }
         public void MapperReset() { }
         public void PlaySound(string soundName) { }
         public void Speak(string text, bool urgent = false) { }

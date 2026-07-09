@@ -4135,6 +4135,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         _core.MapperGotoRequested     += args =>
             Avalonia.Threading.Dispatcher.UIThread.Post(() => Mapper.GotoByName(args));
 
+        // #mapper save/load/clear/zone/color/allowdupes/record (#146) — reset is
+        // handled in Core; the rest touch the mapper VM (zone files, canvas
+        // colours), so run on the UI thread.
+        _core.MapperCommandRequested  += args =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => HandleMapperCommand(args));
+
         // #connect / #reconnect / #lichconnect from the command bar or a script —
         // resolve to a config (reconnect-last / saved profile / explicit creds)
         // and drive the connection. UI-thread-bound because it touches the
@@ -4918,6 +4924,88 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     //   #layout default <name>         set <name> as default in its scope
     //   #layout delete <name>          delete <name> from its scope
     //   #layout reset                  built-in default layout
+    /// <summary>#mapper save/load/clear/zone/color/allowdupes/record (#146),
+    /// dispatched on the UI thread from the command engine (`reset` is handled in
+    /// Core). Unknown subcommands echo usage; nothing reaches the game.</summary>
+    private void HandleMapperCommand(string args)
+    {
+        void Echo(string m) => GameText.AddSystemLine(m);
+        var parts = (args ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        var sub   = parts.Length > 0 ? parts[0].ToLowerInvariant() : "";
+
+        switch (sub)
+        {
+            case "save":
+                Mapper.SaveCurrentZone();
+                Echo($"[mapper] {Mapper.LoadStatus}");
+                break;
+
+            case "load":
+                var reloaded = Mapper.ReloadActiveZone();
+                Echo(reloaded is null ? "[mapper] No zone loaded." : $"[mapper] Reloaded {reloaded}.");
+                break;
+
+            case "clear":
+                Mapper.ClearActiveZone();
+                Echo("[mapper] Current zone cleared in memory — #mapper save to persist, or #mapper load to undo.");
+                break;
+
+            case "zone":
+                if (parts.Length > 1)
+                {
+                    var target = string.Join(" ", parts.Skip(1));
+                    Echo(Mapper.SwitchZone(target)
+                        ? $"[mapper] Zone: {Mapper.ZoneName} (id {Mapper.CurrentZoneId})"
+                        : $"[mapper] No zone matching '{target}'.");
+                }
+                else Echo($"[mapper] Current zone: {Mapper.ZoneName} (id {Mapper.CurrentZoneId})");
+                break;
+
+            case "color":
+            case "colour":
+                HandleMapperColor(parts, Echo);
+                break;
+
+            case "allowdupes":
+                var dup = parts.Length > 1 ? ParseOnOff(parts[1], Mapper.AllowDuplicate) : !Mapper.AllowDuplicate;
+                Mapper.AllowDuplicate = dup;
+                Echo($"[mapper] Allow duplicate rooms: {(dup ? "on" : "off")}");
+                break;
+
+            case "record":
+                // Auto-map as you walk = the AutoMapper master toggle (Genie 3/4 flavour).
+                var rec = parts.Length > 1 ? ParseOnOff(parts[1], _core!.Config.AutoMapper) : !_core!.Config.AutoMapper;
+                _core.Config.SetSetting("automapper", rec.ToString(), showException: false);
+                Echo($"[mapper] Record (auto-map as you walk): {(rec ? "on" : "off")}");
+                break;
+
+            default:
+                Echo("[mapper] Usage: #mapper reset | save | load | clear | zone [<id|name>] | " +
+                     "color <bg|text> <colour> | allowdupes [on|off] | record [on|off]");
+                break;
+        }
+    }
+
+    private void HandleMapperColor(string[] parts, Action<string> echo)
+    {
+        if (parts.Length < 3) { echo("[mapper] Usage: #mapper color <bg|text> <colour>"); return; }
+        if (!Avalonia.Media.Color.TryParse(parts[2], out var c)) { echo($"[mapper] Not a colour: {parts[2]}"); return; }
+        switch (parts[1].ToLowerInvariant())
+        {
+            case "bg": case "background": Mapper.MapBackground = c; echo($"[mapper] Map background: {parts[2]}"); break;
+            case "text": case "fg": case "foreground": Mapper.MapTextColor = c; echo($"[mapper] Map text colour: {parts[2]}"); break;
+            default: echo("[mapper] Usage: #mapper color <bg|text> <colour>"); break;
+        }
+    }
+
+    /// <summary>Parse an on/off/toggle flag argument; anything unrecognised toggles.</summary>
+    private static bool ParseOnOff(string token, bool current) => token.ToLowerInvariant() switch
+    {
+        "on" or "true" or "yes" or "1"  => true,
+        "off" or "false" or "no" or "0" => false,
+        _                               => !current,
+    };
+
     private void HandleLayoutCommand(string args)
     {
         var trimmed = (args ?? string.Empty).Trim();

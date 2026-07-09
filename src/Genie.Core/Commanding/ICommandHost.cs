@@ -246,6 +246,17 @@ public interface ICommandHost
     void MapperReset();
 
     /// <summary>
+    /// The remaining <c>#mapper</c> subcommands beyond <c>reset</c> (#146):
+    /// <c>save</c> / <c>load</c> / <c>clear</c> / <c>zone</c> / <c>color</c> /
+    /// <c>allowdupes</c> / <c>record</c>, plus usage for anything unknown.
+    /// <paramref name="args"/> is the text after <c>#mapper</c> (the subcommand
+    /// and its arguments). The mapper + zone files live in the App layer, so
+    /// <see cref="Genie.Core"/> forwards the whole thing; the Console build with
+    /// no handler echoes a diagnostic.
+    /// </summary>
+    void MapperCommand(string args);
+
+    /// <summary>
     /// Play a sound effect by name (trigger/highlight SFX and the <c>#play</c>
     /// family). The host applies the <c>PlaySounds</c> gate + SoundDir/.wav
     /// resolution and dispatches to the platform audio backend; the Console
