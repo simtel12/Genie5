@@ -286,16 +286,19 @@ public sealed class AutoWalkService : ReactiveObject
     {
         if (Current is { State: AutoWalkState.Active or AutoWalkState.Paused })
         {
-            // Already walking — don't start a second walk without explicit
-            // cancel first. Genie 4's behaviour was to interrupt; we ask
-            // for explicit cancel so the user is aware.
-            return false;
+            // Genie 4 parity (#96): a new #goto interrupts the in-flight walk
+            // rather than being silently rejected. Rejecting emitted no signal,
+            // so a script that `matchwait`s on the second #goto hung forever.
+            // Cancel the old session (tears down its timers + departure
+            // bookkeeping) and fall through to start the new one; the fresh
+            // walk emits its own arrival/failure signal on completion.
+            Cancel("superseded by a new #goto");
         }
 
         if (origin.Id == destination.Id)
         {
             FlashStatus("Already here.");
-            EmitAutomapperSignal("YOU HAVE ARRIVED!");   // #goto to the current room
+            EmitAutomapperSignal(Genie.Core.Mapper.AutomapperSignals.Arrived);   // #goto to the current room
             return false;
         }
 
@@ -303,13 +306,13 @@ public sealed class AutoWalkService : ReactiveObject
         if (moves is null)
         {
             FlashStatus($"No path to '{destination.Title}'.");
-            EmitAutomapperSignal("DESTINATION NOT FOUND");
+            EmitAutomapperSignal(Genie.Core.Mapper.AutomapperSignals.DestinationNotFound);
             return false;
         }
         if (moves.Count == 0)
         {
             FlashStatus("Already here.");
-            EmitAutomapperSignal("YOU HAVE ARRIVED!");   // #goto to the current room
+            EmitAutomapperSignal(Genie.Core.Mapper.AutomapperSignals.Arrived);   // #goto to the current room
             return false;
         }
 
@@ -332,11 +335,12 @@ public sealed class AutoWalkService : ReactiveObject
                                Genie.Core.Mapper.MultiZonePath? plan)
     {
         if (Current is { State: AutoWalkState.Active or AutoWalkState.Paused })
-            return false;
+            // #96: interrupt the in-flight walk instead of a silent reject (see Start).
+            Cancel("superseded by a new #goto");
         if (plan is null || plan.Steps.Count == 0)
         {
             FlashStatus($"No path to '{destinationLabel.Title}'.");
-            EmitAutomapperSignal("DESTINATION NOT FOUND");
+            EmitAutomapperSignal(Genie.Core.Mapper.AutomapperSignals.DestinationNotFound);
             return false;
         }
         return BeginPlan(origin, destinationLabel, plan.Steps, plan.HasCrossZoneHop);
@@ -473,7 +477,7 @@ public sealed class AutoWalkService : ReactiveObject
         {
             StopStepWatchdog();
             if (Current is null || Current.State != AutoWalkState.Active) return;
-            EmitAutomapperSignal("AUTOMAPPER MOVEMENT FAILED");
+            EmitAutomapperSignal(Genie.Core.Mapper.AutomapperSignals.MovementFailed);
             Cancel("no room change after move (stuck)");
         };
         _stepTimer.Start();
@@ -600,7 +604,7 @@ public sealed class AutoWalkService : ReactiveObject
             StopUnfocusTimer();
             StopStepWatchdog();
             // Signal automapper-driven scripts that the #goto leg finished.
-            EmitAutomapperSignal("YOU HAVE ARRIVED!");
+            EmitAutomapperSignal(Genie.Core.Mapper.AutomapperSignals.Arrived);
             return;
         }
 
@@ -616,7 +620,7 @@ public sealed class AutoWalkService : ReactiveObject
         {
             // Plan exhausted but we didn't match destination — must have
             // wandered off. Cancel rather than send arbitrary commands.
-            EmitAutomapperSignal("AUTOMAPPER MOVEMENT FAILED");
+            EmitAutomapperSignal(Genie.Core.Mapper.AutomapperSignals.MovementFailed);
             Cancel("walked past destination");
             return;
         }
