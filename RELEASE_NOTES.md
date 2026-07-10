@@ -1,3 +1,20 @@
+# Genie 5 — v5.0.0-alpha.8.8
+
+Stability and mapper groundwork fixes.
+
+## 🔧 Fixed
+
+- **Connect / reconnect race** — an auto-reconnect racing a manual connect could
+  interleave, with the second attempt clobbering the connection the first just
+  made. Connects are now serialized, so overlapping connect/reconnect attempts
+  always settle on a single clean session.
+- **Cross-zone map connections** — the placeholder `ZoneConnections.xml` that
+  Genie seeds on first launch no longer shadows the cross-zone links derived from
+  your maps' border-room notes. Hand-authored connections now augment the derived
+  graph instead of replacing it wholesale. (Groundwork for multi-zone travel;
+  cross-zone routing itself still depends on per-room server ids your maps may not
+  yet carry.)
+
 # Genie 5 — v5.0.0-alpha.8.7
 
 Two Genie 4 command-parity fixes: `#send` again queues with an optional delay

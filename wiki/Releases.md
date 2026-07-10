@@ -4,7 +4,18 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8.7 — Command Parity
+## Latest: v5.0.0-alpha.8.8 — Mapper & Connect Fixes
+
+Stability and mapper groundwork: connect/reconnect races are serialized, and the placeholder cross-zone connections file no longer shadows the links derived from your maps.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.8** as a delta.
+
+- **Connect / reconnect race** — overlapping connect and auto-reconnect attempts now serialize to a single clean session instead of interleaving.
+- **Cross-zone map connections** — the placeholder `ZoneConnections.xml` seeded on first launch no longer suppresses the cross-zone links derived from your maps' border-room notes; hand-authored entries augment the derived graph. (Groundwork for multi-zone travel.)
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.8)
+
+## v5.0.0-alpha.8.7 — Command Parity
 
 Two Genie 4 command-parity fixes: **`#send`** again queues with an optional delay (instead of sending immediately like `#put`), and **`#beep` / `#bell`** sound the system alert instead of printing an unknown-command error.
 
