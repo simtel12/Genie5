@@ -324,13 +324,40 @@ public sealed class CommandEngine
                     _host.SetStatusBar(string.Join(" ", parts.Skip(textFrom)), slot);
                 }
                 break;
-            case "send":
             case "put":
                 // Genie 4: #put is the canonical "send to game" command in
-                // scripts and triggers (#send is a less-used synonym). The
-                // body is everything after the verb, joined with spaces so
-                // multi-word arguments survive (#put glance left).
+                // scripts and triggers — it sends immediately. The body is
+                // everything after the verb, joined with spaces so multi-word
+                // arguments survive (#put glance left).
                 if (parts.Count > 1) _host.SendToGame(string.Join(" ", parts.Skip(1)));
+                break;
+            case "send":
+                // Genie 4 #send (Core/Command.cs Send()) is NOT an alias for
+                // #put: it routes through the roundtime-gated CommandQueue with
+                // an optional leading numeric delay, and "#send clear" empties
+                // the queue. hunt.cmd relies on this — e.g. `#send 5 $lastcommand`
+                // (retry after 5s + RT when webbed) and the `clear` subcommand.
+                // Delay parse is shared with the in-script `send` verb via
+                // ParseSendDelay, so `#send 5 x` and `send 5 x` behave alike
+                // (incl. the `-N` eager form; a number needs a trailing space,
+                // so `5fire` stays literal).
+                if (parts.Count > 1)
+                {
+                    var body = string.Join(" ", parts.Skip(1));
+                    if (body.Trim().Equals("clear", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _commandQueue.Clear();
+                    }
+                    else
+                    {
+                        var (sendDelay, sendCmd) =
+                            Scripting.ScriptEngine.ParseSendDelay(body);
+                        if (sendCmd.Length > 0)
+                            _commandQueue.AddToQueue(sendDelay, sendCmd,
+                                waitForRoundtime: true, waitForWebbed: false,
+                                waitForStunned: false);
+                    }
+                }
                 break;
             case "wait":
                 if (parts.Count > 2 && double.TryParse(parts[1], out var delay))
@@ -521,6 +548,14 @@ public sealed class CommandEngine
                 // or script alert grabs attention while the window is in the
                 // background.
                 _host.FlashWindow();
+                break;
+            case "beep":
+            case "bell":
+                // #beep / #bell — sound the system alert (Genie 4 parity, gated
+                // on PlaySounds by the host). No arguments; a common trigger
+                // action and hunting-script alert. hunt.cmd et al. use `#beep`
+                // liberally — before this they printed "Unknown command: beep".
+                _host.Beep();
                 break;
             case "goto":
             case "go2":

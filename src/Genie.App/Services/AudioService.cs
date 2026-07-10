@@ -24,9 +24,13 @@ public sealed class AudioService
     [DllImport("winmm.dll", CharSet = CharSet.Unicode)]
     private static extern bool PlaySound(string? pszSound, IntPtr hmod, uint fdwSound);
 
+    [DllImport("user32.dll")]
+    private static extern bool MessageBeep(uint uType);
+
     private const uint SND_ASYNC     = 0x0001;
     private const uint SND_FILENAME  = 0x00020000;
     private const uint SND_NODEFAULT = 0x0002;
+    private const uint MB_SIMPLE     = 0xFFFFFFFF; // standard beep (Genie 4 Interaction.Beep)
 
     /// <summary>Play the sound at <paramref name="fullPath"/> (absolute). No-op
     /// on a blank path or missing file. Never throws.</summary>
@@ -60,6 +64,45 @@ public sealed class AudioService
         catch (Exception ex)
         {
             Diagnostics.ErrorLog.Log("AudioService.Play", ex);
+        }
+    }
+
+    /// <summary>Sound the system default alert ("beep" / "bell", the
+    /// <c>#beep</c> command). Windows uses the native <c>MessageBeep</c> (Genie 4
+    /// <c>Interaction.Beep</c> parity); macOS asks the OS via <c>osascript</c>;
+    /// Linux writes the terminal bell (BEL) — audible when a terminal is
+    /// attached, harmless otherwise. Fire-and-forget; never throws. The
+    /// PlaySounds gate lives upstream in GenieCore.</summary>
+    public void Beep()
+    {
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                MessageBeep(MB_SIMPLE);
+            }
+            else if (OperatingSystem.IsMacOS())
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo("osascript")
+                {
+                    UseShellExecute        = false,
+                    CreateNoWindow         = true,
+                    RedirectStandardError  = true,
+                    RedirectStandardOutput = true,
+                };
+                psi.ArgumentList.Add("-e");
+                psi.ArgumentList.Add("beep");
+                System.Diagnostics.Process.Start(psi);
+            }
+            else // Linux / other Unix — terminal bell, best-effort
+            {
+                Console.Out.Write('\a');
+                Console.Out.Flush();
+            }
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.ErrorLog.Log("AudioService.Beep", ex);
         }
     }
 

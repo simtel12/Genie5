@@ -1466,6 +1466,19 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// thread themselves.</summary>
     public event Action? FlashRequested;
 
+    void ICommandHost.Beep()
+    {
+        // Same PlaySounds gate as PlaySound (Genie 4 gated Interaction.Beep on
+        // bPlaySounds). Gate here so the App backend stays a dumb "make noise".
+        if (Config.PlaySounds) BeepRequested?.Invoke();
+    }
+
+    /// <summary>Raised when <c>#beep</c> / <c>#bell</c> wants the system alert
+    /// sound, after the <c>PlaySounds</c> gate. The App subscribes and plays the
+    /// platform bell; a Console build with no handler is a silent no-op. May
+    /// fire from a script thread — subscribers marshal as needed.</summary>
+    public event Action? BeepRequested;
+
     void ICommandHost.Connect(ConnectRequest request)
     {
         // The connection lifecycle, saved profiles, and the Connect dialog all

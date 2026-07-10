@@ -293,6 +293,20 @@ public interface ICommandHost
     void FlashWindow();
 
     /// <summary>
+    /// Sound the system alert / bell (Genie 4 <c>#beep</c> / <c>#bell</c> — its
+    /// FormMain called <c>Interaction.Beep()</c>). Honors the same
+    /// <c>PlaySounds</c> gate as <see cref="PlaySound"/>. Its classic use is a
+    /// trigger action on a whisper or a hunting-script alert.
+    /// <para>Provided as a default no-op so the many <see cref="ICommandHost"/>
+    /// test doubles and headless/Console hosts need not implement it — only the
+    /// real host (GenieCore) overrides it to raise its beep event. This is the
+    /// one default-bodied member on the interface; the deviation is deliberate,
+    /// to avoid a no-op tax across ~14 implementers for a fire-and-forget,
+    /// nothing-lost-if-absent capability.</para>
+    /// </summary>
+    void Beep() { }
+
+    /// <summary>
     /// Handle a <c>#connect</c> / <c>#reconnect</c> / <c>#lichconnect</c> command
     /// (Genie 4 parity). The connection lifecycle, saved profiles, and the
     /// Connect dialog all live in the App layer, so <see cref="Genie.Core"/>

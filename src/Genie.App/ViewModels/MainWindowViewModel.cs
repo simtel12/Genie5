@@ -4027,6 +4027,9 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // sounds and #play.
         _core.SoundRequested += path => _audio.Play(path);
 
+        // #beep / #bell → system alert bell (already PlaySounds-gated in Core).
+        _core.BeepRequested += () => _audio.Beep();
+
         // TTS backend: synthesize + speak text from #speak (off-thread, lazy
         // engine init). Voice dir is read live (via the provider) so a runtime
         // #config ttsvoicedir applies without reconnecting; status messages are
