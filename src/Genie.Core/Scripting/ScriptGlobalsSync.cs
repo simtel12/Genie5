@@ -111,6 +111,7 @@ public sealed class ScriptGlobalsSync : IDisposable
         Set("roundtimeremaining", "0");
         Set("casttime",           "0");
         Set("casttimeremaining",  "0");
+        Set("spellpreptime",      "0");
         Set("preparedspell", _state.Combat.PreparedSpell);
         Set("stance",        _state.Combat.Stance.ToString().ToLowerInvariant());
 
@@ -177,6 +178,11 @@ public sealed class ScriptGlobalsSync : IDisposable
         // that so we never publish a bogus negative epoch.
         if (p.ServerTime > DateTimeOffset.UnixEpoch)
             Set("gametime", p.ServerTime.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture));
+
+        // $spellpreptime — seconds since the spell was prepared. Ticks up on each
+        // prompt while a spell is held; resets when cleared. Genie 4 parity (#151).
+        var sec = (int)Math.Max(0, _state.Combat.SpellTimeSeconds);
+        Set("spellpreptime", sec.ToString(CultureInfo.InvariantCulture));
     }
 
     private void OnProgressBar(ProgressBarEvent bar)
