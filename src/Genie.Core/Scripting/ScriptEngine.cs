@@ -2320,9 +2320,6 @@ public sealed class ScriptEngine
                 value = inst.DollarStack.Peek()[name[0] - '0'] ?? string.Empty;
                 return true;
             }
-            // $name: locals first (when non-empty), then globals.
-            if (inst.Vars.TryGetValue(name, out var sv) && !string.IsNullOrEmpty(sv))
-            { value = sv; return true; }
             // $spelltime — seconds since the current spell was prepared
             // (Genie 4). Computed live so it counts up; resolved before globals
             // (no stored snapshot).
@@ -2332,6 +2329,9 @@ public sealed class ScriptEngine
             // "0" when none (Genie 4). Computed live from the host, before globals.
             if (name.Equals("spellstarttime", StringComparison.OrdinalIgnoreCase))
             { value = (SpellStartTimeEpoch?.Invoke() ?? 0).ToString(CultureInfo.InvariantCulture); return true; }
+            // $name: global session variables (set by #tvar, events, or host code).
+            // Do NOT check inst.Vars here — that's for local %variables only.
+            // $ prefix explicitly means "global", not "local with fallback to global".
             if (Globals.TryGetValue(name, out var gv))
             { value = gv ?? string.Empty; return true; }
             // Persistent user variables (#var). Resolved after live-state globals
