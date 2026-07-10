@@ -1478,7 +1478,7 @@ public class MapperViewModel : ReactiveObject
             // Signal automapper-driven scripts (travel.cmd, …) that this #goto
             // can't be resolved — they matchwait on "DESTINATION NOT FOUND" and
             // would otherwise hang.
-            AutoWalk?.EmitAutomapperSignal("DESTINATION NOT FOUND");
+            AutoWalk?.EmitAutomapperSignal(AutomapperSignals.DestinationNotFound);
             return;
         }
         GotoNode(target);
@@ -1505,16 +1505,18 @@ public class MapperViewModel : ReactiveObject
     /// title → zone + node).</summary>
     private ZoneRoomIndex RoomIndex() { EnsureMapsScan(); return _roomIndex!; }
 
-    /// <summary>Cross-zone connections. Prefers a hand-authored ZoneConnections.xml;
-    /// falls back to links derived from the maps' border-room notes (the community
-    /// maps ship no ZoneConnections.xml, so this is the normal path).</summary>
+    /// <summary>Cross-zone connections for the multi-zone pathfinder: the links
+    /// derived from the maps' border-room notes MERGED with any hand-authored
+    /// ZoneConnections.xml entries. Authored entries augment (and override on an
+    /// exact endpoint match) the derived graph rather than replacing it wholesale,
+    /// so the placeholder baseline Genie seeds on first launch can't shadow the
+    /// derived links. See <see cref="ZoneConnectionMerge"/>.</summary>
     private IReadOnlyList<ZoneConnection> Connections()
     {
         var authored = new ZoneConnectionsRepository(
             Path.Combine(MapsDirectory, "ZoneConnections.xml")).Load();
-        if (authored.Count > 0) return authored;
         EnsureMapsScan();
-        return _derivedConnections!;
+        return ZoneConnectionMerge.Merge(_derivedConnections!, authored);
     }
 
     /// <summary>
