@@ -1537,6 +1537,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
     // ── Public API ─────────────────────────────────────────────────────────────
 
+    /// <summary>Serializes <see cref="ConnectAsync"/> so a manual connect racing
+    /// the App's auto-reconnect can't interleave teardown / BuildConnection / dial
+    /// (issue #88 / #46 Phase 3 — the "M5" re-entrancy guard). Last caller wins: a
+    /// concurrent connect awaits the in-flight one, then runs.</summary>
+    private readonly System.Threading.SemaphoreSlim _connectGate = new(1, 1);
+
     /// <summary>
     /// Connect (or reconnect) using <paramref name="cfg"/>. Tears down any previous
     /// connection, resets the persistent game state in place, builds a fresh
@@ -1549,24 +1555,35 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     public async Task ConnectAsync(ConnectionConfig cfg, CancellationToken ct = default,
                                    bool reloadRules = true, bool clearPerCharacter = true)
     {
-        await TeardownConnectionAsync();
-        // Fresh session → clear the persistent state in place (consumers hold it by
-        // reference). Transient world/vitals always reset; per-character identity +
-        // live skill ranks only on a genuine character SWITCH (clearPerCharacter) —
-        // a same-char reconnect or the first connect from offline keeps them so the
-        // Mapper doesn't re-prompt for info/exp (issue #88 / #46 Phase 3, Change #4).
-        _state.Reset(clearPerCharacter);
-        _roomChangedSincePrompt = false;   // don't carry a dangling room-change flag across reconnect (PR #92)
-        // On a character SWITCH, also drop the builtin trackers' accumulated
-        // per-character state so the Experience/Active-Spells panels and their
-        // $Skill.*/$SpellTimer.* globals don't bleed the previous character's data
-        // into the next. A same-character reconnect / first-from-offline keeps it.
-        if (clearPerCharacter) Scripts.Extensions.DispatchReset();
-        // reloadRules drives the per-connection .cfg auto-load: replay the
-        // connecting character's saved rules (true on first connect AND on a switch;
-        // false on a same-char reconnect so runtime-added rules survive).
-        BuildConnection(cfg, reloadRules);
-        await _connection!.ConnectAsync(ct);
+        // Guard against overlapping connects (auto-reconnect racing a manual
+        // connect, or a double-click): without this, two callers interleave and the
+        // second BuildConnection clobbers the _connection the first just dialed.
+        await _connectGate.WaitAsync(ct);
+        try
+        {
+            await TeardownConnectionAsync();
+            // Fresh session → clear the persistent state in place (consumers hold it by
+            // reference). Transient world/vitals always reset; per-character identity +
+            // live skill ranks only on a genuine character SWITCH (clearPerCharacter) —
+            // a same-char reconnect or the first connect from offline keeps them so the
+            // Mapper doesn't re-prompt for info/exp (issue #88 / #46 Phase 3, Change #4).
+            _state.Reset(clearPerCharacter);
+            _roomChangedSincePrompt = false;   // don't carry a dangling room-change flag across reconnect (PR #92)
+            // On a character SWITCH, also drop the builtin trackers' accumulated
+            // per-character state so the Experience/Active-Spells panels and their
+            // $Skill.*/$SpellTimer.* globals don't bleed the previous character's data
+            // into the next. A same-character reconnect / first-from-offline keeps it.
+            if (clearPerCharacter) Scripts.Extensions.DispatchReset();
+            // reloadRules drives the per-connection .cfg auto-load: replay the
+            // connecting character's saved rules (true on first connect AND on a switch;
+            // false on a same-char reconnect so runtime-added rules survive).
+            BuildConnection(cfg, reloadRules);
+            await _connection!.ConnectAsync(ct);
+        }
+        finally
+        {
+            _connectGate.Release();
+        }
     }
 
     /// <summary>
