@@ -1,3 +1,22 @@
+# Genie 5 — v5.0.0-alpha.8.7
+
+Two Genie 4 command-parity fixes: `#send` again queues with an optional delay
+instead of firing immediately like `#put`, and `#beep` / `#bell` sound the
+system alert instead of reporting an unknown command.
+
+## 🔧 Fixed
+
+- **`#send` delay & queue** — `#send` had behaved like `#put` (send right now).
+  It again matches Genie 4: it queues through the roundtime gate with an optional
+  leading delay, and `#send clear` empties the queue. `#send 5 stow my gem` waits
+  5 seconds (plus roundtime), then sends `stow my gem`; `#put` still sends
+  immediately. Scripts that rely on `#send N …` — such as retry-after-web combat
+  loops — now behave as intended instead of transmitting the literal delay.
+- **`#beep` / `#bell`** — both previously printed `Unknown command: beep`. They
+  now sound the system alert, respecting the **Play Sounds** setting: a native
+  beep on Windows, the system alert on macOS, and the terminal bell on Linux.
+  Handy as a trigger action or a hunting-script alert.
+
 # Genie 5 — v5.0.0-alpha.8.6
 
 A Genie 4 parity and polish pass: a connect-time **flags check** that warns when

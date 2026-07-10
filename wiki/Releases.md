@@ -4,7 +4,18 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8.6 — Genie 4 Parity & Polish
+## Latest: v5.0.0-alpha.8.7 — Command Parity
+
+Two Genie 4 command-parity fixes: **`#send`** again queues with an optional delay (instead of sending immediately like `#put`), and **`#beep` / `#bell`** sound the system alert instead of printing an unknown-command error.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.7** as a delta.
+
+- **`#send` delay & queue** — `#send` again matches Genie 4: it queues through the roundtime gate with an optional leading delay (`#send 5 stow my gem` waits 5 seconds plus roundtime, then sends), and `#send clear` empties the queue. `#put` still sends immediately. Scripts that rely on `#send N …` — such as retry-after-web loops — now work as intended.
+- **`#beep` / `#bell`** — now sound the system alert (respecting the Play Sounds setting) instead of printing `Unknown command: beep`: native beep on Windows, system alert on macOS, terminal bell on Linux.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.7)
+
+## v5.0.0-alpha.8.6 — Genie 4 Parity & Polish
 
 A connect-time **`flags` check** that warns when DragonRealms' settings would confuse the parser, the **Show in Main Window** toggle on every stream's right-click menu, Genie 4's **`#lc`** Lich shortcuts, and parser + travel fixes.
 
