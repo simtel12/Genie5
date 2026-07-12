@@ -122,6 +122,10 @@
     <AvaloniaResource Include="Assets/app.icns" />
     <AvaloniaResource Include="Assets/app.png" />
     <AvaloniaResource Include="Assets/Icons/*.png" />
+    <!-- 16 body-part sprites for the Injuries panel, one per DR hit-test
+         region (asset name = the dialog's region id). Colour variants are
+         baked at runtime by Controls/InjurySprites.cs. -->
+    <AvaloniaResource Include="Assets/Injuries/*.png" />
     <!-- 9-slice border bitmaps for the Genie 4-style windowed (MDI) window
          chrome — consumed by Themes/MdiDocumentWindowSkin.axaml. -->
     <AvaloniaResource Include="Assets/skin_*.bmp" />

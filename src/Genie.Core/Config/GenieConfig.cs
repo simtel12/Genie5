@@ -182,6 +182,10 @@ public sealed class GenieConfig
     /// closed window has no reason to refresh.
     /// </summary>
     public int InjuriesPollSeconds { get; set; }
+    /// <summary>Injuries panel layout: true = assembled body figure, false =
+    /// the 4×4 part grid (default). Set from the panel's Figure-layout toggle
+    /// or <c>#config injurieslayout figure|grid</c>.</summary>
+    public bool InjuriesFigureLayout { get; set; }
     public bool ShowLinks { get; set; } = true;
     /// <summary>MonsterBold (#131): render DR's &lt;pushBold&gt; creature names /
     /// combat hits in bold + the <c>creatures</c> preset colour, in every window
@@ -540,6 +544,7 @@ public sealed class GenieConfig
         ("maxgosubdepth", MaxGoSubDepth.ToString()),
         ("roundtimeoffset", RoundTimeOffset.ToString()),
         ("injuriespoll", InjuriesPollSeconds.ToString()),
+        ("injurieslayout", InjuriesFigureLayout ? "figure" : "grid"),
         ("scriptdir", ScriptDirRaw),
         ("sounddir", SoundDirRaw),
         ("ttsvoicedir", TtsVoiceDirRaw),
@@ -695,6 +700,10 @@ public sealed class GenieConfig
                     // "1" can't hammer the server with health commands.
                     var ips = (int)UtilityCore.StringToDouble(value);
                     InjuriesPollSeconds = ips <= 0 ? 0 : Math.Max(10, ips);
+                    break;
+                case "injurieslayout":
+                    // "figure" or "grid"; anything else falls back to grid.
+                    InjuriesFigureLayout = value.Trim().Equals("figure", StringComparison.OrdinalIgnoreCase);
                     break;
                 case "scriptdir": ScriptDirRaw = SetDir(value); break;
                 case "sounddir": SoundDirRaw = SetDir(value); break;

@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Reactive.Linq;
+using Avalonia;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Genie.Core;
 using Genie.Core.Events;
 using ReactiveUI;
@@ -11,40 +13,56 @@ using ReactiveUI.Fody.Helpers;
 namespace Genie.App.ViewModels;
 
 /// <summary>
-/// Backs the dockable Injuries panel (public issue #18) — a body-silhouette
+/// Backs the dockable Injuries panel (public issue #18) — a body-part sprite
 /// grid fed by the server's injuries dialog
 /// (<c>&lt;dialogData id="injuries"&gt;&lt;image id="rightLeg" name="Injury1"/&gt;…</c>).
 ///
-/// Each of DR's 16 hit-test regions gets a cell whose colour encodes the last
-/// reading (grey = healthy, yellow→orange→red = wound 1–3, steel blue = scar,
-/// purple = nerve damage — nsys can't distinguish wound from scar);
-/// the list below the grid spells the same readings out in words, so severity
-/// never rides on colour alone. The dialog reflects the player's selected
-/// display mode (E/I Wound/Scar/Both — the <c>_injury N</c> radios), and DR
-/// re-pushes the full dialog at every login, so a stale panel self-corrects on
-/// reconnect.
+/// Each of DR's 16 hit-test regions gets a sprite cell whose colour variant
+/// encodes the last reading (natural ivory = healthy, yellow→orange→red =
+/// wound 1–3, steel blue = scar, purple = nerve damage — nsys can't
+/// distinguish wound from scar); the list below the grid spells the same
+/// readings out in words, so severity never rides on colour alone. The dialog
+/// reflects the player's selected display mode (E/I Wound/Scar/Both — the
+/// <c>_injury N</c> radios), and DR re-pushes the full dialog at every login,
+/// so a stale panel self-corrects on reconnect.
 ///
 /// Hidden by default; re-open via Window → Injuries.
 /// </summary>
 public sealed class InjuriesViewModel : ReactiveObject
 {
-    /// <summary>One body-region cell in the silhouette grid.</summary>
+    /// <summary>One body-region cell in the sprite grid / figure.</summary>
     public sealed class InjuryCell : ReactiveObject
     {
+        private readonly string _regionId;
+        private readonly double _figureCrop;
+
         /// <summary>Short grid label ("R Arm").</summary>
         public string Label    { get; }
         /// <summary>Full region name for tooltips + the summary list ("Right Arm").</summary>
         public string FullName { get; }
 
-        [Reactive] public IBrush Background { get; private set; } = HealthyBg;
-        [Reactive] public IBrush Foreground { get; private set; } = HealthyFg;
-        [Reactive] public string Tip        { get; private set; }
+        /// <summary>Body-part sprite in the colour variant for the current
+        /// reading (see <see cref="Controls.InjurySprites"/>). Null when the
+        /// asset pipeline isn't available — the label still renders.</summary>
+        [Reactive] public IImage? Sprite        { get; private set; }
+        /// <summary>Same variant for the assembled-figure layout: the arm/leg
+        /// sprites carry their own built-in hands/feet, cropped here at the
+        /// wrist/ankle so the dedicated hand/foot parts take over. Identical
+        /// to <see cref="Sprite"/> for every other region.</summary>
+        [Reactive] public IImage? FigureSprite  { get; private set; }
+        /// <summary>Healthy parts render ghosted so injuries pop at a glance.</summary>
+        [Reactive] public double  SpriteOpacity { get; private set; } = HealthyOpacity;
+        [Reactive] public IBrush  Foreground    { get; private set; } = HealthyFg;
+        [Reactive] public string  Tip           { get; private set; }
 
-        public InjuryCell(string label, string fullName)
+        public InjuryCell(string regionId, string label, string fullName, double figureCrop = 1.0)
         {
-            Label    = label;
-            FullName = fullName;
-            Tip      = $"{fullName} — healthy";
+            _regionId   = regionId;
+            _figureCrop = figureCrop;
+            Label       = label;
+            FullName    = fullName;
+            Tip         = $"{fullName} — healthy";
+            UpdateSprites(Controls.InjurySprites.Get(regionId, InjuryKind.None, 0));
         }
 
         internal InjuryKind Kind     { get; private set; } = InjuryKind.None;
@@ -52,21 +70,23 @@ public sealed class InjuriesViewModel : ReactiveObject
 
         internal void Set(InjuryKind kind, int severity)
         {
-            Kind     = kind;
-            Severity = severity;
-            Background = kind switch
-            {
-                InjuryKind.Wound when severity <= 1 => Wound1Bg,
-                InjuryKind.Wound when severity == 2 => Wound2Bg,
-                InjuryKind.Wound                    => Wound3Bg,
-                InjuryKind.Scar                     => ScarBg,
-                InjuryKind.Damage                   => DamageBg,
-                _                                   => HealthyBg,
-            };
-            Foreground = kind == InjuryKind.None ? HealthyFg : InjuredFg;
+            Kind          = kind;
+            Severity      = severity;
+            UpdateSprites(Controls.InjurySprites.Get(_regionId, kind, severity));
+            SpriteOpacity = kind == InjuryKind.None ? HealthyOpacity : 1.0;
+            Foreground    = kind == InjuryKind.None ? HealthyFg : InjuredFg;
             Tip = kind == InjuryKind.None
                 ? $"{FullName} — healthy"
                 : $"{FullName} — {KindWord(kind)} ({severity})";
+        }
+
+        private void UpdateSprites(Bitmap? bmp)
+        {
+            Sprite = bmp;
+            FigureSprite = bmp is null || _figureCrop >= 1.0
+                ? bmp
+                : new CroppedBitmap(bmp, new PixelRect(
+                    0, 0, bmp.PixelSize.Width, (int)(bmp.PixelSize.Height * _figureCrop)));
         }
 
         /// <summary>Display word per kind. Nerve damage is "damage" — the
@@ -79,37 +99,36 @@ public sealed class InjuriesViewModel : ReactiveObject
             _                 => "healthy",
         };
 
-        // Static brushes shared by all cells (dark-theme palette; wound
-        // severity also lands in the text list, so colour is never the only
-        // carrier). Healthy sits a step above the ~#1f1f1f panel background so
-        // the silhouette figure stays visible when uninjured.
-        private static readonly IBrush HealthyBg = new SolidColorBrush(Color.Parse("#343434"));
+        private const double HealthyOpacity = 0.35;
         private static readonly IBrush HealthyFg = new SolidColorBrush(Color.Parse("#808080"));
         private static readonly IBrush InjuredFg = new SolidColorBrush(Color.Parse("#f0f0f0"));
-        private static readonly IBrush Wound1Bg  = new SolidColorBrush(Color.Parse("#8a7a20"));
-        private static readonly IBrush Wound2Bg  = new SolidColorBrush(Color.Parse("#a86018"));
-        private static readonly IBrush Wound3Bg  = new SolidColorBrush(Color.Parse("#a82828"));
-        private static readonly IBrush ScarBg    = new SolidColorBrush(Color.Parse("#5a6f80"));
-        private static readonly IBrush DamageBg  = new SolidColorBrush(Color.Parse("#7a5a9a"));
     }
 
-    // The 16 regions the injuries dialog reports (ids verbatim from the XML).
-    public InjuryCell Head      { get; } = new("Head",   "Head");
-    public InjuryCell Neck      { get; } = new("Neck",   "Neck");
-    public InjuryCell RightEye  { get; } = new("R Eye",  "Right Eye");
-    public InjuryCell LeftEye   { get; } = new("L Eye",  "Left Eye");
-    public InjuryCell RightArm  { get; } = new("R Arm",  "Right Arm");
-    public InjuryCell LeftArm   { get; } = new("L Arm",  "Left Arm");
-    public InjuryCell RightHand { get; } = new("R Hand", "Right Hand");
-    public InjuryCell LeftHand  { get; } = new("L Hand", "Left Hand");
-    public InjuryCell Chest     { get; } = new("Chest",  "Chest");
-    public InjuryCell Abdomen   { get; } = new("Abdomen","Abdomen");
-    public InjuryCell Back      { get; } = new("Back",   "Back");
-    public InjuryCell RightLeg  { get; } = new("R Leg",  "Right Leg");
-    public InjuryCell LeftLeg   { get; } = new("L Leg",  "Left Leg");
-    public InjuryCell RightFoot { get; } = new("R Foot", "Right Foot");
-    public InjuryCell LeftFoot  { get; } = new("L Foot", "Left Foot");
-    public InjuryCell Nsys      { get; } = new("Nerves", "Nervous System");
+    // The 16 regions the injuries dialog reports (ids verbatim from the XML;
+    // each id doubles as the sprite asset name under Assets/Injuries/). The
+    // arm/leg crop fractions are where the wrist/ankle sits in those sprites
+    // (they carry built-in hands/feet) — only the figure layout uses them.
+    public InjuryCell Head      { get; } = new("head",      "Head",   "Head");
+    public InjuryCell Neck      { get; } = new("neck",      "Neck",   "Neck");
+    public InjuryCell RightEye  { get; } = new("rightEye",  "R Eye",  "Right Eye");
+    public InjuryCell LeftEye   { get; } = new("leftEye",   "L Eye",  "Left Eye");
+    public InjuryCell RightArm  { get; } = new("rightArm",  "R Arm",  "Right Arm", 0.84);
+    public InjuryCell LeftArm   { get; } = new("leftArm",   "L Arm",  "Left Arm",  0.84);
+    public InjuryCell RightHand { get; } = new("rightHand", "R Hand", "Right Hand");
+    public InjuryCell LeftHand  { get; } = new("leftHand",  "L Hand", "Left Hand");
+    public InjuryCell Chest     { get; } = new("chest",     "Chest",  "Chest");
+    public InjuryCell Abdomen   { get; } = new("abdomen",   "Abdomen","Abdomen");
+    public InjuryCell Back      { get; } = new("back",      "Back",   "Back");
+    public InjuryCell RightLeg  { get; } = new("rightLeg",  "R Leg",  "Right Leg", 0.83);
+    public InjuryCell LeftLeg   { get; } = new("leftLeg",   "L Leg",  "Left Leg",  0.83);
+    public InjuryCell RightFoot { get; } = new("rightFoot", "R Foot", "Right Foot");
+    public InjuryCell LeftFoot  { get; } = new("leftFoot",  "L Foot", "Left Foot");
+    public InjuryCell Nsys      { get; } = new("nsys",      "Nerves", "Nervous System");
+
+    /// <summary>Grid display order (4 columns): torso row first, then the
+    /// paired limbs with the character's RIGHT side leading — the doll
+    /// convention (character faces the viewer) carried into a grid.</summary>
+    public IReadOnlyList<InjuryCell> Cells { get; }
 
     private readonly Dictionary<string, InjuryCell> _cells;
 
@@ -142,6 +161,25 @@ public sealed class InjuriesViewModel : ReactiveObject
     private GenieCore? _core;
     private int _refreshIndex;
     private int _appliedSeconds = -1;
+    private bool _figureLayout;
+
+    /// <summary>Panel layout toggle: true = assembled body figure, false =
+    /// the 4×4 part grid (default). Persisted quietly to config
+    /// (<c>injurieslayout</c>) — same pattern as <see cref="RefreshIndex"/>;
+    /// seeding from config in <see cref="Attach"/> is a no-op write.</summary>
+    public bool FigureLayout
+    {
+        get => _figureLayout;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _figureLayout, value);
+            if (_core is not null && value != _core.Config.InjuriesFigureLayout)
+            {
+                _core.Config.SetSetting("injurieslayout", value ? "figure" : "grid", showException: false);
+                _core.Config.Save();
+            }
+        }
+    }
 
     /// <summary>Selected picker index. Setting it applies + saves the config
     /// value; seeding from config in <see cref="Attach"/> is a no-op write.</summary>
@@ -164,6 +202,13 @@ public sealed class InjuriesViewModel : ReactiveObject
 
     public InjuriesViewModel()
     {
+        Cells = new[]
+        {
+            Head,     Neck,    Chest,     Back,
+            Abdomen,  Nsys,    RightEye,  LeftEye,
+            RightArm, LeftArm, RightHand, LeftHand,
+            RightLeg, LeftLeg, RightFoot, LeftFoot,
+        };
         _cells = new Dictionary<string, InjuryCell>(StringComparer.OrdinalIgnoreCase)
         {
             ["head"] = Head,           ["neck"] = Neck,
@@ -191,6 +236,9 @@ public sealed class InjuriesViewModel : ReactiveObject
                 nearest = i;
         _refreshIndex = nearest;
         this.RaisePropertyChanged(nameof(RefreshIndex));
+
+        _figureLayout = core.Config.InjuriesFigureLayout;
+        this.RaisePropertyChanged(nameof(FigureLayout));
 
         core.GameEvents.OfType<InjuryEvent>()
             .ObserveOn(RxApp.MainThreadScheduler)

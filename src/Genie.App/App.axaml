@@ -433,77 +433,95 @@
     </DataTemplate>
 
     <!-- ── Injuries ─────────────────────────────────────────────────────── -->
-    <!-- Body-silhouette wound/scar display (issue #18), fed by the server's
-         injuries dialog. The paper doll is drawn as vector shapes (not a
-         bitmap) so each region's Fill rebinds to its live severity brush and
-         the figure scales with the panel. Mirrored like the in-game doll:
-         the character faces the viewer, so RIGHT-side regions sit on the
-         viewer's LEFT. Back + Nervous System aren't front-visible, so they
-         render as badges under the figure. Colour encodes the reading
-         (grey=healthy, yellow→orange→red=wound 1–3, steel blue=scar,
-         purple=nerve damage); the list below repeats it in words, so colour
-         is never the only carrier. -->
+    <!-- Body-part sprite display (issue #18), fed by the server's injuries
+         dialog. Each of the 16 regions renders its Assets/Injuries sprite in
+         a colour variant baked by InjurySprites (natural ivory ghosted =
+         healthy, yellow→orange→red = wound 1–3, steel blue = scar, purple =
+         nerve damage); the list below repeats every reading in words, so
+         colour is never the only carrier. Two layouts, toggled by the
+         Figure-layout checkbox (persisted as #config injurieslayout):
+           grid   — 4×4 part cells, same idea as Wrayth's injuries dialog;
+                    RIGHT-side parts lead their pair (doll convention).
+           figure — the parts assembled into a front-facing body, back +
+                    nervous system beside it (rear/internal views). Canvas
+                    coordinates come from the assembly worked out in the
+                    sprite-sheet slicing pass; element order IS the stacking
+                    order: legs → feet → abdomen → chest → arms → hands →
+                    gorget → head → eyes. Arm/leg sprites are cropped at the
+                    wrist/ankle (InjuryCell.FigureSprite) because they carry
+                    built-in hands/feet that the dedicated parts replace. -->
     <DataTemplate DataType="docking:InjuriesTool">
       <ScrollViewer>
         <StackPanel Spacing="6" Margin="8">
           <TextBlock FontSize="10" Foreground="{DynamicResource Theme.SectionHeader}" FontWeight="SemiBold"
                      Text="{Binding ViewModel.Count, StringFormat='INJURIES ({0})'}"/>
-          <Viewbox MaxWidth="170" MaxHeight="270" Stretch="Uniform" HorizontalAlignment="Left">
-            <Canvas Width="140" Height="214">
-              <Canvas.Styles>
-                <Style Selector="Ellipse, Rectangle">
-                  <Setter Property="Stroke"          Value="#505050"/>
-                  <Setter Property="StrokeThickness" Value="1"/>
-                </Style>
-              </Canvas.Styles>
-              <!-- neck first so the head overlaps the seam -->
-              <Rectangle Canvas.Left="62" Canvas.Top="41" Width="16" Height="15"
-                         Fill="{Binding ViewModel.Neck.Background}" ToolTip.Tip="{Binding ViewModel.Neck.Tip}"/>
-              <!-- torso -->
-              <Rectangle Canvas.Left="44" Canvas.Top="54" Width="52" Height="42" RadiusX="6" RadiusY="6"
-                         Fill="{Binding ViewModel.Chest.Background}" ToolTip.Tip="{Binding ViewModel.Chest.Tip}"/>
-              <Rectangle Canvas.Left="46" Canvas.Top="97" Width="48" Height="34" RadiusX="6" RadiusY="6"
-                         Fill="{Binding ViewModel.Abdomen.Background}" ToolTip.Tip="{Binding ViewModel.Abdomen.Tip}"/>
-              <!-- arms + hands (right side of the body = viewer's left) -->
-              <Rectangle Canvas.Left="26" Canvas.Top="56" Width="16" Height="62" RadiusX="8" RadiusY="8"
-                         Fill="{Binding ViewModel.RightArm.Background}" ToolTip.Tip="{Binding ViewModel.RightArm.Tip}"/>
-              <Rectangle Canvas.Left="98" Canvas.Top="56" Width="16" Height="62" RadiusX="8" RadiusY="8"
-                         Fill="{Binding ViewModel.LeftArm.Background}" ToolTip.Tip="{Binding ViewModel.LeftArm.Tip}"/>
-              <Ellipse Canvas.Left="24" Canvas.Top="119" Width="19" Height="19"
-                       Fill="{Binding ViewModel.RightHand.Background}" ToolTip.Tip="{Binding ViewModel.RightHand.Tip}"/>
-              <Ellipse Canvas.Left="97" Canvas.Top="119" Width="19" Height="19"
-                       Fill="{Binding ViewModel.LeftHand.Background}" ToolTip.Tip="{Binding ViewModel.LeftHand.Tip}"/>
-              <!-- legs + feet -->
-              <Rectangle Canvas.Left="47" Canvas.Top="132" Width="21" Height="64" RadiusX="8" RadiusY="8"
-                         Fill="{Binding ViewModel.RightLeg.Background}" ToolTip.Tip="{Binding ViewModel.RightLeg.Tip}"/>
-              <Rectangle Canvas.Left="72" Canvas.Top="132" Width="21" Height="64" RadiusX="8" RadiusY="8"
-                         Fill="{Binding ViewModel.LeftLeg.Background}" ToolTip.Tip="{Binding ViewModel.LeftLeg.Tip}"/>
-              <Rectangle Canvas.Left="41" Canvas.Top="197" Width="26" Height="14" RadiusX="7" RadiusY="7"
-                         Fill="{Binding ViewModel.RightFoot.Background}" ToolTip.Tip="{Binding ViewModel.RightFoot.Tip}"/>
-              <Rectangle Canvas.Left="73" Canvas.Top="197" Width="26" Height="14" RadiusX="7" RadiusY="7"
-                         Fill="{Binding ViewModel.LeftFoot.Background}" ToolTip.Tip="{Binding ViewModel.LeftFoot.Tip}"/>
-              <!-- head last so it sits over the neck; eyes over the head -->
-              <Ellipse Canvas.Left="52" Canvas.Top="4" Width="36" Height="40"
-                       Fill="{Binding ViewModel.Head.Background}" ToolTip.Tip="{Binding ViewModel.Head.Tip}"/>
-              <Ellipse Canvas.Left="58" Canvas.Top="18" Width="9" Height="9" Stroke="#707070"
-                       Fill="{Binding ViewModel.RightEye.Background}" ToolTip.Tip="{Binding ViewModel.RightEye.Tip}"/>
-              <Ellipse Canvas.Left="73" Canvas.Top="18" Width="9" Height="9" Stroke="#707070"
-                       Fill="{Binding ViewModel.LeftEye.Background}" ToolTip.Tip="{Binding ViewModel.LeftEye.Tip}"/>
+          <ItemsControl ItemsSource="{Binding ViewModel.Cells}" MaxWidth="248" HorizontalAlignment="Left"
+                        IsVisible="{Binding !ViewModel.FigureLayout}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <UniformGrid Columns="4"/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:InjuriesViewModel+InjuryCell">
+                <!-- transparent Background so the whole cell hit-tests for the tooltip -->
+                <StackPanel Margin="2,3" Spacing="2" Background="Transparent" ToolTip.Tip="{Binding Tip}">
+                  <Image Source="{Binding Sprite}" Height="52" Stretch="Uniform"
+                         Opacity="{Binding SpriteOpacity}"/>
+                  <TextBlock Text="{Binding Label}" FontSize="9" HorizontalAlignment="Center"
+                             Foreground="{Binding Foreground}"/>
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Viewbox MaxWidth="260" MaxHeight="330" Stretch="Uniform" HorizontalAlignment="Left"
+                   IsVisible="{Binding ViewModel.FigureLayout}">
+            <Canvas Width="920" Height="1125">
+              <Image Canvas.Left="194" Canvas.Top="645" Width="127" Height="365" Stretch="Uniform"
+                     Source="{Binding ViewModel.RightLeg.FigureSprite}" Opacity="{Binding ViewModel.RightLeg.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.RightLeg.Tip}"/>
+              <Image Canvas.Left="318" Canvas.Top="645" Width="127" Height="365" Stretch="Uniform"
+                     Source="{Binding ViewModel.LeftLeg.FigureSprite}" Opacity="{Binding ViewModel.LeftLeg.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.LeftLeg.Tip}"/>
+              <!-- ankle cuffs sit over the legs' crop line -->
+              <Image Canvas.Left="141" Canvas.Top="972" Width="134" Height="145" Stretch="Uniform"
+                     Source="{Binding ViewModel.RightFoot.FigureSprite}" Opacity="{Binding ViewModel.RightFoot.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.RightFoot.Tip}"/>
+              <Image Canvas.Left="365" Canvas.Top="972" Width="131" Height="145" Stretch="Uniform"
+                     Source="{Binding ViewModel.LeftFoot.FigureSprite}" Opacity="{Binding ViewModel.LeftFoot.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.LeftFoot.Tip}"/>
+              <Image Canvas.Left="226" Canvas.Top="455" Width="189" Height="220" Stretch="Uniform"
+                     Source="{Binding ViewModel.Abdomen.FigureSprite}" Opacity="{Binding ViewModel.Abdomen.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.Abdomen.Tip}"/>
+              <Image Canvas.Left="191" Canvas.Top="225" Width="258" Height="280" Stretch="Uniform"
+                     Source="{Binding ViewModel.Chest.FigureSprite}" Opacity="{Binding ViewModel.Chest.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.Chest.Tip}"/>
+              <!-- pauldrons over the chest's shoulder line -->
+              <Image Canvas.Left="130" Canvas.Top="235" Width="116" Height="260" Stretch="Uniform"
+                     Source="{Binding ViewModel.RightArm.FigureSprite}" Opacity="{Binding ViewModel.RightArm.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.RightArm.Tip}"/>
+              <Image Canvas.Left="395" Canvas.Top="235" Width="114" Height="260" Stretch="Uniform"
+                     Source="{Binding ViewModel.LeftArm.FigureSprite}" Opacity="{Binding ViewModel.LeftArm.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.LeftArm.Tip}"/>
+              <Image Canvas.Left="132" Canvas.Top="477" Width="89" Height="150" Stretch="Uniform"
+                     Source="{Binding ViewModel.RightHand.FigureSprite}" Opacity="{Binding ViewModel.RightHand.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.RightHand.Tip}"/>
+              <Image Canvas.Left="414" Canvas.Top="477" Width="88" Height="150" Stretch="Uniform"
+                     Source="{Binding ViewModel.LeftHand.FigureSprite}" Opacity="{Binding ViewModel.LeftHand.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.LeftHand.Tip}"/>
+              <!-- gorget flares wider than the head's neck; head over its collar -->
+              <Image Canvas.Left="229" Canvas.Top="185" Width="182" Height="170" Stretch="Uniform"
+                     Source="{Binding ViewModel.Neck.FigureSprite}" Opacity="{Binding ViewModel.Neck.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.Neck.Tip}"/>
+              <Image Canvas.Left="242" Canvas.Top="48" Width="155" Height="240" Stretch="Uniform"
+                     Source="{Binding ViewModel.Head.FigureSprite}" Opacity="{Binding ViewModel.Head.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.Head.Tip}"/>
+              <Image Canvas.Left="270" Canvas.Top="131" Width="49" Height="34" Stretch="Uniform"
+                     Source="{Binding ViewModel.RightEye.FigureSprite}" Opacity="{Binding ViewModel.RightEye.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.RightEye.Tip}"/>
+              <Image Canvas.Left="322" Canvas.Top="131" Width="48" Height="34" Stretch="Uniform"
+                     Source="{Binding ViewModel.LeftEye.FigureSprite}" Opacity="{Binding ViewModel.LeftEye.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.LeftEye.Tip}"/>
+              <!-- rear / internal views beside the figure -->
+              <Image Canvas.Left="650" Canvas.Top="120" Width="260" Height="280" Stretch="Uniform"
+                     Source="{Binding ViewModel.Back.FigureSprite}" Opacity="{Binding ViewModel.Back.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.Back.Tip}"/>
+              <TextBlock Canvas.Left="748" Canvas.Top="408" Text="Back" FontSize="30"
+                         Foreground="{Binding ViewModel.Back.Foreground}"/>
+              <Image Canvas.Left="685" Canvas.Top="520" Width="190" Height="300" Stretch="Uniform"
+                     Source="{Binding ViewModel.Nsys.FigureSprite}" Opacity="{Binding ViewModel.Nsys.SpriteOpacity}" ToolTip.Tip="{Binding ViewModel.Nsys.Tip}"/>
+              <TextBlock Canvas.Left="730" Canvas.Top="828" Text="Nerves" FontSize="30"
+                         Foreground="{Binding ViewModel.Nsys.Foreground}"/>
             </Canvas>
           </Viewbox>
-          <!-- regions with no front-facing spot on the figure -->
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <Border Background="{Binding ViewModel.Back.Background}" CornerRadius="3" Padding="12,3"
-                    BorderBrush="#505050" BorderThickness="1" ToolTip.Tip="{Binding ViewModel.Back.Tip}">
-              <TextBlock Text="{Binding ViewModel.Back.Label}" FontSize="10"
-                         Foreground="{Binding ViewModel.Back.Foreground}"/>
-            </Border>
-            <Border Background="{Binding ViewModel.Nsys.Background}" CornerRadius="3" Padding="12,3"
-                    BorderBrush="#505050" BorderThickness="1" ToolTip.Tip="{Binding ViewModel.Nsys.Tip}">
-              <TextBlock Text="{Binding ViewModel.Nsys.Label}" FontSize="10"
-                         Foreground="{Binding ViewModel.Nsys.Foreground}"/>
-            </Border>
-          </StackPanel>
+          <CheckBox Content="Figure layout" FontSize="10" MinHeight="0" Padding="4,0"
+                    IsChecked="{Binding ViewModel.FigureLayout}"
+                    ToolTip.Tip="Show the body parts assembled into a figure instead of the 4×4 grid. Same setting as #config injurieslayout figure|grid."/>
           <!-- opt-in silent `health` poll cadence (#config injuriespoll) — the
                only way to tell nerve wound from nerve scar. Off by default. -->
           <StackPanel Orientation="Horizontal" Spacing="6"
