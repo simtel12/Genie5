@@ -25,8 +25,9 @@ namespace Genie.App.ViewModels;
 
 /// <summary>
 /// Top-level Configuration dialog VM. Profile-scoped: every config file lives
-/// under <c>Config/Profiles/{ProfileId}/</c> so each character can have its own
-/// highlights, triggers, aliases, etc.
+/// under <c>Profiles/{Char}-{Acct}/</c> (the same per-character dir Core loads
+/// from at connect) so each character can have its own highlights, triggers,
+/// aliases, etc.
 ///
 /// <para>Engine selection rules:</para>
 /// <list type="bullet">
@@ -46,6 +47,7 @@ public class ConfigurationViewModel : ReactiveObject
 {
     private readonly GenieCore?           _core;
     private readonly string               _configRoot;
+    private readonly Func<ConnectionProfile?, string> _profileDirResolver;
     private readonly ConnectionProfile?   _connectedProfile;
     private readonly WindowSettingsStore  _windowSettings;
     private readonly DisplaySettings?     _display;
@@ -79,10 +81,20 @@ public class ConfigurationViewModel : ReactiveObject
         ConnectionProfile?   connectedProfile,
         WindowSettingsStore  windowSettings,
         DisplaySettings?     display     = null,
-        string?              displayPath = null)
+        string?              displayPath = null,
+        Func<ConnectionProfile?, string>? profileDirResolver = null)
     {
         _core             = core;
         _configRoot       = configRoot;
+        // The host's resolver (MainWindowViewModel.GetProfileConfigDir) keeps
+        // this dialog writing to the SAME per-character dir Core loads from.
+        // Fallback (tests / design-time): global Config for null, else the
+        // per-character path under the default root.
+        _profileDirResolver = profileDirResolver ?? (p => p is null
+            ? configRoot
+            : Genie.Core.Config.GenieConfig.ProfileDirFor(
+                  Path.GetDirectoryName(Path.GetFullPath(configRoot))!,
+                  p.CharacterName, p.AccountName));
         _connectedProfile = connectedProfile;
         _windowSettings   = windowSettings;
         _display          = display;
@@ -276,9 +288,7 @@ public class ConfigurationViewModel : ReactiveObject
     /// or the global <c>Config/</c> dir when no profile is selected.</summary>
     private string PathFor(string fileName)
     {
-        var dir = SelectedProfile is null
-            ? _configRoot
-            : Path.Combine(_configRoot, "Profiles", SelectedProfile.Id.ToString("N"));
+        var dir = _profileDirResolver(SelectedProfile);
         Directory.CreateDirectory(dir);
         return Path.Combine(dir, fileName);
     }

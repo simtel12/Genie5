@@ -77,7 +77,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
     /// <summary>
     /// Per-profile layout presets for the connected saved profile —
-    /// <c>{Config}/Profiles/{guid}/Layouts/</c>. Null when not connected, or
+    /// <c>Profiles/{Char}-{Acct}/Layouts/</c>. Null when not connected, or
     /// connected via bare credentials (no saved profile to scope to).
     /// </summary>
     private Settings.LayoutStore? _profileLayouts;
@@ -1219,7 +1219,8 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             // When the selected profile matches the connected one, edits go
             // straight to the live engines; otherwise edits act on draft
             // engines loaded from that profile's directory.
-            var cfgVm = new ConfigurationViewModel(_core, _configDir, Profiles, ConnectedProfile, WindowSettings, Display, _displayPath);
+            var cfgVm = new ConfigurationViewModel(_core, _configDir, Profiles, ConnectedProfile, WindowSettings, Display, _displayPath,
+                                                   GetProfileConfigDir);
             // TTS hooks for the Text-to-Speech tab — this VM owns the TtsService.
             cfgVm.SpeakSample     = text => _tts?.Speak(text, Services.TtsPriority.High);
             cfgVm.TtsVoiceChanged = () => _tts?.Reset();
@@ -2976,22 +2977,91 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// Resolve the per-profile config directory. When <paramref name="profile"/>
     /// is null we use the legacy global <c>Config/</c> directory — preserving
     /// behaviour for users who never picked a profile and for fresh installs.
+    ///
+    /// <para>The path comes from <see cref="Genie.Core.Config.GenieConfig.ProfileDirFor"/>
+    /// so it is the SAME <c>Profiles/{Char}-{Acct}/</c> directory Core switches
+    /// to at connect (<c>ApplyCharacterProfile</c>) and loads <c>*.cfg</c> rule
+    /// files from — and the same one the wiki documents. An earlier scheme used
+    /// <c>Config/Profiles/{profile-guid}/</c>, which Core never read: a Genie 4
+    /// import saved "this character only" landed in the GUID dir and silently
+    /// vanished on restart. Any existing GUID dir is migrated on first resolve.</para>
+    ///
+    /// <para>A profile with no character/account identity resolves to the shared
+    /// <c>Config/</c> dir — again matching where Core actually loads from for
+    /// such a session.</para>
     /// </summary>
     public string GetProfileConfigDir(ConnectionProfile? profile)
     {
         if (profile is null) return _configDir;
 
         // Honor a per-profile data root: when the profile points at its own
-        // folder, its config (rules, layouts) lives under {DataDirectory}/Config
-        // so it stays consistent with Core, which also repoints there. Empty =
-        // the default global Config dir.
-        var baseConfigDir = profile.DataDirectory is { Length: > 0 } dd
-            ? Path.Combine(Path.GetFullPath(dd), "Config")
-            : _configDir;
+        // folder, everything lives under it — matching Core, which repoints
+        // its whole data root there (UseExplicitRoot). Empty = default root.
+        var dataRoot = profile.DataDirectory is { Length: > 0 } dd
+            ? Path.GetFullPath(dd)
+            : Path.GetDirectoryName(_configDir)!;
 
-        var dir = Path.Combine(baseConfigDir, "Profiles", profile.Id.ToString("N"));
+        var dir = Genie.Core.Config.GenieConfig.ProfileDirFor(
+            dataRoot, profile.CharacterName, profile.AccountName);
         Directory.CreateDirectory(dir);
+        MigrateLegacyGuidProfileDir(dataRoot, profile, dir);
         return dir;
+    }
+
+    /// <summary>
+    /// One-time migration from the pre-unification per-profile scheme
+    /// (<c>Config/Profiles/{profile-guid}/</c>) to the per-character dir Core
+    /// reads (<c>Profiles/{Char}-{Acct}/</c>). Moves each file/subfolder that
+    /// doesn't already exist at the destination — never overwrites — then
+    /// removes the GUID dir if that emptied it. Anything that can't move stays
+    /// put; best-effort like the Config\Maps → Maps migration above.
+    /// </summary>
+    private static void MigrateLegacyGuidProfileDir(string dataRoot, ConnectionProfile profile, string newDir)
+    {
+        try
+        {
+            var legacy = Path.Combine(dataRoot, "Config", "Profiles", profile.Id.ToString("N"));
+            if (!Directory.Exists(legacy)) return;
+            if (string.Equals(Path.GetFullPath(legacy), Path.GetFullPath(newDir),
+                              StringComparison.OrdinalIgnoreCase)) return;
+
+            MoveContentsIfAbsent(legacy, newDir);
+
+            // Clean up the GUID dir (and its Profiles parent) when emptied so
+            // the stale scheme doesn't linger and confuse folder archaeology.
+            if (!Directory.EnumerateFileSystemEntries(legacy).Any())
+            {
+                Directory.Delete(legacy);
+                var parent = Path.GetDirectoryName(legacy)!;
+                if (!Directory.EnumerateFileSystemEntries(parent).Any())
+                    Directory.Delete(parent);
+            }
+        }
+        catch { /* best-effort — a failed migration must not block startup/connect */ }
+    }
+
+    /// <summary>Recursively move everything under <paramref name="from"/> into
+    /// <paramref name="to"/>, skipping entries that already exist at the
+    /// destination (existing per-character data always wins over legacy).</summary>
+    private static void MoveContentsIfAbsent(string from, string to)
+    {
+        Directory.CreateDirectory(to);
+        foreach (var file in Directory.GetFiles(from))
+        {
+            var dest = Path.Combine(to, Path.GetFileName(file));
+            if (!File.Exists(dest))
+                try { File.Move(file, dest); } catch { /* leave it in the legacy dir */ }
+        }
+        foreach (var sub in Directory.GetDirectories(from))
+        {
+            MoveContentsIfAbsent(sub, Path.Combine(to, Path.GetFileName(sub)));
+            try
+            {
+                if (!Directory.EnumerateFileSystemEntries(sub).Any())
+                    Directory.Delete(sub);
+            }
+            catch { /* best-effort */ }
+        }
     }
 
     /// <summary>

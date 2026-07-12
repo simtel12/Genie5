@@ -5,7 +5,7 @@ namespace Genie.App.ViewModels;
 /// <summary>Where a saved layout lives.</summary>
 public enum LayoutScope
 {
-    /// <summary>Per-connected-profile layouts ({Config}/Profiles/{guid}/Layouts).</summary>
+    /// <summary>Per-connected-profile layouts (Profiles/{Char}-{Acct}/Layouts).</summary>
     Profile,
     /// <summary>Global layouts shared across characters ({AppData}/Genie5/Layouts).</summary>
     Global,

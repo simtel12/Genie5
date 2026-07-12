@@ -412,11 +412,15 @@ public sealed class GenieConfig
     /// shared <c>Config</c> directory.
     ///
     /// On first use for a given character — i.e. the per-character directory
-    /// doesn't exist yet — any legacy <c>Config/*.cfg</c> files are copied
-    /// into the new directory as a seed. This means the first character a
-    /// user logs in as after upgrading inherits their old shared settings;
-    /// subsequent characters start as copies of the same baseline. From there
-    /// each character's rule sets diverge independently.
+    /// holds none of the <see cref="CfgFiles"/> yet — any legacy
+    /// <c>Config/*.cfg</c> files are copied into the new directory as a seed.
+    /// (The trigger is cfg-file absence, not directory absence: the host UI
+    /// may pre-create the folder for windows.json / Layouts before the
+    /// character's first connect, and that must not defeat the seed.) This
+    /// means the first character a user logs in as after upgrading inherits
+    /// their old shared settings; subsequent characters start as copies of
+    /// the same baseline. From there each character's rule sets diverge
+    /// independently.
     ///
     /// Returns the resolved absolute path so callers can log it.
     /// </summary>
@@ -436,22 +440,22 @@ public sealed class GenieConfig
         ProfileConfigDirRaw = rel;
 
         var full = ConfigProfileDir;
-        if (!Directory.Exists(full))
+        Directory.CreateDirectory(full);
+        // One-time seed from legacy Config/*.cfg so the user's existing
+        // aliases / classes / etc. carry into their first character. "First
+        // time" = no cfg file in the dir yet; once any rule set is saved
+        // per-character the seed never runs again for this character.
+        var legacy = ConfigDir;
+        if (Directory.Exists(legacy) && !legacy.Equals(full, StringComparison.OrdinalIgnoreCase)
+            && !CfgFiles.Any(n => File.Exists(Path.Combine(full, n))))
         {
-            Directory.CreateDirectory(full);
-            // One-time seed from legacy Config/*.cfg so the user's existing
-            // aliases / classes / etc. carry into their first character.
-            var legacy = ConfigDir;
-            if (Directory.Exists(legacy) && !legacy.Equals(full, StringComparison.OrdinalIgnoreCase))
+            foreach (var name in CfgFiles)
             {
-                foreach (var name in CfgFiles)
+                var src = Path.Combine(legacy, name);
+                var dst = Path.Combine(full, name);
+                if (File.Exists(src) && !File.Exists(dst))
                 {
-                    var src = Path.Combine(legacy, name);
-                    var dst = Path.Combine(full, name);
-                    if (File.Exists(src) && !File.Exists(dst))
-                    {
-                        try { File.Copy(src, dst); } catch { /* best-effort seed */ }
-                    }
+                    try { File.Copy(src, dst); } catch { /* best-effort seed */ }
                 }
             }
         }
@@ -464,6 +468,28 @@ public sealed class GenieConfig
     /// one identity everywhere.</summary>
     public static string CharacterSlug(string characterName, string accountName) =>
         $"{Sanitize(characterName)}-{Sanitize(accountName)}";
+
+    /// <summary>
+    /// Pure-path version of <see cref="ApplyCharacterProfile"/>: the absolute
+    /// per-character config directory for <paramref name="dataRoot"/> —
+    /// <c>{root}/Profiles/{Char}-{Acct}/</c>, falling back to the shared
+    /// <c>{root}/Config/</c> when either name is missing (mirroring the
+    /// engine's fallback for LIST / unauthenticated sessions). No side
+    /// effects: nothing is created and <see cref="ProfileConfigDirRaw"/> is
+    /// untouched. This is THE path contract between Core (which loads
+    /// <c>*.cfg</c> from here at connect) and any host UI that persists
+    /// per-character files — hosts must write where this points or their
+    /// files are never read back. Assumes the default <c>Config</c> dir name;
+    /// a <c>configdir</c> override in <c>settings.cfg</c> only shifts the
+    /// no-character fallback, which hosts don't use for per-character data.
+    /// </summary>
+    public static string ProfileDirFor(string dataRoot, string? characterName, string? accountName)
+    {
+        var root = Path.GetFullPath(dataRoot);
+        return string.IsNullOrWhiteSpace(characterName) || string.IsNullOrWhiteSpace(accountName)
+            ? Path.Combine(root, "Config")
+            : Path.Combine(root, "Profiles", CharacterSlug(characterName, accountName));
+    }
 
     /// <summary>Files that are character-specific and should follow the profile dir.</summary>
     private static readonly string[] CfgFiles =
