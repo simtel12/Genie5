@@ -21,9 +21,12 @@ namespace Genie.Core.Persistence;
 /// </summary>
 public static class CfgFormat
 {
+    // Empty names are skipped — a nameless class entry emits "#class on",
+    // which the loader reads as a list command, not an add.
     public static IEnumerable<string> ClassLines(IReadOnlyDictionary<string, bool> classes) =>
         classes
-            .Where(kvp => !kvp.Key.Equals("default", StringComparison.OrdinalIgnoreCase))
+            .Where(kvp => kvp.Key.Length > 0 &&
+                          !kvp.Key.Equals("default", StringComparison.OrdinalIgnoreCase))
             .Select(kvp => $"#class {kvp.Key} {(kvp.Value ? "on" : "off")}");
 
     public static IEnumerable<string> AliasLines(IEnumerable<AliasRule> aliases) =>

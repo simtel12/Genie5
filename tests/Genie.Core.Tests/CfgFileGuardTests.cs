@@ -147,6 +147,23 @@ public class CfgFileGuardTests : IDisposable
     }
 
     [Fact]
+    public void Loading_does_not_expand_variables_into_stored_rules()
+    {
+        var (host, cmd, trig, _) = Make();
+        // monstercount is a defined global at load time — the old load path ran
+        // lines through ProcessInput, whose expansion baked the trigger's
+        // pattern to the literal "0" (and the next #save persisted it).
+        host.Globals["monstercount"] = "0";
+        WriteCfg("triggers.cfg", "#trigger add {$monstercount} {#statusbar 4 Monstercount: $monstercount}\n");
+
+        cmd.ProcessInput("#trigger load");
+
+        var rule = trig.Triggers.Single();
+        Assert.Equal("$monstercount", rule.Pattern);
+        Assert.Equal("#statusbar 4 Monstercount: $monstercount", rule.Action);
+    }
+
+    [Fact]
     public void Corrupt_json_cfg_is_reported_and_not_dispatched()
     {
         var (host, cmd, _, subs) = Make();
@@ -169,7 +186,24 @@ public class CfgFileGuardTests : IDisposable
         public Dictionary<string, string> Globals { get; } = new();
 
         public IReadOnlyDictionary<string, string> GetGlobalVariables() => Globals;
-        public string ExpandVariables(string text) => text;
+
+        // Real $name expansion (mirrors the app host) so the no-expand-on-load
+        // test actually fails if a loader routes lines through ProcessInput.
+        public string ExpandVariables(string text)
+        {
+            if (string.IsNullOrEmpty(text) || text.IndexOf('$') < 0) return text;
+            var sb = new System.Text.StringBuilder(text.Length);
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (text[i] != '$') { sb.Append(text[i]); continue; }
+                int j = i + 1;
+                while (j < text.Length && (char.IsLetterOrDigit(text[j]) || text[j] == '_')) j++;
+                var name = text[(i + 1)..j];
+                if (name.Length > 0 && Globals.TryGetValue(name, out var v)) { sb.Append(v); i = j - 1; }
+                else sb.Append('$');
+            }
+            return sb.ToString();
+        }
 
         public void SendToGame(string text, bool userInput = false, string origin = "", string? echoOverride = null)
             => SentToGame.Add(text);

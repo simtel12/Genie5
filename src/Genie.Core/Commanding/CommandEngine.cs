@@ -1078,10 +1078,15 @@ public sealed class CommandEngine
     // self-heal JSON-format saves via PersistenceService + a cfg rewrite.
 
     /// <summary>Dispatch a cfg file's lines: only #command lines run; anything
-    /// else is counted and reported, never sent to the game. Lines keep the
-    /// normal ProcessInput pipeline (variable expansion, separator split); a
-    /// <c>#</c> line under a custom commandchar still dispatches internally —
-    /// saves always write <c>#</c>.</summary>
+    /// else is counted and reported, never sent to the game. Every line goes
+    /// straight to <see cref="HandleInternalCommand"/> — NOT ProcessInput —
+    /// because its variable-expansion pass bakes any $var that happens to be
+    /// defined at load time into the stored rule (a trigger saved with pattern
+    /// <c>$monstercount</c> came back as pattern <c>0</c>, and the next #save
+    /// would have persisted the corruption). cfg files are machine-written,
+    /// one #command per line, so expansion and separator-splitting are never
+    /// wanted here. A <c>#</c> line under a custom commandchar dispatches the
+    /// same way — saves always write <c>#</c>.</summary>
     private void RunCfgFileLines(IReadOnlyList<string> lines, string fileName)
     {
         int skipped = 0;
@@ -1089,9 +1094,10 @@ public sealed class CommandEngine
         {
             var line = raw.TrimStart();
             if (line.Length == 0) continue;
-            if (line[0] == _config.CommandChar)      ProcessInput(line);
-            else if (line[0] == '#')                 HandleInternalCommand(line[1..]);
-            else                                     skipped++;
+            if (line[0] == _config.CommandChar || line[0] == '#')
+                HandleInternalCommand(line[1..]);
+            else
+                skipped++;
         }
         if (skipped > 0)
             _host.Echo($"{fileName}: skipped {skipped} line(s) that are not #commands.");
