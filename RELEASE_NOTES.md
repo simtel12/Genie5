@@ -1,3 +1,60 @@
+# Genie 5 — v5.0.0-alpha.8.9
+
+A script-management milestone: the Scripts window grows into a full **Script
+Manager**, the Injuries panel gets a proper body-part display, and a cluster of
+script-variable parity gaps closes.
+
+## ✨ New
+
+- **Script Manager** — the Scripts window is now a full management panel
+  (Scripts → Script Manager):
+  - **Library tree** of your scripts folder (subfolders included) with a filter
+    box, live folder watching, and preserved expansion across refreshes.
+  - **Running scripts** with pause state, elapsed time, and the current line;
+    a detail strip for the selected script; per-row actions (pause/resume,
+    abort, reload, vars, trace, debug level, edit).
+  - **Run with arguments**, inline new-script creation, two-step delete, and
+    right-click menus on both the library tree and running rows.
+  - **Script Bar chips** gain the same right-click menu, with live paused-state
+    sync.
+  - **`#script` command parity with Genie 4** — every panel action routes
+    through it: `abort`/`pause`/`resume`/`pauseorresume` accept `all` and
+    `except <name>`, `#script reload` hot-swaps a running script's file at its
+    next `goto` (state preserved), plus `trace`, `vars`, `debug 0-10`, and
+    `explorer` (opens the panel). `#script` alone lists running scripts in the
+    Genie 4 status format.
+  - **External Editor picker** — Scripts → External Editor shows which editor
+    Edit will use and lets you change it or reset to the OS default (same
+    setting as Display Settings).
+- **Injuries body display** — the Injuries panel renders each body part as a
+  sprite with severity colour variants (healthy ghost, wound 1–3, scar, nerve
+  damage), in a compact 4×4 grid or an assembled figure — toggle in the panel
+  or via `#config injurieslayout figure|grid`. Readings stay listed in words,
+  so colour is never the only signal.
+- **`$spellpreptime`** reserved script variable — the current spell's prep
+  duration, alongside `$spellstarttime`/`$spelltime`.
+
+## 🔧 Fixed
+
+- **Window-menu Copy** — right-click → Copy now copies the full highlighted
+  selection. It had silently copied nothing (then only the right-clicked line):
+  the menu resolved its target to the individual line under the pointer rather
+  than the window that owns the menu. Ctrl+C was never affected.
+- **`$` variable scoping matches Genie 4** — `$name` resolves globals only
+  (`#tvar`/`#var`/events) and no longer falls back to script-local `%`
+  variables, fixing globals set through `#link → #parse` menu-script chains
+  being shadowed by same-named locals. `$argcount` — which had only worked via
+  that fallback — is restored as a true `$`-frame token: script args at top
+  level, gosub args inside a gosub, capture count after a capturing match.
+- **Mapper legend placement** — on dense maps (e.g. Throne City) the colour
+  legend tests each viewport corner against the actual room boxes instead of
+  the zone's bounding box, so it lands in a genuinely clear corner instead of
+  covering rooms.
+- **Cross-zone wait bar** — the "boarding boat · time left" text updates every
+  second again (it could stick at just the separator).
+- **Details side-tab** — the collapsed DETAILS caption renders vertically
+  instead of clipping.
+
 # Genie 5 — v5.0.0-alpha.8.8
 
 Stability and mapper groundwork fixes.

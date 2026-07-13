@@ -4,7 +4,21 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8.8 — Mapper & Connect Fixes
+## Latest: v5.0.0-alpha.8.9 — Script Manager & Injuries
+
+The Scripts window grows into a full **Script Manager** (library tree, running-script controls, Genie 4 `#script` command parity incl. hot reload), the Injuries panel gets a sprite-based body display, and a cluster of script-variable parity gaps closes.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.9** as a delta.
+
+- **Script Manager** — library tree with filter + live folder watch, running rows with pause/elapsed/current line, run-with-args, right-click actions everywhere (incl. Script Bar chips), an External Editor picker, and full Genie 4 `#script` parity (`abort/pause/resume … all | except <name>`, hot `reload` at the next `goto`, `trace`, `vars`, `debug`, `explorer`).
+- **Injuries body display** — per-part sprites with severity colours, in a 4×4 grid or an assembled figure (`#config injurieslayout`).
+- **Script variables** — new **`$spellpreptime`**; **`$` scoping matches Genie 4** (`$` = globals only, fixing `#link → #parse` global visibility); **`$argcount`** restored as a true `$`-frame token.
+- **Window-menu Copy** copies the full highlighted selection (Ctrl+C was never affected).
+- **Mapper legend** finds a genuinely clear viewport corner on dense maps; the cross-zone **wait-bar text** ticks again; the collapsed **DETAILS** tab renders vertically.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.9)
+
+## v5.0.0-alpha.8.8 — Mapper & Connect Fixes
 
 Stability and mapper groundwork: connect/reconnect races are serialized, and the placeholder cross-zone connections file no longer shadows the links derived from your maps.
 
