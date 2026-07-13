@@ -4,7 +4,18 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8.10 — Import Integrity
+## Latest: v5.0.0-alpha.8.11 — Scriptable /commands
+
+A small, focused release: scripts can now run client /commands.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.11** as a delta.
+
+- **Scripts can drive client /commands** — `put /sort weapon`, `send /sort weapon`, and a bare `/sort weapon` script line now run the Circle Calculator (and every other tracker command — `/calc`, `/tt`, `/spelltimer`, `/exp`) exactly like typed input, instead of leaking the literal text to the game server. The semicolon form and delayed sends work too. (#169)
+- **Script-author note:** `#put /sort weapon` (leading `#`) is a *comment* in the script language — Genie 4 parity — and is ignored by design. Use `put /sort weapon` or a bare `/sort weapon` line.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.11)
+
+## v5.0.0-alpha.8.10 — Import Integrity
 
 A bug-sweep with one theme: rules you import or save now load back exactly as written — Genie 4 imports finally survive a restart.
 

@@ -1,3 +1,25 @@
+# Genie 5 — v5.0.0-alpha.8.11
+
+A small, focused release: **scripts can now run client /commands.**
+
+## 🔧 Fixed
+
+- **Scripts can drive client /commands** — `put /sort weapon`,
+  `send /sort weapon`, and a bare `/sort weapon` script line now run the
+  Circle Calculator (and every other tracker command — `/calc`, `/tt`,
+  `/spelltimer`, `/exp`) exactly like typed input, instead of leaking the
+  literal text to the game server. Claimed commands never touch the wire
+  and don't consume the type-ahead budget; anything no tracker claims
+  still goes to the game verbatim. The semicolon form
+  (`put look;/sort weapon`) and delayed sends (`send 0.5 /sort`) work
+  too. (#169)
+
+## 📝 Script-author note
+
+`#put /sort weapon` (leading `#`) is a **comment** in the script
+language — Genie 4 parity — and is ignored by design. Use
+`put /sort weapon` or a bare `/sort weapon` line.
+
 # Genie 5 — v5.0.0-alpha.8.10
 
 A bug-sweep release with one theme: **rules you import or save now load back
