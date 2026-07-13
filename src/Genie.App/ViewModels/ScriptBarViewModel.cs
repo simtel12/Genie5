@@ -23,6 +23,7 @@ namespace Genie.App.ViewModels;
 public sealed class ScriptBarViewModel : ReactiveObject
 {
     private GenieCore? _core;
+    private DispatcherTimer? _pauseSync;
 
     /// <summary>
     /// Scripts currently in the engine's instance list (both <c>.cmd</c> and
@@ -104,6 +105,28 @@ public sealed class ScriptBarViewModel : ReactiveObject
     /// </summary>
     public event Action<string>? EditScript;
 
+    /// <summary>
+    /// Build one chip with its context-menu commands baked in. The menu items
+    /// live in a popup (detached visual tree), so <c>$parent</c> reflection
+    /// bindings can't reach the VM-level commands — each chip carries its own,
+    /// all routed through the command pipeline like the Script Manager panel.
+    /// </summary>
+    private ScriptBarItem MakeItem(string name, bool isJs, int debugLevel)
+    {
+        var item = new ScriptBarItem(name, isJs) { DebugLevel = debugLevel };
+        item.InitMenuCommands(
+            pauseResume: () => Process($"#script pauseorresume {name}"),
+            abort:       () => Process($"#stop {name}"),
+            vars:        () => Process($"#script vars {name}"),
+            trace:       () => Process($"#script trace {name}"),
+            reload:      () => Process($"#script reload {name}"),
+            edit:        () => EditScript?.Invoke(name),
+            setDebug:    lvl => Process($"#script debug {lvl} {name}"));
+        return item;
+    }
+
+    private void Process(string command) => _core?.Commands.ProcessInput(command);
+
     public void Attach(GenieCore core)
     {
         _core = core;
@@ -124,10 +147,27 @@ public sealed class ScriptBarViewModel : ReactiveObject
                 for (int i = RunningScripts.Count - 1; i >= 0; i--)
                     if (RunningScripts[i].Name.Equals(name, StringComparison.OrdinalIgnoreCase))
                         RunningScripts.RemoveAt(i);
-                RunningScripts.Add(new ScriptBarItem(name, isJs) { DebugLevel = lvl });
+                RunningScripts.Add(MakeItem(name, isJs, lvl));
                 HasScripts = RunningScripts.Count > 0;
             });
         };
+
+        // Keep each chip's pause glyph honest: pause state can change from
+        // outside the chip (the Script Manager panel, #script pauseorresume,
+        // #pauseall). There's no engine event for pause, so sync from the
+        // status snapshot on a slow poll — same pull pattern as the panel.
+        _pauseSync?.Stop();
+        _pauseSync = new DispatcherTimer(TimeSpan.FromSeconds(1),
+                                         DispatcherPriority.Background,
+                                         (_, _) =>
+        {
+            if (_core is null || RunningScripts.Count == 0) return;
+            foreach (var s in _core.Scripts.GetStatuses())
+                foreach (var item in RunningScripts)
+                    if (item.Name.Equals(s.Name, StringComparison.OrdinalIgnoreCase))
+                        item.IsPaused = s.Paused;
+        });
+        _pauseSync.Start();
 
         // Keep each chip's dbg:N readout in sync with the engine: fired when a
         // script changes its own level (#debug N) or when SetTrace is called.
@@ -188,4 +228,29 @@ public sealed class ScriptBarItem : ReactiveObject
 
     /// <summary>Pause button glyph — ⏸ while running, ▶ while paused.</summary>
     public string PauseGlyph => _pauseGlyph.Value;
+
+    // ── context-menu commands (set by ScriptBarViewModel.MakeItem) ──────────
+    // Null until InitMenuCommands runs; Avalonia treats a null Command as
+    // disabled, so a chip constructed without them (tests) degrades safely.
+
+    public ReactiveCommand<Unit, Unit>?   MenuPauseResumeCommand { get; private set; }
+    public ReactiveCommand<Unit, Unit>?   AbortCommand           { get; private set; }
+    public ReactiveCommand<Unit, Unit>?   VarsCommand            { get; private set; }
+    public ReactiveCommand<Unit, Unit>?   TraceCommand           { get; private set; }
+    public ReactiveCommand<Unit, Unit>?   ReloadCommand          { get; private set; }
+    public ReactiveCommand<Unit, Unit>?   EditCommand            { get; private set; }
+    public ReactiveCommand<string, Unit>? SetDebugCommand        { get; private set; }
+
+    public void InitMenuCommands(Action pauseResume, Action abort, Action vars,
+                                 Action trace, Action reload, Action edit,
+                                 Action<string> setDebug)
+    {
+        MenuPauseResumeCommand = ReactiveCommand.Create(pauseResume);
+        AbortCommand           = ReactiveCommand.Create(abort);
+        VarsCommand            = ReactiveCommand.Create(vars);
+        TraceCommand           = ReactiveCommand.Create(trace);
+        ReloadCommand          = ReactiveCommand.Create(reload);
+        EditCommand            = ReactiveCommand.Create(edit);
+        SetDebugCommand        = ReactiveCommand.Create<string>(lvl => setDebug(lvl ?? "0"));
+    }
 }

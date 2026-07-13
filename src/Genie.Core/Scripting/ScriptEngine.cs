@@ -367,6 +367,8 @@ public sealed class ScriptEngine
             _echo($"[script] parse error in {name}: {ex.Message}");
             return false;
         }
+        inst.SourcePath = Path.GetFullPath(path);
+        inst.BaseDir    = baseDir;
 
         // Reload semantics (gated by AbortDupeScript, default true): starting a
         // script that's already running stops the existing instance and replaces
@@ -411,6 +413,7 @@ public sealed class ScriptEngine
         for (int i = 0; i < 9; i++)
             initDollar[i + 1] = i < args.Count ? args[i] : string.Empty;
         inst.DollarStack.Push(initDollar);
+        inst.DollarCounts.Push(args.Count);
 
         _instances.Add(inst);
         _echo($"[script] {name} started");
@@ -492,6 +495,258 @@ public sealed class ScriptEngine
             }
     }
 
+    /// <summary>Toggle pause/resume per script (Genie 4 <c>#script
+    /// pauseorresume</c> — each matching script flips its OWN state, so a mixed
+    /// set inverts rather than synchronising). Null/empty name = every script.</summary>
+    public void PauseOrResume(string? name)
+    {
+        bool all = string.IsNullOrEmpty(name);
+        bool any = false;
+        foreach (var inst in _instances)
+        {
+            if (!all && !inst.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) continue;
+            any = true;
+            inst.UserPaused = !inst.UserPaused;
+            _echo($"[script] {inst.Name} {(inst.UserPaused ? "paused" : "resumed")}");
+        }
+        foreach (var s in _js.RunningStats())
+        {
+            if (!all && !s.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) continue;
+            any = true;
+            if (s.Paused) _js.Resume(s.Name); else _js.Pause(s.Name);
+        }
+        if (!any && !all) _echo($"[script] no running script named {name}");
+        Tick();
+    }
+
+    /// <summary>Mark script(s) for hot reload at their next <c>goto</c>
+    /// (Genie 4 <c>#script reload</c>). Null/empty name = every running .cmd
+    /// script. .js scripts have no label structure, so a .js target is
+    /// rejected with an explanatory echo.</summary>
+    public void RequestReload(string? name)
+    {
+        bool all = string.IsNullOrEmpty(name);
+        bool any = false;
+        foreach (var inst in _instances)
+        {
+            if (!inst.Running) continue;
+            if (!all && !inst.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) continue;
+            any = true;
+            if (inst.PendingReload)
+            {
+                _echo($"[script] {inst.Name} is already pending reload at the next label.");
+            }
+            else
+            {
+                inst.PendingReload = true;
+                _echo($"[script] {inst.Name} will be reloaded at the next label.");
+            }
+        }
+        if (!any && !all)
+        {
+            _echo(IsJavaScript(name!)
+                ? $"[script] reload is not supported for .js scripts ({name})"
+                : $"[script] no running script named {name}");
+        }
+    }
+
+    /// <summary>Structured snapshots of every running script (.cmd + .js) —
+    /// the Script Manager panel's row model. Poll on a UI timer (the panel's
+    /// analogue of <see cref="JsRunningStats"/>); also the single source the
+    /// string-based <see cref="StatusLines"/> formats from.</summary>
+    public IReadOnlyList<ScriptStatus> GetStatuses()
+    {
+        var list = new List<ScriptStatus>();
+        foreach (var inst in _instances)
+            if (inst.Running) list.Add(SnapshotOf(inst));
+        foreach (var s in _js.RunningStats())
+            list.Add(new ScriptStatus(s.Name, IsJs: true, s.Paused,
+                s.Paused ? "Paused" : "Running", CurrentLine: 0, s.SourcePath,
+                s.ElapsedSec, DebugLevel: 0, PendingMatchCount: 0, GosubDepth: 0,
+                PendingReload: false));
+        return list;
+    }
+
+    private static ScriptStatus SnapshotOf(ScriptInstance inst)
+    {
+        // Pc points at the NEXT line to execute (StepOne advances it before
+        // dispatch), so the line the script is "at" — the blocking statement
+        // for a waiting script — is Pc-1.
+        int lineNo = 0;
+        if (inst.Lines.Count > 0)
+            lineNo = inst.Lines[Math.Clamp(inst.Pc - 1, 0, inst.Lines.Count - 1)].LineNumber;
+        return new ScriptStatus(
+            inst.Name, IsJs: false, inst.UserPaused, StateName(inst), lineNo,
+            inst.SourcePath, inst.RunClock.Elapsed.TotalSeconds, inst.DebugLevel,
+            inst.PendingMatches.Count, inst.GosubStack.Count, inst.PendingReload);
+    }
+
+    /// <summary>One Genie 4-format status line per running script (both .cmd
+    /// and .js): <c>Name(Paused) [Debuglevel: N]: 12.30 seconds. State
+    /// (file.cmd)</c>. Used by <c>#script</c>/<c>#scripts</c> listings and the
+    /// vars/trace dump headers. <paramref name="filter"/> is an exact script
+    /// name; null/empty/"all" = everything.</summary>
+    public IReadOnlyList<string> StatusLines(string? filter)
+    {
+        bool all = string.IsNullOrEmpty(filter) ||
+                   filter!.Equals("all", StringComparison.OrdinalIgnoreCase);
+        var lines = new List<string>();
+        foreach (var s in GetStatuses())
+        {
+            if (!all && !s.Name.Equals(filter, StringComparison.OrdinalIgnoreCase)) continue;
+            lines.Add(FormatStatus(s));
+        }
+        return lines;
+    }
+
+    /// <summary>Local-variable dump for <c>#script vars</c>: a status header
+    /// per matching .cmd script followed by its <c>name=value</c> rows
+    /// (sorted; <paramref name="valueFilter"/> is a case-insensitive substring
+    /// match on the whole row). Null/empty/"all" name = every script.</summary>
+    public IReadOnlyList<string> VarsLines(string? name, string valueFilter)
+    {
+        bool all = string.IsNullOrEmpty(name) ||
+                   name!.Equals("all", StringComparison.OrdinalIgnoreCase);
+        var lines = new List<string>();
+        foreach (var inst in _instances)
+        {
+            if (!inst.Running) continue;
+            if (!all && !inst.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) continue;
+            lines.Add(FormatStatus(SnapshotOf(inst)));
+            foreach (var kv in inst.Vars.OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                var row = $"{kv.Key}={kv.Value}";
+                if (valueFilter.Length == 0 ||
+                    row.Contains(valueFilter, StringComparison.OrdinalIgnoreCase))
+                    lines.Add("  " + row);
+            }
+        }
+        if (lines.Count == 0 && !all && IsJavaScript(name!))
+            lines.Add($"[script] vars is not supported for .js scripts ({name})");
+        return lines;
+    }
+
+    /// <summary>Control-flow trace dump for <c>#script trace</c>: a status
+    /// header per matching .cmd script followed by its rolling
+    /// <see cref="ScriptTrace"/> entries (oldest first).</summary>
+    public IReadOnlyList<string> TraceDumpLines(string? name)
+    {
+        bool all = string.IsNullOrEmpty(name) ||
+                   name!.Equals("all", StringComparison.OrdinalIgnoreCase);
+        var lines = new List<string>();
+        foreach (var inst in _instances)
+        {
+            if (!inst.Running) continue;
+            if (!all && !inst.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) continue;
+            lines.Add(FormatStatus(SnapshotOf(inst)));
+            foreach (var entry in inst.Trace.Lines())
+                lines.Add("  " + entry);
+        }
+        if (lines.Count == 0 && !all && IsJavaScript(name!))
+            lines.Add($"[script] trace is not supported for .js scripts ({name})");
+        return lines;
+    }
+
+    private static string FormatStatus(ScriptStatus s)
+    {
+        var paused = s.Paused ? "(Paused)" : "";
+        var dbg    = s.DebugLevel > 0 ? $" [Debuglevel: {s.DebugLevel}]" : "";
+        var file   = s.SourcePath.Length > 0
+            ? Path.GetFileName(s.SourcePath)
+            : s.Name + (s.IsJs ? ".js" : ".cmd");
+        var secs   = s.ElapsedSeconds.ToString("0.00", CultureInfo.InvariantCulture);
+        return $"{s.Name}{paused}{dbg}: {secs} seconds. {s.State} ({file})";
+    }
+
+    /// <summary>Human-readable blocking state, mirroring Genie 4's
+    /// <c>Script.State</c> strings closely enough for muscle memory.</summary>
+    private static string StateName(ScriptInstance inst)
+    {
+        if (inst.UserPaused)             return "Paused";
+        if (inst.InMatchWait)            return "MatchWait";
+        if (inst.WaitForPattern != null) return "WaitFor";
+        if (inst.WaitEvalExpr != null)   return "WaitEval";
+        if (inst.Paused) return inst.PauseMode switch
+        {
+            PauseMode.Wait  => "Waiting",
+            PauseMode.Move  => "Moving",
+            PauseMode.Delay => "Sleeping",
+            _               => "Pausing",
+        };
+        return "Running";
+    }
+
+    /// <summary>
+    /// Genie 4 hot reload (Script.cs HotReload), consumed at a <c>goto</c> when
+    /// <see cref="ScriptInstance.PendingReload"/> is set: re-read + re-parse the
+    /// source file, keep the live state (Vars, DollarStack, Actions, pending
+    /// matches, Trace, timer, debug level — all untouched on the instance),
+    /// remap gosub return addresses into the new line list by content, and let
+    /// the goto continue to <paramref name="label"/> in the new text. On any
+    /// failure (unreadable file, parse error, label gone) the script stops with
+    /// a clear message — Genie 4's AbortOnScriptError behaviour.
+    /// </summary>
+    private bool HotReload(ScriptInstance inst, string label)
+    {
+        ScriptInstance fresh;
+        try
+        {
+            fresh = ScriptParser.Parse(inst.Name, inst.BaseDir, File.ReadAllText(inst.SourcePath));
+        }
+        catch (Exception ex)
+        {
+            _echo($"[script] {inst.Name}: hot reload failed at '{label}': {ex.Message}. Stopped.");
+            inst.Running = false;
+            ScriptFinished?.Invoke(inst.Name);
+            return false;
+        }
+        if (!fresh.Labels.ContainsKey(label))
+        {
+            _echo($"[script] {inst.Name}: hot reload failed at '{label}' — label not found in the new file. Stopped.");
+            inst.Running = false;
+            ScriptFinished?.Invoke(inst.Name);
+            return false;
+        }
+
+        // Remap gosub return addresses (indices into the OLD Lines list) onto
+        // the new list by matching raw content within the same origin file —
+        // Genie 4's FindNewJumpLineIndex.
+        var returns = inst.GosubStack.ToArray();   // top → bottom
+        inst.GosubStack.Clear();
+        for (int i = returns.Length - 1; i >= 0; i--)
+            inst.GosubStack.Push(FindNewLineIndex(inst.Lines, returns[i], fresh.Lines));
+
+        inst.Lines         = fresh.Lines;
+        inst.Labels        = fresh.Labels;
+        inst.IfFalseJump   = fresh.IfFalseJump;
+        inst.ElseJump      = fresh.ElseJump;
+        inst.BraceEndJump  = fresh.BraceEndJump;
+        inst.WhileBackJump = fresh.WhileBackJump;
+        inst.PendingReload = false;
+        inst.Trace.Add($"hot reload → {label}");
+        _echo($"[script] {inst.Name} reloaded from disk (continuing at '{label}')");
+        return true;
+    }
+
+    /// <summary>Nearest same-content line in the new list (same Raw text and
+    /// include origin, smallest source-line distance). Falls back to line 0 —
+    /// the Genie 4 behaviour — when the line was edited away.</summary>
+    private static int FindNewLineIndex(List<ScriptLine> oldLines, int oldIdx, List<ScriptLine> newLines)
+    {
+        if (oldIdx < 0 || oldIdx >= oldLines.Count) return 0;
+        var old = oldLines[oldIdx];
+        int best = 0, bestDist = int.MaxValue;
+        for (int i = 0; i < newLines.Count; i++)
+        {
+            var l = newLines[i];
+            if (!l.Raw.Equals(old.Raw, StringComparison.Ordinal)) continue;
+            if (!l.Origin.Equals(old.Origin, StringComparison.OrdinalIgnoreCase)) continue;
+            int d = Math.Abs(l.LineNumber - old.LineNumber);
+            if (d < bestDist) { best = i; bestDist = d; }
+        }
+        return best;
+    }
+
     public void PauseAll()
     {
         _js.PauseAll();
@@ -568,6 +823,7 @@ public sealed class ScriptEngine
                     inst.InMatchWait       = false;
                     inst.MatchWaitDeadline = DateTime.MaxValue;
                     inst.PendingMatches.Clear();
+                    inst.Trace.Add($"match {label}");
                     break;
                 }
             }
@@ -728,6 +984,7 @@ public sealed class ScriptEngine
                         inst.InMatchWait       = false;
                         inst.MatchWaitDeadline = DateTime.MaxValue;
                         inst.PendingMatches.Clear();
+                        inst.Trace.Add("matchwait timeout");
                     }
                     else continue;
                 }
@@ -898,6 +1155,9 @@ public sealed class ScriptEngine
             if (captures != null || !act.IsEval)
             {
                 inst.DollarStack.Push(captures ?? new string[10]);
+                inst.DollarCounts.Push(captures is null
+                    ? 0
+                    : captures.Skip(1).Count(c => c is not null));
                 framePushed = true;
             }
             try
@@ -915,7 +1175,10 @@ public sealed class ScriptEngine
             finally
             {
                 if (framePushed && inst.DollarStack.Count > 0)
+                {
                     inst.DollarStack.Pop();
+                    if (inst.DollarCounts.Count > 0) inst.DollarCounts.Pop();
+                }
             }
         }
     }
@@ -995,7 +1258,11 @@ public sealed class ScriptEngine
         // the rest of the line" — nothing is substituted or dispatched.
         if (t.Length == 0) return true;
         if (t[0] == '#') return true;
-        if ((t[0] == ':' || t[^1] == ':') && !t.Contains(' ')) return true;
+        if ((t[0] == ':' || t[^1] == ':') && !t.Contains(' '))
+        {
+            inst.Trace.Add($"passing label {t.Trim(':')}", line.Origin, line.LineNumber);
+            return true;
+        }
 
         // Brace block delimiters are structural — the parser already mapped
         // jumps over them; at runtime they're no-ops.
@@ -1336,13 +1603,24 @@ public sealed class ScriptEngine
                 return false;
 
             case "goto":
-                if (inst.Labels.TryGetValue(rest.Trim(), out var gi))
+            {
+                var gLabel = rest.Trim();
+                // Capture before HotReload — it replaces inst.Lines, so
+                // currentIdx only indexes the OLD list.
+                var gOrigin = inst.Lines[currentIdx].Origin;
+                // #script reload is consumed here — Genie 4 hot-reloads at the
+                // next goto (its "at the next label" message notwithstanding),
+                // so a running loop picks up edits at its natural jump point.
+                if (inst.PendingReload && !HotReload(inst, gLabel)) return false;
+                if (inst.Labels.TryGetValue(gLabel, out var gi))
                 {
                     inst.Pc = gi + 1;
-                    DbgEcho(inst, 1, $"goto {rest.Trim()} → line {gi + 1}");
+                    DbgEcho(inst, 1, $"goto {gLabel} → line {gi + 1}");
+                    inst.Trace.Add($"goto {gLabel}", gOrigin, lineNo);
                 }
                 else { _echo($"[script] unknown label: {rest}"); inst.Running = false; }
                 return true;
+            }
 
             case "gosub":
             {
@@ -1360,6 +1638,7 @@ public sealed class ScriptEngine
                     // instead of the current frame.
                     inst.GosubStack.Clear();
                     while (inst.DollarStack.Count > 1) inst.DollarStack.Pop();
+                    while (inst.DollarCounts.Count > 1) inst.DollarCounts.Pop();
                     DbgEcho(inst, 1, "gosub clear (stack emptied)");
                     return true;
                 }
@@ -1378,11 +1657,13 @@ public sealed class ScriptEngine
                 inst.Pc = ss + 1;
                 DbgEcho(inst, 1, $"gosub {label.Trim()} → line {ss + 1}" +
                     (string.IsNullOrEmpty(gosubArgs) ? "" : $" args: {gosubArgs}"));
+                inst.Trace.Add($"gosub {label.Trim()}", inst.Lines[currentIdx].Origin, lineNo);
                 // Gosub arguments populate $0..$9 on a NEW stack frame — they
                 // do NOT touch %0..%9 (script args). On return the frame is
                 // popped, restoring the caller's $-scope. Matches Genie4.
                 var frame = new string[10];
                 frame[0] = gosubArgs ?? string.Empty;
+                int gosubArgCount = 0;
                 if (!string.IsNullOrEmpty(gosubArgs))
                 {
                     // Quote/brace-aware split (Genie 4 parity), NOT a plain
@@ -1394,10 +1675,12 @@ public sealed class ScriptEngine
                     // (mm_train) spray a fresh window per option and mangle the
                     // click commands.
                     var parts = Genie.Core.Parsing.ArgumentParser.ParseArgs(gosubArgs);
+                    gosubArgCount = parts.Count;
                     for (int a = 0; a < 9; a++)
                         frame[a + 1] = a < parts.Count ? parts[a] : string.Empty;
                 }
                 inst.DollarStack.Push(frame);
+                inst.DollarCounts.Push(gosubArgCount);
                 return true;
             }
 
@@ -1406,13 +1689,16 @@ public sealed class ScriptEngine
                 {
                     var retPc = inst.GosubStack.Pop();
                     if (inst.DollarStack.Count > 1) inst.DollarStack.Pop();
+                    if (inst.DollarCounts.Count > 1) inst.DollarCounts.Pop();
                     DbgEcho(inst, 1, $"return → line {retPc}");
+                    inst.Trace.Add("return", inst.Lines[currentIdx].Origin, lineNo);
                     inst.Pc = retPc;
                 }
                 else inst.Running = false;
                 return true;
 
             case "exit":
+                inst.Trace.Add("exit", inst.Lines[currentIdx].Origin, lineNo);
                 inst.Running = false;
                 ScriptFinished?.Invoke(inst.Name);
                 return false;
@@ -2320,6 +2606,18 @@ public sealed class ScriptEngine
                 value = inst.DollarStack.Peek()[name[0] - '0'] ?? string.Empty;
                 return true;
             }
+            // $argcount — arg count of the current $-frame (Genie 4
+            // Script.cs:2335 substitutes it from the same ArgList $0..$9 read):
+            // script args at top level, gosub args inside a gosub, capture
+            // count after a capturing match. Resolved before globals so a
+            // stray global can't shadow it.
+            if (name.Equals("argcount", StringComparison.OrdinalIgnoreCase))
+            {
+                value = inst.DollarCounts.Count > 0
+                    ? inst.DollarCounts.Peek().ToString(CultureInfo.InvariantCulture)
+                    : inst.Vars.TryGetValue("argcount", out var ac) ? ac : "0";
+                return true;
+            }
             // $spelltime — seconds since the current spell was prepared
             // (Genie 4). Computed live so it counts up; resolved before globals
             // (no stored snapshot).
@@ -2455,11 +2753,16 @@ public sealed class ScriptEngine
             {
                 frame = new string[10];
                 inst.DollarStack.Push(frame);
+                inst.DollarCounts.Push(0);
             }
             for (int i = 0; i < 10; i++) frame[i] = string.Empty;
             frame[0] = m.Value;
             for (int i = 1; i < m.Groups.Count && i <= 9; i++)
                 frame[i] = m.Groups[i].Value;
+            // The frame was overwritten in place; its $argcount follows suit
+            // (Genie 4: the count always describes what $0..$9 currently hold).
+            if (inst.DollarCounts.Count > 0) inst.DollarCounts.Pop();
+            inst.DollarCounts.Push(Math.Min(9, m.Groups.Count - 1));
         }
         return true;
     }

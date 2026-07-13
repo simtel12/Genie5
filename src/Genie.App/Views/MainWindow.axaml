@@ -387,11 +387,6 @@
                   IsChecked="{Binding TimeTrackerVisible, Mode=OneWay}"
                   Command="{Binding ToggleTimeTrackerCommand}"
                   ToolTip.Tip="Elanthian date, moon/sun rise-set countdowns and observed sky, tracked by the built-in Time Tracker (/tt help)."/>
-        <MenuItem Header="Scr_ipts"
-                  ToggleType="CheckBox"
-                  IsChecked="{Binding ScriptsVisible, Mode=OneWay}"
-                  Command="{Binding ToggleScriptsCommand}"
-                  ToolTip.Tip="Running scripts (.cmd and .js) with per-script Stop, a Start… file picker, and the script output log."/>
         <MenuItem Header="P_ortrait"
                   ToggleType="CheckBox"
                   IsChecked="{Binding SceneVisible, Mode=OneWay}"
@@ -478,7 +473,17 @@
       <!-- For per-script operations (Run, Edit, Stop one), use the Script Bar  -->
       <!-- (auto-shown at the bottom when any script is running) or the         -->
       <!-- dockable Scripts panel (toggle via Window menu).                     -->
-      <MenuItem Header="_Scripts">
+      <MenuItem Header="_Scripts" SubmenuOpened="OnWindowMenuOpened">
+        <!-- The Script Manager panel toggle lives here (not under Window) —
+             it's the scripts workspace, so this is where users look for it.
+             OnWindowMenuOpened refreshes the check mark from the dock's true
+             state, same as the Window menu. -->
+        <MenuItem Header="Script _Manager"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding ScriptsVisible, Mode=OneWay}"
+                  Command="{Binding ToggleScriptsCommand}"
+                  ToolTip.Tip="Browse, run, and edit your script library, and manage running scripts (.cmd and .js) — pause, stop, reload, vars, trace. Also opens via #script explorer."/>
+        <Separator/>
         <MenuItem Header="_List Running Scripts"
                   Command="{Binding ListRunningScriptsCommand}"
                   ToolTip.Tip="Echo the names of currently running scripts to the Game window. Same as #scripts."/>
@@ -505,6 +510,23 @@
                     Command="{Binding TraceAllScriptsCommand}" CommandParameter="5"/>
           <MenuItem Header="_10 — maximum"
                     Command="{Binding TraceAllScriptsCommand}" CommandParameter="10"/>
+        </MenuItem>
+        <Separator/>
+        <!-- External editor for Edit Script (Script Manager, Script Bar ✏,
+             #edit). Shows the resolved launch-ladder rung; Change… writes the
+             Display-settings override (same value as Display Settings →
+             External editor), Use OS Default clears it. -->
+        <MenuItem Header="External _Editor"
+                  SubmenuOpened="OnScriptsEditorMenuOpened"
+                  ToolTip.Tip="The program Edit Script opens files with — override → #config editor → OS default.">
+          <MenuItem Header="{Binding Scripts.EditorDisplay}" IsEnabled="False"/>
+          <Separator/>
+          <MenuItem Header="_Change…"
+                    Command="{Binding Scripts.ChangeEditorCommand}"
+                    ToolTip.Tip="Pick the editor program via file picker."/>
+          <MenuItem Header="Use OS _Default"
+                    Command="{Binding Scripts.DefaultEditorCommand}"
+                    ToolTip.Tip="Clear the override — fall back to #config editor, then the OS default text editor."/>
         </MenuItem>
         <Separator/>
         <MenuItem Header="_Open Scripts Folder"
@@ -1527,6 +1549,32 @@
             <DataTemplate x:DataType="vm:ScriptBarItem">
               <Border Background="#283139" BorderBrush="#3e4a55"
                       BorderThickness="1" CornerRadius="3" Padding="6,1">
+                <!-- Right-click menu — Genie 4's Script Bar dropdown (Resume/
+                     Pause, Abort, Debug levels, Trace, Vars, Edit) plus the
+                     Genie 5 reload. Commands are per-chip (see
+                     ScriptBarViewModel.MakeItem) because this popup detaches
+                     from the visual tree. -->
+                <Border.ContextMenu>
+                  <ContextMenu>
+                    <MenuItem Header="Pause / resume" Command="{Binding MenuPauseResumeCommand}"/>
+                    <MenuItem Header="Abort" Command="{Binding AbortCommand}"/>
+                    <Separator/>
+                    <MenuItem Header="Debug level" IsVisible="{Binding !IsJavaScript}">
+                      <MenuItem Header="0 — off"          Command="{Binding SetDebugCommand}" CommandParameter="0"/>
+                      <MenuItem Header="1 — goto/gosub"   Command="{Binding SetDebugCommand}" CommandParameter="1"/>
+                      <MenuItem Header="2 — + pause/wait" Command="{Binding SetDebugCommand}" CommandParameter="2"/>
+                      <MenuItem Header="3 — + if"         Command="{Binding SetDebugCommand}" CommandParameter="3"/>
+                      <MenuItem Header="4 — + var/math"   Command="{Binding SetDebugCommand}" CommandParameter="4"/>
+                      <MenuItem Header="5 — + actions"    Command="{Binding SetDebugCommand}" CommandParameter="5"/>
+                      <MenuItem Header="10 — every line"  Command="{Binding SetDebugCommand}" CommandParameter="10"/>
+                    </MenuItem>
+                    <MenuItem Header="Show vars"  IsVisible="{Binding !IsJavaScript}" Command="{Binding VarsCommand}"/>
+                    <MenuItem Header="Show trace" IsVisible="{Binding !IsJavaScript}" Command="{Binding TraceCommand}"/>
+                    <MenuItem Header="Reload at next label" IsVisible="{Binding !IsJavaScript}" Command="{Binding ReloadCommand}"/>
+                    <Separator/>
+                    <MenuItem Header="Edit" Command="{Binding EditCommand}"/>
+                  </ContextMenu>
+                </Border.ContextMenu>
                 <StackPanel Orientation="Horizontal" Spacing="4"
                             VerticalAlignment="Center">
                   <TextBlock Text="{Binding Name}" FontSize="11"

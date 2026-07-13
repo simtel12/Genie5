@@ -395,6 +395,12 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     private void OnWindowMenuOpened(object? sender, RoutedEventArgs e)
         => ViewModel?.RefreshVisibilityBools();
 
+    // Scripts → External Editor: re-resolve the "current editor" caption on
+    // open, so a change made in the Display Settings dialog (same setting)
+    // shows here without a restart.
+    private void OnScriptsEditorMenuOpened(object? sender, RoutedEventArgs e)
+        => ViewModel?.Scripts.RefreshEditorDisplay();
+
     // Layout menu uses SubmenuOpened (not Command on the parent MenuItem,
     // which doesn't fire when the click opens a submenu) so the Load Layout ▶
     // child sees a freshly-populated SavedLayouts collection. Without this,

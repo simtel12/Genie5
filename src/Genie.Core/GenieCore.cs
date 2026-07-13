@@ -1230,6 +1230,60 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             inst.DebugLevel = level;
     }
 
+    void ICommandHost.PauseOrResumeScript(string? name) => Scripts.PauseOrResume(name);
+
+    void ICommandHost.ReloadScript(string? name) => Scripts.RequestReload(name);
+
+    void ICommandHost.ShowScriptVars(string? name, string filter)
+        => EchoDumpLines(Scripts.VarsLines(name, filter ?? string.Empty), name);
+
+    void ICommandHost.ShowScriptTrace(string? name)
+        => EchoDumpLines(Scripts.TraceDumpLines(name), name);
+
+    private void EchoDumpLines(IReadOnlyList<string> lines, string? name)
+    {
+        if (lines.Count == 0)
+        {
+            EchoLine?.Invoke(string.IsNullOrEmpty(name) || name!.Equals("all", StringComparison.OrdinalIgnoreCase)
+                ? "No scripts running."
+                : $"No running script named {name}.");
+            return;
+        }
+        foreach (var l in lines) EchoLine?.Invoke(l);
+    }
+
+    void ICommandHost.SetScriptDebugLevel(int level, string? name)
+    {
+        if (string.IsNullOrEmpty(name) || name!.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            // Per-name so each script echoes and fires DebugLevelChanged (the
+            // Script Bar chips track the live level) — unlike the quiet
+            // #traceall path above, which predates the event.
+            foreach (var n in Scripts.RunningScriptNames())
+                if (!Scripts.IsJavaScript(n)) Scripts.SetTrace(n, level);
+        }
+        else
+        {
+            Scripts.SetTrace(name!, level);
+        }
+    }
+
+    /// <summary>Raised when <c>#script explorer</c> asks the App layer to open
+    /// the Script Manager window. No subscriber (Console/headless build) falls
+    /// back to an explanatory echo.</summary>
+    public event Action? ScriptExplorerRequested;
+
+    void ICommandHost.ShowScriptExplorer()
+    {
+        if (ScriptExplorerRequested is null)
+            EchoLine?.Invoke("The Script Explorer requires the App UI.");
+        else
+            ScriptExplorerRequested.Invoke();
+    }
+
+    IReadOnlyList<string> ICommandHost.ScriptStatusLines(string? filter)
+        => Scripts.StatusLines(filter);
+
     IReadOnlyList<string> ICommandHost.RunningScripts()
         => Scripts.RunningScriptNames();
 

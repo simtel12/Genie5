@@ -10,12 +10,16 @@ using Xunit;
 namespace Genie.Core.Tests;
 
 /// <summary>
-/// Genie 4 parity for the <c>#script</c> dispatcher (Command.cs:2188):
-/// <c>abort</c> / <c>pause</c> / <c>resume</c> act on the named script (or all
-/// scripts for "all" / no name); it NEVER starts a script — scripts start with
-/// <c>.name</c>. Before this matched Genie 4, "#script abort foo" was handed to
-/// RunScript and tried to start a script named "abort" (hit by mm_train's wait
-/// mode, which stops its watched script with "#script abort $MM_WAIT_SCRIPT").
+/// Genie 4 parity for the <c>#script</c> dispatcher (Command.cs:2188 + the
+/// FormMain Command_Script* handlers): <c>abort</c> / <c>pause</c> /
+/// <c>resume</c> / <c>pauseorresume</c> act on the named script (or all
+/// scripts for "all" / no name) with an optional trailing
+/// <c>except &lt;name&gt;</c>; <c>reload</c> / <c>trace</c> / <c>vars</c> /
+/// <c>debug</c> / <c>explorer</c> route to their host members. It NEVER starts
+/// a script — scripts start with <c>.name</c>. Before this matched Genie 4,
+/// "#script abort foo" was handed to RunScript and tried to start a script
+/// named "abort" (hit by mm_train's wait mode, which stops its watched script
+/// with "#script abort $MM_WAIT_SCRIPT").
 /// </summary>
 public class ScriptCommandTests : IDisposable
 {
@@ -44,6 +48,7 @@ public class ScriptCommandTests : IDisposable
     {
         // mm_train: put #script abort $MM_WAIT_SCRIPT
         var host = new FakeCommandHost();
+        host.RunningNames.Add("hunt");
         Run(host, "#script abort hunt");
 
         Assert.Equal("hunt", host.StoppedScript);
@@ -59,6 +64,17 @@ public class ScriptCommandTests : IDisposable
 
         Assert.True(host.StopAllCalled);
         Assert.Null(host.RanScript);
+    }
+
+    [Fact]
+    public void Abort_all_except_spares_the_excepted_script()
+    {
+        var host = new FakeCommandHost();
+        host.RunningNames.AddRange(new[] { "hunt", "favors", "exptally" });
+        Run(host, "#script abort all except favors");
+
+        Assert.False(host.StopAllCalled);
+        Assert.Equal(new[] { "hunt", "exptally" }, host.Stopped);
     }
 
     [Fact]
@@ -83,13 +99,109 @@ public class ScriptCommandTests : IDisposable
     }
 
     [Fact]
+    public void Pause_all_except_pauses_the_others_individually()
+    {
+        var host = new FakeCommandHost();
+        host.RunningNames.AddRange(new[] { "hunt", "favors" });
+        Run(host, "#script pause all except hunt");
+
+        Assert.Equal(new[] { "favors" }, host.Paused);
+    }
+
+    [Fact]
+    public void PauseOrResume_routes_named_and_all_forms()
+    {
+        var host = new FakeCommandHost();
+        Run(host, "#script pauseorresume hunt");
+        Assert.True(host.PauseOrResumeCalled);
+        Assert.Equal("hunt", host.PauseOrResumeTarget);
+
+        host = new FakeCommandHost();
+        Run(host, "#script pauseorresume");
+        Assert.True(host.PauseOrResumeCalled);
+        Assert.Null(host.PauseOrResumeTarget);
+    }
+
+    [Fact]
+    public void Reload_routes_named_and_all_forms()
+    {
+        var host = new FakeCommandHost();
+        Run(host, "#script reload hunt");
+        Assert.True(host.ReloadCalled);
+        Assert.Equal("hunt", host.ReloadTarget);
+
+        host = new FakeCommandHost();
+        Run(host, "#script reload all");
+        Assert.True(host.ReloadCalled);
+        Assert.Null(host.ReloadTarget);
+    }
+
+    [Fact]
+    public void Debug_parses_level_then_name()
+    {
+        var host = new FakeCommandHost();
+        Run(host, "#script debug 5 hunt");
+        Assert.Equal(5, host.DebugLevelSet);
+        Assert.Equal("hunt", host.DebugTarget);
+
+        host = new FakeCommandHost();
+        Run(host, "#script debug 10");
+        Assert.Equal(10, host.DebugLevelSet);
+        Assert.Null(host.DebugTarget);
+
+        host = new FakeCommandHost();
+        Run(host, "#script debug hunt");
+        Assert.Null(host.DebugLevelSet);
+        Assert.Contains(host.Echoed, l => l.StartsWith("Usage: #script debug"));
+    }
+
+    [Fact]
+    public void Vars_parses_name_and_filter()
+    {
+        var host = new FakeCommandHost();
+        Run(host, "#script vars hunt exp");
+        Assert.True(host.VarsCalled);
+        Assert.Equal("hunt", host.VarsName);
+        Assert.Equal("exp", host.VarsFilter);
+
+        host = new FakeCommandHost();
+        Run(host, "#script variables");
+        Assert.True(host.VarsCalled);
+        Assert.Null(host.VarsName);
+        Assert.Equal(string.Empty, host.VarsFilter);
+    }
+
+    [Fact]
+    public void Trace_routes_named_and_all_forms()
+    {
+        var host = new FakeCommandHost();
+        Run(host, "#script trace hunt");
+        Assert.True(host.TraceCalled);
+        Assert.Equal("hunt", host.TraceName);
+
+        host = new FakeCommandHost();
+        Run(host, "#script trace all");
+        Assert.True(host.TraceCalled);
+        Assert.Null(host.TraceName);
+    }
+
+    [Fact]
+    public void Explorer_routes_to_the_host()
+    {
+        var host = new FakeCommandHost();
+        Run(host, "#script explorer");
+        Assert.True(host.ExplorerShown);
+    }
+
+    [Fact]
     public void Unknown_subcommand_lists_scripts_instead_of_running_one()
     {
         var host = new FakeCommandHost();
         Run(host, "#script somescript");
 
         Assert.Null(host.RanScript);
-        Assert.Contains("No scripts running.", host.Echoed);
+        Assert.Contains("Active scripts:", host.Echoed);
+        Assert.Contains("None.", host.Echoed);
     }
 
     [Fact]
@@ -99,7 +211,22 @@ public class ScriptCommandTests : IDisposable
         Run(host, "#script");
 
         Assert.Null(host.RanScript);
-        Assert.Contains("No scripts running.", host.Echoed);
+        Assert.Contains("Active scripts:", host.Echoed);
+        Assert.Contains("None.", host.Echoed);
+    }
+
+    [Fact]
+    public void Listing_prints_status_lines_from_the_host()
+    {
+        // The fake relies on ICommandHost's default ScriptStatusLines, which
+        // falls back to the plain running-script names.
+        var host = new FakeCommandHost();
+        host.RunningNames.Add("hunt");
+        Run(host, "#scripts");
+
+        Assert.Contains("Active scripts:", host.Echoed);
+        Assert.Contains("hunt", host.Echoed);
+        Assert.DoesNotContain("None.", host.Echoed);
     }
 
     /// <summary>ICommandHost double recording script-lifecycle calls.</summary>
@@ -107,10 +234,25 @@ public class ScriptCommandTests : IDisposable
     {
         public string?      RanScript     { get; private set; }
         public string?      StoppedScript { get; private set; }
+        public List<string> Stopped       { get; } = new();
         public bool         StopAllCalled { get; private set; }
         public bool         PauseCalled   { get; private set; }
         public string?      PausedScript  { get; private set; }
+        public List<string> Paused        { get; } = new();
         public string?      ResumedScript { get; private set; }
+        public bool         PauseOrResumeCalled  { get; private set; }
+        public string?      PauseOrResumeTarget  { get; private set; }
+        public bool         ReloadCalled  { get; private set; }
+        public string?      ReloadTarget  { get; private set; }
+        public int?         DebugLevelSet { get; private set; }
+        public string?      DebugTarget   { get; private set; }
+        public bool         VarsCalled    { get; private set; }
+        public string?      VarsName      { get; private set; }
+        public string?      VarsFilter    { get; private set; }
+        public bool         TraceCalled   { get; private set; }
+        public string?      TraceName     { get; private set; }
+        public bool         ExplorerShown { get; private set; }
+        public List<string> RunningNames  { get; } = new();
         public List<string> Echoed        { get; } = new();
 
         public IReadOnlyDictionary<string, string> GetGlobalVariables() => new Dictionary<string, string>();
@@ -126,14 +268,21 @@ public class ScriptCommandTests : IDisposable
         public void SendToGame(string text, bool userInput = false, string origin = "", string? echoOverride = null) { }
         public void RunScript(string text) => RanScript = text;
         public void InjectParsedLine(string line) { }
-        public void StopScript(string? name) => StoppedScript = name;
+        public void StopScript(string? name) { StoppedScript = name; if (name is not null) Stopped.Add(name); }
         public void StopAllScripts() => StopAllCalled = true;
         public void PauseAllScripts() { }
         public void ResumeAllScripts() { }
-        public void PauseScript(string? name) { PauseCalled = true; PausedScript = name; }
+        public void PauseScript(string? name)
+        { PauseCalled = true; PausedScript = name; if (name is not null) Paused.Add(name); }
         public void ResumeScript(string? name) => ResumedScript = name;
         public void SetTraceLevelAll(int level) { }
-        public IReadOnlyList<string> RunningScripts() => Array.Empty<string>();
+        public void PauseOrResumeScript(string? name) { PauseOrResumeCalled = true; PauseOrResumeTarget = name; }
+        public void ReloadScript(string? name) { ReloadCalled = true; ReloadTarget = name; }
+        public void ShowScriptVars(string? name, string filter) { VarsCalled = true; VarsName = name; VarsFilter = filter; }
+        public void ShowScriptTrace(string? name) { TraceCalled = true; TraceName = name; }
+        public void SetScriptDebugLevel(int level, string? name) { DebugLevelSet = level; DebugTarget = name; }
+        public void ShowScriptExplorer() => ExplorerShown = true;
+        public IReadOnlyList<string> RunningScripts() => RunningNames;
         public void SetGlobalVariable(string name, string value) { }
         public void RemoveGlobalVariable(string name) { }
         public string SetLiveAudit(Genie.Core.Diagnostics.AuditMode mode) => string.Empty;

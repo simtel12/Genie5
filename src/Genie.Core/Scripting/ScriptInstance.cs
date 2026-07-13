@@ -30,6 +30,13 @@ public sealed class ScriptInstance
     // entire script lifetime. Matches Genie4's per-frame ArgList semantics.
     public Stack<string[]> DollarStack = new();
 
+    // Arg count of each DollarStack frame, kept in lockstep (pushed/popped at
+    // the same sites). Backs $argcount — Genie 4 substitutes it from the SAME
+    // ArgList that $0..$9 read (Script.cs:2335, ArgList.Count - 1), so the
+    // count must travel with the frame: script args at top level, gosub args
+    // in a gosub, capture-group count after a capturing match.
+    public Stack<int> DollarCounts = new();
+
     // if-block jump tables (built at parse time)
     public Dictionary<int, int> IfFalseJump = new(); // if/elseif line idx → target when condition false
     public Dictionary<int, int> ElseJump   = new(); // else line idx → target after else block
@@ -43,6 +50,28 @@ public sealed class ScriptInstance
 
     public int  Pc;
     public bool Running = true;
+
+    /// <summary>Full path of the file this script was parsed from — set by the
+    /// engine at start. Used by hot reload (<c>#script reload</c>) and the
+    /// <c>#script</c> listing's "(file)" suffix.</summary>
+    public string SourcePath = string.Empty;
+
+    /// <summary>Include base directory (the script's own folder) — needed to
+    /// re-parse with identical include resolution on hot reload.</summary>
+    public string BaseDir = string.Empty;
+
+    /// <summary>Wall-clock run time for the <c>#script</c> listing (Genie 4
+    /// <c>RunTimeSeconds</c>). The .js counterpart is
+    /// <c>JsScriptInstance.RunClock</c>.</summary>
+    public readonly System.Diagnostics.Stopwatch RunClock = System.Diagnostics.Stopwatch.StartNew();
+
+    /// <summary>Set by <c>#script reload</c>; consumed at the script's next
+    /// <c>goto</c>, where the engine re-reads the file and jumps to the target
+    /// label in the new text (Genie 4 hot-reload semantics).</summary>
+    public bool PendingReload;
+
+    /// <summary>Rolling control-flow trace for <c>#script trace</c>.</summary>
+    public readonly ScriptTrace Trace = new();
 
     /// <summary>Debug verbosity: 0=off, 1=goto/gosub/return, 2=+pause/wait,
     /// 3=+if, 4=+var/math, 5=+actions, 10=all rows.</summary>

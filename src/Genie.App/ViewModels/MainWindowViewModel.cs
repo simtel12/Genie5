@@ -1123,7 +1123,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         WindowSettings.Register("analytics",  "Analytics");
         WindowSettings.Register("active-spells", "Active Spells");
         WindowSettings.Register("time-tracker", "Time Tracker");
-        WindowSettings.Register("scripts",   "Scripts");
+        WindowSettings.Register("scripts",   "Script Manager");   // id predates the panel's evolution into the manager
         WindowSettings.Register("scene",     "Portrait");   // Genie 4's Portrait window (room/scene art); id predates the rename
         WindowSettings.Register("mobs",      "Mobs");
         WindowSettings.Register("players",   "Players");
@@ -4120,8 +4120,59 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // editor (or OS default `.cmd` handler) — so the App owns the
         // launch logic and both sources fan in here.
         ScriptBar.EditScript          += OpenScriptInEditor;
+        Scripts.EditScriptRequested   += OpenScriptInEditor;
+        Scripts.EditFileRequested     += path =>
+        {
+            // Exact-path variant for subfolder scripts / running rows — the
+            // name-based OpenScriptInEditor rejects path separators by design.
+            try
+            {
+                LaunchExternalEditor(path);
+                GameText.AddSystemLine($"[editor] opened '{Path.GetFileName(path)}'");
+            }
+            catch (Exception ex)
+            {
+                ErrorLog.Log("ScriptManager.EditFile", ex);
+                GameText.AddSystemLine($"[editor] failed to open '{path}': {ex.Message}");
+            }
+        };
         _core.EditScriptRequested     += name =>
             Avalonia.Threading.Dispatcher.UIThread.Post(() => OpenScriptInEditor(name));
+
+        // Script Manager panel: folder-open reuses the menu command's logic
+        // (issue #37 pathing); #script explorer opens/reveals the panel — the
+        // typed equivalent of Window → Script Manager (Genie 4 parity).
+        Scripts.OpenFolderRequested   += () => OpenScriptsFolderCommand.Execute().Subscribe();
+
+        // Editor strip at the bottom of the panel: shows which rung of the
+        // LaunchExternalEditor ladder Edit will use, and lets the user set /
+        // clear the Display-settings override (the same value the Display
+        // Settings dialog's text box edits).
+        Scripts.ResolveEditorDescription = () =>
+        {
+            if (!string.IsNullOrWhiteSpace(Display.EditorPath))
+                return Display.EditorPath;
+            if (!string.IsNullOrWhiteSpace(_core?.Config?.Editor))
+                return $"{_core!.Config.Editor}  (#config editor)";
+            return OperatingSystem.IsWindows() ? "OS default (notepad)" : "OS default";
+        };
+        Scripts.EditorPathChanged = path =>
+        {
+            Display.EditorPath = path ?? string.Empty;
+            try { Display.Save(_displayPath); }
+            catch (Exception ex) { ErrorLog.Log("ScriptManager.SetEditor", ex); }
+        };
+        Scripts.RefreshEditorDisplay();
+        _core.ScriptExplorerRequested += () =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (DockFactory is GenieDockFactory factory &&
+                    !factory.IsToolVisible("scripts"))
+                {
+                    factory.SetToolVisibility("scripts", true);
+                    ScriptsVisible = true;
+                }
+            });
 
         // #statusbar / #status [N] {text} — scripts write progress to the ten
         // positional slots under the vitals Status Bar (#111; moved off the

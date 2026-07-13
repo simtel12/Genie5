@@ -1,0 +1,308 @@
+<!-- Script Manager dock tool (evolved from the original Scripts panel; dock id
+     stays "scripts"). Layout mirrors the approved mockup: toolbar, library
+     tree | running list split, detail strip for the selected running script,
+     and the [script] output log. Every action routes through the command
+     pipeline (see ScriptsViewModel) so the panel behaves exactly like typed
+     #script commands. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Genie.App.ViewModels"
+             xmlns:controls="using:Genie.App.Controls"
+             x:Class="Genie.App.Views.ScriptManagerView"
+             x:DataType="vm:ScriptsViewModel">
+
+  <UserControl.Styles>
+    <!-- Persist per-node expansion (and auto-expand during filtering).
+         Reflection binding by necessity: style setters have no x:DataType
+         context, and the item's DataContext IS the ScriptFileNode. -->
+    <Style Selector="TreeViewItem">
+      <Setter Property="IsExpanded" Value="{ReflectionBinding IsExpanded, Mode=TwoWay}"/>
+      <Setter Property="Padding" Value="2,0"/>
+      <Setter Property="MinHeight" Value="22"/>
+    </Style>
+    <Style Selector="Button.rowaction">
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="Padding" Value="5,1"/>
+      <Setter Property="MinWidth" Value="0"/>
+      <Setter Property="MinHeight" Value="0"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,*,Auto,110" Margin="4">
+
+    <!-- ── Toolbar ─────────────────────────────────────────────────────── -->
+    <DockPanel Grid.Row="0" Margin="0,0,0,4" LastChildFill="True">
+      <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="4">
+        <Button Content="New" FontSize="11" Padding="8,2"
+                Command="{Binding NewScriptCommand}"
+                ToolTip.Tip="Create a new script (opens in your editor)"/>
+        <Button Content="Run" FontSize="11" Padding="8,2"
+                Command="{Binding RunSelectedCommand}"
+                ToolTip.Tip="Run the selected script (double-click or Enter also runs)"/>
+        <TextBox Watermark="args" FontSize="11" Width="90" MinHeight="0" Padding="6,3"
+                 Text="{Binding RunArgs}"
+                 ToolTip.Tip="Optional arguments passed to the script on Run (%1, %2, …)"/>
+        <Button Content="Edit" FontSize="11" Padding="8,2"
+                Command="{Binding EditSelectedCommand}"
+                ToolTip.Tip="Open the selected script in your editor"/>
+        <Button Content="Delete" FontSize="11" Padding="8,2"
+                Command="{Binding DeleteSelectedCommand}"
+                IsVisible="{Binding !ConfirmingDelete}"
+                ToolTip.Tip="Delete the selected script file"/>
+        <Button Content="Confirm?" FontSize="11" Padding="8,2"
+                Foreground="{DynamicResource Theme.Danger}"
+                Command="{Binding DeleteSelectedCommand}"
+                IsVisible="{Binding ConfirmingDelete}"
+                ToolTip.Tip="Click again to permanently delete"/>
+      </StackPanel>
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+        <Button Content="⌂" FontSize="11" Padding="6,2"
+                Command="{Binding OpenFolderCommand}"
+                ToolTip.Tip="Open the scripts folder"/>
+        <Button Content="⟳" FontSize="11" Padding="6,2"
+                Command="{Binding RefreshCommand}"
+                ToolTip.Tip="Rescan the scripts folder"/>
+      </StackPanel>
+      <TextBox Watermark="Filter scripts" FontSize="11" Margin="4,0"
+               Text="{Binding Filter}" MinHeight="0" Padding="6,3"/>
+    </DockPanel>
+
+    <!-- ── Library | Running split ─────────────────────────────────────── -->
+    <Grid Grid.Row="1" ColumnDefinitions="2*,4,3*">
+
+      <!-- Library tree -->
+      <Border Grid.Column="0" Background="{DynamicResource Theme.ToolbarBg}"
+              BorderBrush="{DynamicResource Theme.Border}"
+              BorderThickness="1" CornerRadius="3" Padding="2">
+        <Grid RowDefinitions="Auto,Auto,*">
+          <TextBlock Grid.Row="0" Text="LIBRARY" FontSize="10" Margin="4,2"
+                     Foreground="{DynamicResource Theme.SectionHeader}"/>
+          <!-- Inline naming row for New (Enter commits, Esc cancels). -->
+          <TextBox Grid.Row="1" Watermark="new script name…" FontSize="11"
+                   Margin="4,0,4,2" MinHeight="0" Padding="6,3"
+                   IsVisible="{Binding IsNamingNew}"
+                   Text="{Binding NewScriptName}">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter"  Command="{Binding CommitNewCommand}"/>
+              <KeyBinding Gesture="Escape" Command="{Binding CancelNewCommand}"/>
+            </TextBox.KeyBindings>
+          </TextBox>
+          <TreeView Grid.Row="2" ItemsSource="{Binding Library}"
+                    SelectedItem="{Binding SelectedFile}"
+                    FontSize="12"
+                    DoubleTapped="OnTreeDoubleTapped"
+                    KeyDown="OnTreeKeyDown"
+                    PointerPressed="OnTreePointerPressed">
+            <!-- Right-click menu. Lives on the TreeView (not per item) so it
+                 inherits the VM DataContext — popups can't reach $parent
+                 bindings — and acts on SelectedFile, which the PointerPressed
+                 handler above moves to the item under the cursor first.
+                 File-only actions disable themselves on folders (canExecute). -->
+            <TreeView.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="Run" Command="{Binding RunSelectedCommand}"/>
+                <MenuItem Header="Edit" Command="{Binding EditSelectedCommand}"/>
+                <Separator/>
+                <MenuItem Header="Copy run command" Command="{Binding CopyRunCommandCommand}"
+                          ToolTip.Tip="Copy the .name invocation to the clipboard"/>
+                <MenuItem Header="Copy full path" Command="{Binding CopyPathCommand}"/>
+                <MenuItem Header="Open containing folder" Command="{Binding OpenContainingFolderCommand}"/>
+                <Separator/>
+                <MenuItem Header="New script…" Command="{Binding NewScriptCommand}"/>
+                <MenuItem Header="Refresh" Command="{Binding RefreshCommand}"/>
+                <Separator/>
+                <MenuItem Header="{Binding DeleteMenuHeader}" Command="{Binding DeleteSelectedCommand}"
+                          ToolTip.Tip="Two-step: pick once to arm, again to permanently delete"/>
+              </ContextMenu>
+            </TreeView.ContextMenu>
+            <TreeView.ItemTemplate>
+              <TreeDataTemplate DataType="vm:ScriptFileNode" ItemsSource="{Binding Children}">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
+                             Foreground="{DynamicResource Theme.TextPrimary}"/>
+                  <Border Background="#2d3b46" CornerRadius="2" Padding="3,0"
+                          VerticalAlignment="Center" IsVisible="{Binding IsJs}">
+                    <TextBlock Text="js" FontSize="9" Foreground="#e8c97a"/>
+                  </Border>
+                </StackPanel>
+              </TreeDataTemplate>
+            </TreeView.ItemTemplate>
+          </TreeView>
+        </Grid>
+      </Border>
+
+      <GridSplitter Grid.Column="1" Background="Transparent" ResizeDirection="Columns"/>
+
+      <!-- Running scripts -->
+      <Border Grid.Column="2" Background="{DynamicResource Theme.ToolbarBg}"
+              BorderBrush="{DynamicResource Theme.Border}"
+              BorderThickness="1" CornerRadius="3" Padding="2">
+        <Grid RowDefinitions="Auto,*">
+          <DockPanel Grid.Row="0" Margin="4,2">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+              <Button Content="⏸ All" Classes="rowaction"
+                      Command="{Binding PauseAllCommand}" ToolTip.Tip="Pause all scripts"/>
+              <Button Content="▶ All" Classes="rowaction"
+                      Command="{Binding ResumeAllCommand}" ToolTip.Tip="Resume all scripts"/>
+              <Button Content="Stop All" Classes="rowaction"
+                      Command="{Binding StopAllCommand}"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="RUNNING" FontSize="10"
+                         Foreground="{DynamicResource Theme.SectionHeader}"
+                         VerticalAlignment="Center"/>
+              <TextBlock Text="{Binding RunningScripts.Count}" FontSize="10"
+                         Foreground="{DynamicResource Theme.TextMuted}"
+                         VerticalAlignment="Center"/>
+            </StackPanel>
+          </DockPanel>
+          <ListBox Grid.Row="1" ItemsSource="{Binding RunningScripts}"
+                   SelectedItem="{Binding SelectedRunning}"
+                   Background="Transparent" Padding="0"
+                   PointerPressed="OnRunningPointerPressed">
+            <ListBox.Styles>
+              <Style Selector="ListBoxItem">
+                <Setter Property="Padding" Value="4,2"/>
+                <Setter Property="MinHeight" Value="24"/>
+              </Style>
+            </ListBox.Styles>
+            <ListBox.ItemTemplate>
+              <DataTemplate DataType="vm:RunningScriptRow">
+                <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto">
+                  <!-- Right-click mirror of the ⋯ flyout below — the row's
+                       own commands, so it works in the detached popup tree. -->
+                  <Grid.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem Header="{Binding PauseTip}" Command="{Binding PauseResumeCommand}"/>
+                      <MenuItem Header="Abort" Command="{Binding StopCommand}"/>
+                      <Separator/>
+                      <MenuItem Header="Debug level">
+                        <MenuItem Header="0 — off"           Command="{Binding SetDebugCommand}" CommandParameter="0"/>
+                        <MenuItem Header="1 — goto/gosub"    Command="{Binding SetDebugCommand}" CommandParameter="1"/>
+                        <MenuItem Header="2 — + pause/wait"  Command="{Binding SetDebugCommand}" CommandParameter="2"/>
+                        <MenuItem Header="3 — + if"          Command="{Binding SetDebugCommand}" CommandParameter="3"/>
+                        <MenuItem Header="4 — + var/math"    Command="{Binding SetDebugCommand}" CommandParameter="4"/>
+                        <MenuItem Header="5 — + actions"     Command="{Binding SetDebugCommand}" CommandParameter="5"/>
+                        <MenuItem Header="10 — every line"   Command="{Binding SetDebugCommand}" CommandParameter="10"/>
+                      </MenuItem>
+                      <MenuItem Header="Show vars"  Command="{Binding VarsCommand}"/>
+                      <MenuItem Header="Show trace" Command="{Binding TraceCommand}"/>
+                      <MenuItem Header="Reload at next label" Command="{Binding ReloadCommand}"/>
+                      <Separator/>
+                      <MenuItem Header="Edit" Command="{Binding EditCommand}"/>
+                    </ContextMenu>
+                  </Grid.ContextMenu>
+                  <!-- state glyph: green ▶ running, amber ⏸ paused -->
+                  <TextBlock Grid.Column="0" Text="▶" FontSize="11" Margin="0,0,4,0"
+                             Foreground="#7fc47f" VerticalAlignment="Center"
+                             IsVisible="{Binding !Paused}"/>
+                  <TextBlock Grid.Column="0" Text="⏸" FontSize="11" Margin="0,0,4,0"
+                             Foreground="#e8c97a" VerticalAlignment="Center"
+                             IsVisible="{Binding Paused}"/>
+                  <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12"
+                             FontWeight="SemiBold" VerticalAlignment="Center"
+                             Foreground="{DynamicResource Theme.TextPrimary}"/>
+                  <Border Grid.Column="2" Background="#2d3b46" CornerRadius="2"
+                          Padding="3,0" Margin="4,0" VerticalAlignment="Center"
+                          IsVisible="{Binding IsJavaScript}">
+                    <TextBlock Text="js" FontSize="9" Foreground="#e8c97a"/>
+                  </Border>
+                  <TextBlock Grid.Column="3" Text="{Binding Summary}" FontSize="11"
+                             Margin="6,0" VerticalAlignment="Center"
+                             Foreground="{DynamicResource Theme.TextMuted}"
+                             TextTrimming="CharacterEllipsis"/>
+                  <Button Grid.Column="4" Classes="rowaction" Margin="1,0"
+                          Content="{Binding PauseGlyph}"
+                          ToolTip.Tip="{Binding PauseTip}"
+                          Command="{Binding PauseResumeCommand}"/>
+                  <Button Grid.Column="5" Classes="rowaction" Margin="1,0" Content="■"
+                          ToolTip.Tip="Stop" Command="{Binding StopCommand}"/>
+                  <Button Grid.Column="6" Classes="rowaction" Margin="1,0" Content="⋯"
+                          ToolTip.Tip="More actions">
+                    <Button.Flyout>
+                      <MenuFlyout>
+                        <MenuItem Header="{Binding PauseTip}" Command="{Binding PauseResumeCommand}"/>
+                        <MenuItem Header="Abort" Command="{Binding StopCommand}"/>
+                        <Separator/>
+                        <MenuItem Header="Debug level">
+                          <MenuItem Header="0 — off"           Command="{Binding SetDebugCommand}" CommandParameter="0"/>
+                          <MenuItem Header="1 — goto/gosub"    Command="{Binding SetDebugCommand}" CommandParameter="1"/>
+                          <MenuItem Header="2 — + pause/wait"  Command="{Binding SetDebugCommand}" CommandParameter="2"/>
+                          <MenuItem Header="3 — + if"          Command="{Binding SetDebugCommand}" CommandParameter="3"/>
+                          <MenuItem Header="4 — + var/math"    Command="{Binding SetDebugCommand}" CommandParameter="4"/>
+                          <MenuItem Header="5 — + actions"     Command="{Binding SetDebugCommand}" CommandParameter="5"/>
+                          <MenuItem Header="10 — every line"   Command="{Binding SetDebugCommand}" CommandParameter="10"/>
+                        </MenuItem>
+                        <MenuItem Header="Show vars"  Command="{Binding VarsCommand}"/>
+                        <MenuItem Header="Show trace" Command="{Binding TraceCommand}"/>
+                        <MenuItem Header="Reload at next label" Command="{Binding ReloadCommand}"/>
+                        <Separator/>
+                        <MenuItem Header="Edit" Command="{Binding EditCommand}"/>
+                      </MenuFlyout>
+                    </Button.Flyout>
+                  </Button>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- ── Detail strip (selected running script) ───────────────────────── -->
+    <Border Grid.Row="2" Background="{DynamicResource Theme.PanelBgDeep}"
+            BorderBrush="{DynamicResource Theme.Border}" BorderThickness="1"
+            CornerRadius="3" Padding="6,4" Margin="0,4,0,0"
+            IsVisible="{Binding SelectedRunning, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Grid.Column="0" Spacing="2">
+          <TextBlock FontSize="10" Foreground="{DynamicResource Theme.SectionHeader}"
+                     Text="{Binding SelectedRunning.Name, StringFormat='SELECTED — {0}'}"/>
+          <TextBlock FontSize="11" FontFamily="Consolas,Menlo,monospace"
+                     Foreground="{DynamicResource Theme.TextSecondary}"
+                     Text="{Binding SelectedRunning.DetailText}"
+                     TextTrimming="CharacterEllipsis"/>
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4"
+                    VerticalAlignment="Center">
+          <Button Content="Vars"   Classes="rowaction" Command="{Binding SelectedRunning.VarsCommand}"
+                  ToolTip.Tip="Dump the script's variables to the game window"/>
+          <Button Content="Trace"  Classes="rowaction" Command="{Binding SelectedRunning.TraceCommand}"
+                  ToolTip.Tip="Dump the recent control-flow trace to the game window"/>
+          <Button Content="Reload" Classes="rowaction" Command="{Binding SelectedRunning.ReloadCommand}"
+                  ToolTip.Tip="Hot-reload from disk at the script's next goto"/>
+          <Button Content="Edit"   Classes="rowaction" Command="{Binding SelectedRunning.EditCommand}"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- ── Output log ───────────────────────────────────────────────────── -->
+    <Border Grid.Row="3" Background="{DynamicResource Theme.PanelBgDeep}"
+            BorderBrush="{DynamicResource Theme.Border}"
+            BorderThickness="1" CornerRadius="3" Margin="0,4,0,0">
+      <Grid RowDefinitions="Auto,*">
+        <DockPanel Grid.Row="0" Margin="4,2,4,0">
+          <Button DockPanel.Dock="Right" Content="Clear" Classes="rowaction"
+                  Command="{Binding ClearOutputCommand}"/>
+          <TextBlock Text="{Binding StatusText}" FontSize="10"
+                     Foreground="{DynamicResource Theme.SectionHeader}"
+                     VerticalAlignment="Center"/>
+        </DockPanel>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      controls:AutoScrollBehavior.ItemsSource="{Binding Output}">
+          <ItemsControl ItemsSource="{Binding Output}"
+                        FontFamily="Consolas,Menlo,monospace" FontSize="11"
+                        Foreground="{DynamicResource Theme.TextSecondary}" Margin="4">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="vm:TextLine">
+                <SelectableTextBlock TextWrapping="Wrap"
+                                     controls:InlinesBehavior.Source="{Binding Inlines}"/>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

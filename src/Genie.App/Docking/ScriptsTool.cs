@@ -5,8 +5,8 @@ using Genie.Core.Layout;
 namespace Genie.App.Docking;
 
 /// <summary>
-/// Scripts dock tool. Shows currently-running scripts with stop buttons,
-/// a Start... command for the file picker, and a scrollable echo log.
+/// Script Manager dock tool (id stays <c>"scripts"</c> so saved layouts keep
+/// working): script library browser + running-script management + output log.
 /// </summary>
 public class ScriptsTool : Tool, IWindowMenuHost
 {
@@ -19,7 +19,7 @@ public class ScriptsTool : Tool, IWindowMenuHost
     {
         ViewModel = vm;
         Id        = "scripts";
-        Title     = "Scripts";
+        Title     = "Script Manager";
 
         if (settings is not null)
         {

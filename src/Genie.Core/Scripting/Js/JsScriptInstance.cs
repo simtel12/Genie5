@@ -18,6 +18,10 @@ internal sealed class JsScriptInstance
 {
     public string Name { get; }
 
+    /// <summary>Full path of the source file (set at start) — surfaced in the
+    /// Script Manager's status snapshots so Edit/Open actions can target it.</summary>
+    public string SourcePath = string.Empty;
+
     /// <summary>Script-local variables (genie.getVar/setVar). Seeded with the
     /// launch args as 1..N, the joined args as 0, and the script name.</summary>
     public Dictionary<string, string> Locals { get; } = new(StringComparer.OrdinalIgnoreCase);

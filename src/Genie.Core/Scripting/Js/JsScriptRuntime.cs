@@ -6,8 +6,10 @@ using Jint.Runtime;
 
 namespace Genie.Core.Scripting.Js;
 
-/// <summary>One running <c>.js</c> script's stats for the performance overlay.</summary>
-public readonly record struct JsScriptStat(string Name, double ElapsedSec, bool Paused);
+/// <summary>One running <c>.js</c> script's stats for the performance overlay
+/// and the Script Manager's status snapshots. <paramref name="SourcePath"/>
+/// defaults to empty so existing consumers are unaffected.</summary>
+public readonly record struct JsScriptStat(string Name, double ElapsedSec, bool Paused, string SourcePath = "");
 
 /// <summary>
 /// Owns the set of running <c>.js</c> scripts and the Jint engines that execute
@@ -88,7 +90,7 @@ internal sealed class JsScriptRuntime
         if (abortDupe)
             StopInternal(name, suppressFinish: true);
 
-        var inst = new JsScriptInstance(name);
+        var inst = new JsScriptInstance(name) { SourcePath = Path.GetFullPath(path) };
         for (int i = 0; i < args.Count; i++) inst.Locals[(i + 1).ToString()] = args[i];
         inst.Locals["0"]          = string.Join(" ", args);
         inst.Locals["scriptname"] = name;
@@ -254,7 +256,7 @@ internal sealed class JsScriptRuntime
             var list = new List<JsScriptStat>(_instances.Count);
             foreach (var i in _instances)
                 if (i.Running)
-                    list.Add(new JsScriptStat(i.Name, i.RunClock.Elapsed.TotalSeconds, i.Paused));
+                    list.Add(new JsScriptStat(i.Name, i.RunClock.Elapsed.TotalSeconds, i.Paused, i.SourcePath));
             return list;
         }
     }

@@ -19,7 +19,8 @@ namespace Genie.Core.Tests;
 /// </summary>
 public class EchoWindowTokenTests
 {
-    private static List<(string msg, string? window)> RunFixture(string body)
+    private static List<(string msg, string? window)> RunFixture(
+        string body, IDictionary<string, string>? globals = null)
     {
         var calls = new List<(string, string?)>();
         var dir = Path.Combine(Path.GetTempPath(), "gc_echotest_" + Guid.NewGuid().ToString("N"));
@@ -29,6 +30,11 @@ public class EchoWindowTokenTests
             File.WriteAllText(Path.Combine(dir, "t.cmd"), body);
             var engine = new ScriptEngine(dir, new TypeAheadSession(),
                                           sendCommand: _ => { }, echo: _ => { });
+            // $vars are GLOBALS-only (Genie 4 Script.cs:2368 — the $ branch
+            // resolves via m_oGlobals, never script locals). Alert scripts set
+            // $alertwindow with #var/#tvar; the fixture seeds the same store.
+            if (globals is not null)
+                foreach (var (k, v) in globals) engine.Globals[k] = v;
             engine.EchoTo = (msg, win, _) => calls.Add((msg, win));
             engine.TryStart("t", new List<string>());
             for (int i = 0; i < 200; i++) engine.Tick();
@@ -41,8 +47,8 @@ public class EchoWindowTokenTests
     public void Window_token_strips_the_chevron()
     {
         var calls = RunFixture(
-            "var w Log\n" +
-            "put #echo >$w hello\n");
+            "put #echo >$w hello\n",
+            new Dictionary<string, string> { ["w"] = "Log" });
 
         Assert.Contains(("hello", "Log"), calls);
     }
@@ -56,8 +62,8 @@ public class EchoWindowTokenTests
         // this was quote-aware the token started with '"', fell out of the
         // option loop, and the whole line (quotes and all) dumped to main.
         var calls = RunFixture(
-            "var w Moonmage Training Menu\n" +
-            "put #echo \">$w\" cyan Enter value for CHARGE:\n");
+            "put #echo \">$w\" cyan Enter value for CHARGE:\n",
+            new Dictionary<string, string> { ["w"] = "Moonmage Training Menu" });
 
         Assert.Contains(("Enter value for CHARGE:", "Moonmage Training Menu"), calls);
     }
@@ -79,8 +85,8 @@ public class EchoWindowTokenTests
         // leading chevrons are trimmed so the echo still reaches "Log"
         // instead of manufacturing a junk window named ">Log".
         var calls = RunFixture(
-            "var w >Log\n" +
-            "put #echo >$w hello\n");
+            "put #echo >$w hello\n",
+            new Dictionary<string, string> { ["w"] = ">Log" });
 
         Assert.Contains(("hello", "Log"), calls);
     }

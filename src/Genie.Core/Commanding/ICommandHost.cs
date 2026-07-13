@@ -120,6 +120,57 @@ public interface ICommandHost
     /// </summary>
     void SetTraceLevelAll(int level);
 
+    // ── #script sub-commands (Genie 4 Core/Command.cs:2188 dispatcher) ──────
+    // Default-bodied for the same reason as Beep(): these are forwarding-style,
+    // nothing-lost-if-absent members that the many ICommandHost test doubles
+    // and headless hosts need not implement — only GenieCore overrides them.
+
+    /// <summary>Toggle pause/resume per script (<c>#script pauseorresume</c>).
+    /// Null/empty toggles every running script individually.</summary>
+    void PauseOrResumeScript(string? name) { }
+
+    /// <summary>Mark script(s) for hot reload at their next <c>goto</c>
+    /// (<c>#script reload</c>). Null/empty = every running script.</summary>
+    void ReloadScript(string? name) { }
+
+    /// <summary>Dump a script's local variables to the main window
+    /// (<c>#script vars &lt;name&gt; [filter]</c>). Null/empty name = every
+    /// script; <paramref name="filter"/> is a substring match on the
+    /// <c>name=value</c> rows.</summary>
+    void ShowScriptVars(string? name, string filter) { }
+
+    /// <summary>Dump a script's rolling control-flow trace to the main window
+    /// (<c>#script trace &lt;name|all&gt;</c>).</summary>
+    void ShowScriptTrace(string? name) { }
+
+    /// <summary>Set one script's debug/trace level (<c>#script debug
+    /// &lt;level&gt; &lt;name&gt;</c>); null/empty name = every script.</summary>
+    void SetScriptDebugLevel(int level, string? name) { }
+
+    /// <summary>Open the Script Manager / Explorer window (<c>#script
+    /// explorer</c>). Lives in the App layer; headless hosts explain that.</summary>
+    void ShowScriptExplorer() => Echo("The Script Explorer requires the App UI.");
+
+    /// <summary>
+    /// Genie 4-format status lines for the <c>#script</c>/<c>#scripts</c>
+    /// listing — <c>Name(Paused) [Debuglevel: N]: 12.30 seconds. State
+    /// (file.cmd)</c>. <paramref name="filter"/> is an exact script name
+    /// (null/empty/"all" = everything). The default falls back to the plain
+    /// names from <see cref="RunningScripts"/> for hosts without a script
+    /// engine surface.
+    /// </summary>
+    IReadOnlyList<string> ScriptStatusLines(string? filter)
+    {
+        var names = RunningScripts();
+        if (string.IsNullOrEmpty(filter) ||
+            filter!.Equals("all", StringComparison.OrdinalIgnoreCase))
+            return names;
+        var hits = new List<string>();
+        foreach (var n in names)
+            if (n.Equals(filter, StringComparison.OrdinalIgnoreCase)) hits.Add(n);
+        return hits;
+    }
+
     /// <summary>
     /// Names of currently running scripts. Used by <c>#scripts</c> to list
     /// them at the command bar.
@@ -299,10 +350,10 @@ public interface ICommandHost
     /// trigger action on a whisper or a hunting-script alert.
     /// <para>Provided as a default no-op so the many <see cref="ICommandHost"/>
     /// test doubles and headless/Console hosts need not implement it — only the
-    /// real host (GenieCore) overrides it to raise its beep event. This is the
-    /// one default-bodied member on the interface; the deviation is deliberate,
-    /// to avoid a no-op tax across ~14 implementers for a fire-and-forget,
-    /// nothing-lost-if-absent capability.</para>
+    /// real host (GenieCore) overrides it to raise its beep event. The
+    /// <c>#script</c> sub-command members above follow the same deliberate
+    /// pattern: default-bodied to avoid a no-op tax across ~17 implementers for
+    /// fire-and-forget, nothing-lost-if-absent capabilities.</para>
     /// </summary>
     void Beep() { }
 

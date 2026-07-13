@@ -18,7 +18,8 @@ namespace Genie.Core.Tests;
 /// </summary>
 public class ScriptNestedVarAndDefTests
 {
-    private static List<string> RunFixture(string body, Func<string, string?>? userVars = null)
+    private static List<string> RunFixture(string body, Func<string, string?>? userVars = null,
+                                           IDictionary<string, string>? globals = null)
     {
         var echoed = new List<string>();
         var dir = Path.Combine(Path.GetTempPath(), "gc_nesttest_" + Guid.NewGuid().ToString("N"));
@@ -29,6 +30,8 @@ public class ScriptNestedVarAndDefTests
             var engine = new ScriptEngine(dir, new TypeAheadSession(),
                                           sendCommand: _ => { }, echo: l => echoed.Add(l));
             if (userVars is not null) engine.UserVarLookup = userVars;
+            if (globals is not null)
+                foreach (var (k, v) in globals) engine.Globals[k] = v;
             engine.TryStart("t", new List<string>());
             for (int i = 0; i < 200; i++) engine.Tick();
             return echoed;
@@ -43,11 +46,11 @@ public class ScriptNestedVarAndDefTests
             "var counter 1\n" +
             "var harness1 loaded\n" +
             "var output var1\n" +
-            "var var1 foo\n" +
             "echo A=%harness%counter\n" +   // %counter→1 ⇒ %harness1 ⇒ loaded
-            "echo B=$%output\n";            // %output→var1 ⇒ $var1 ⇒ foo
+            "echo B=$%output\n";            // %output→var1 ⇒ $var1 ⇒ foo (a GLOBAL —
+                                            // $ never reads script locals, G4 parity)
 
-        var o = RunFixture(body);
+        var o = RunFixture(body, globals: new Dictionary<string, string> { ["var1"] = "foo" });
 
         Assert.Contains("A=loaded", o);
         Assert.Contains("B=foo",    o);

@@ -369,58 +369,88 @@ public sealed class CommandEngine
                 break;
             case "script":
             {
-                // Genie 4 #script <sub> [name|all] — script lifecycle dispatcher
-                // (Core/Command.cs:2188). It NEVER starts a script (scripts start
-                // with ".name"); mm_train's wait mode relies on
-                // "#script abort <name>". Before this matched Genie 4, the whole
-                // remainder was passed to RunScript, so "#script abort foo" tried
-                // to start a script named "abort". Genie 4's "except" clause on
-                // the all-form is not supported yet; "all except x" acts on all.
-                // Bare #script and unknown sub-commands list what's running,
-                // like #scripts (Genie 4 EventListScripts).
+                // Genie 4 #script <sub> [name|all] [except <name>] — script
+                // lifecycle dispatcher (Core/Command.cs:2188 + the FormMain
+                // Command_Script* handlers). It NEVER starts a script (scripts
+                // start with ".name"); mm_train's wait mode relies on
+                // "#script abort <name>". Target grammar: blank or "all" means
+                // every running script; abort/pause/resume/pauseorresume also
+                // honour a trailing "except <name>" (reload does not — Genie 4
+                // parity). Bare #script and unknown sub-commands list what's
+                // running, like #scripts (Genie 4 EventListScripts).
                 var scriptSub  = parts.Count > 1 ? parts[1].ToLowerInvariant() : string.Empty;
-                var scriptName = parts.Count > 2 ? string.Join(" ", parts.Skip(2)).Trim() : string.Empty;
-                var scriptAll  = scriptName.Length == 0 ||
-                                 scriptName.Equals("all", StringComparison.OrdinalIgnoreCase) ||
-                                 scriptName.StartsWith("all ", StringComparison.OrdinalIgnoreCase);
+                var scriptRest = parts.Count > 2 ? string.Join(" ", parts.Skip(2)).Trim() : string.Empty;
                 switch (scriptSub)
                 {
                     case "abort":
-                        if (scriptAll) _host.StopAllScripts();
-                        else           _host.StopScript(scriptName);
-                        break;
-                    case "pause":
-                        _host.PauseScript(scriptAll ? null : scriptName);
-                        break;
-                    case "resume":
-                        _host.ResumeScript(scriptAll ? null : scriptName);
-                        break;
-                    case "pauseorresume":
-                    case "reload":
-                    case "trace":
-                    case "vars":
-                    case "variables":
-                    case "debug":
-                    case "debuglevel":
-                    case "explorer":
-                        _host.Echo($"#script {scriptSub} is not yet implemented.");
-                        break;
-                    default:
                     {
-                        // Same listing as #scripts (Genie 4's default is
-                        // EventListScripts).
-                        var scriptList = _host.RunningScripts();
-                        if (scriptList.Count == 0)
-                        {
-                            _host.Echo("No scripts running.");
-                        }
-                        else
-                        {
-                            _host.Echo("Running scripts:");
-                            foreach (var n in scriptList) _host.Echo($"  {n}");
-                        }
+                        var (target, except) = ParseScriptTarget(scriptRest);
+                        if (target is null && except is null) _host.StopAllScripts();
+                        else ForEachTargetScript(target, except, n => _host.StopScript(n));
                         break;
                     }
+                    case "pause":
+                    {
+                        var (target, except) = ParseScriptTarget(scriptRest);
+                        if (except is null) _host.PauseScript(target);
+                        else ForEachTargetScript(target, except, n => _host.PauseScript(n));
+                        break;
+                    }
+                    case "resume":
+                    {
+                        var (target, except) = ParseScriptTarget(scriptRest);
+                        if (except is null) _host.ResumeScript(target);
+                        else ForEachTargetScript(target, except, n => _host.ResumeScript(n));
+                        break;
+                    }
+                    case "pauseorresume":
+                    {
+                        var (target, except) = ParseScriptTarget(scriptRest);
+                        if (except is null) _host.PauseOrResumeScript(target);
+                        else ForEachTargetScript(target, except, n => _host.PauseOrResumeScript(n));
+                        break;
+                    }
+                    case "reload":
+                    {
+                        var (target, _) = ParseScriptTarget(scriptRest);
+                        _host.ReloadScript(target);
+                        break;
+                    }
+                    case "trace":
+                        _host.ShowScriptTrace(NullIfAll(scriptRest));
+                        break;
+                    case "vars":
+                    case "variables":
+                    {
+                        // #script vars <name|all> [filter] — the filter is a
+                        // substring match on the name=value rows.
+                        var varName   = parts.Count > 2 ? parts[2] : string.Empty;
+                        var varFilter = parts.Count > 3 ? string.Join(" ", parts.Skip(3)) : string.Empty;
+                        _host.ShowScriptVars(NullIfAll(varName), varFilter);
+                        break;
+                    }
+                    case "debug":
+                    case "debuglevel":
+                    {
+                        // #script debug <level> [name|all]
+                        if (parts.Count < 3 || !int.TryParse(parts[2], out var dbgLevel))
+                        {
+                            _host.Echo("Usage: #script debug <0-10> [name|all]");
+                            break;
+                        }
+                        var dbgName = parts.Count > 3 ? string.Join(" ", parts.Skip(3)).Trim() : string.Empty;
+                        _host.SetScriptDebugLevel(dbgLevel, NullIfAll(dbgName));
+                        break;
+                    }
+                    case "explorer":
+                        _host.ShowScriptExplorer();
+                        break;
+                    default:
+                        // Genie 4's default: list active scripts. The text
+                        // AFTER the unknown sub-word is the exact-name filter
+                        // (ArrayToString(oArgs, 2)); the sub-word itself is not.
+                        ListScripts(scriptRest);
+                        break;
                 }
                 break;
             }
@@ -462,20 +492,9 @@ public sealed class CommandEngine
                 break;
             }
             case "scripts":
-            {
-                // List currently-running scripts.
-                var running = _host.RunningScripts();
-                if (running.Count == 0)
-                {
-                    _host.Echo("No scripts running.");
-                }
-                else
-                {
-                    _host.Echo("Running scripts:");
-                    foreach (var n in running) _host.Echo($"  {n}");
-                }
+                // List currently-running scripts (same as bare #script).
+                ListScripts(parts.Count > 1 ? string.Join(" ", parts.Skip(1)).Trim() : string.Empty);
                 break;
-            }
             case "edit":
             {
                 // #edit <name> — open Scripts/<name>.cmd in the user's
@@ -822,6 +841,55 @@ public sealed class CommandEngine
     /// scripts can log concurrently. Write failures are reported, not thrown —
     /// a bad log path must never abort the command that issued the <c>#log</c>.
     /// </summary>
+    /// <summary>
+    /// Parse a <c>#script</c> sub-command target: <c>&lt;name&gt;</c>,
+    /// <c>all</c>, or blank, with an optional trailing <c>except &lt;name&gt;</c>
+    /// (Genie 4 FormMain.Command_Script* semantics — the except keyword must
+    /// follow something, and "all"/blank both mean every running script).
+    /// A null Target means the every-script case.
+    /// </summary>
+    private static (string? Target, string? Except) ParseScriptTarget(string rest)
+    {
+        string? except = null;
+        int i = rest.ToLowerInvariant().IndexOf("except ", StringComparison.Ordinal);
+        if (i > 0)
+        {
+            except = rest[(i + 7)..].Trim();
+            rest   = rest[..i].TrimEnd();
+            if (except.Length == 0) except = null;
+        }
+        if (rest.Length == 0 || rest.Equals("all", StringComparison.OrdinalIgnoreCase))
+            return (null, except);
+        return (rest, except);
+    }
+
+    private static string? NullIfAll(string s)
+        => s.Length == 0 || s.Equals("all", StringComparison.OrdinalIgnoreCase) ? null : s;
+
+    /// <summary>Apply <paramref name="op"/> to every running script matching
+    /// <paramref name="target"/> (null = all) and not excluded by
+    /// <paramref name="except"/>.</summary>
+    private void ForEachTargetScript(string? target, string? except, Action<string> op)
+    {
+        foreach (var n in _host.RunningScripts())
+        {
+            if (target is not null && !n.Equals(target, StringComparison.OrdinalIgnoreCase)) continue;
+            if (except is not null && n.Equals(except, StringComparison.OrdinalIgnoreCase)) continue;
+            op(n);
+        }
+    }
+
+    /// <summary>The <c>#script</c>/<c>#scripts</c> listing — Genie 4's
+    /// EventListScripts format: an "Active scripts:" header, then one status
+    /// line per running script, or "None."</summary>
+    private void ListScripts(string filter)
+    {
+        var lines = _host.ScriptStatusLines(NullIfAll(filter));
+        _host.Echo("Active scripts:");
+        if (lines.Count == 0) _host.Echo("None.");
+        else foreach (var l in lines) _host.Echo(l);
+    }
+
     private void WriteLogFile(string path, string text, bool banner)
     {
         try
