@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.VisualTree;
 using Genie.App.Controls;
 
@@ -64,7 +65,7 @@ public static class WindowMenuBehavior
     {
         if (sender is not ContextMenu menu) return;
 
-        if (menu.PlacementTarget is Control target)
+        if (ResolveMenuTarget(menu) is { } target)
             _currentTarget = target;
 
         if (menu.DataContext is IWindowMenuHost host)
@@ -78,27 +79,47 @@ public static class WindowMenuBehavior
     {
         if (sender is not ContextMenu menu) return;
 
-        // PlacementTarget is only reliably assigned by the time Opened fires —
-        // Opening can run before the open sequence sets it, and a null target
-        // reads as "no selection anywhere", leaving Copy permanently greyed in
-        // every window menu regardless of the actual selection. Re-resolve and
-        // re-gate now that the target is real; the open menu updates live via
+        // Re-resolve on Opened as well: on the very first open the menu isn't
+        // parented to its Popup until the open sequence completes, so Opening
+        // can miss the target. By Opened the Popup parent (and its
+        // PlacementTarget) always exists. The open menu updates live via
         // CanExecuteChanged.
-        if (menu.PlacementTarget is Control target)
+        if (ResolveMenuTarget(menu) is { } target)
             _currentTarget = target;
         _copy.RaiseCanExecuteChanged();
     }
 
+    /// <summary>The control the menu is attached to (the window's content
+    /// root). Two traps here, both verified on Avalonia 11.3.11:
+    /// (1) ContextMenu.PlacementTarget is NOT assigned by the attached-menu
+    /// open path — it stays null through Opening AND Opened; the internal
+    /// Popup's PlacementTarget is set instead, so read that.
+    /// (2) That popup target is the DEEPEST control under the right-click
+    /// (e.g. the clicked line's SelectableTextBlock), not the menu's owner —
+    /// searching its subtree finds only that one line's selection, silently
+    /// truncating Copy to a single line. Walk up to the ancestor that owns
+    /// this menu; fall back to the raw target if the walk finds none.</summary>
+    private static Control? ResolveMenuTarget(ContextMenu menu)
+    {
+        var seed = menu.PlacementTarget ?? (menu.Parent as Popup)?.PlacementTarget;
+        for (var c = seed; c is not null; c = c.GetVisualParent() as Control)
+            if (c.ContextMenu == menu)
+                return c;
+        return seed;
+    }
+
     // ── Copy current selection ─────────────────────────────────────────────
 
-    private static string? CurrentSelection()
+    private static string? CurrentSelection() => CurrentSelection(out _);
+
+    private static string? CurrentSelection(out string trace)
     {
         // Primary: the open menu's placement target. Fallback: the last
         // right-/left-clicked window's ScrollViewer (PageScroll tracks every
         // press, including the right-click that opened this menu) — covers
         // any path where PlacementTarget was still null when we looked.
         var target = _currentTarget ?? PageScroll.CurrentTarget;
-        if (target is null) return null;
+        if (target is null) { trace = "no target"; return null; }
 
         // 1) Game window: cross-line selection owned by the LineSelection
         //    behavior (its rendered per-line SelectionStart/End survive a
@@ -107,15 +128,26 @@ public static class WindowMenuBehavior
                          .OfType<ItemsControl>()
                          .FirstOrDefault(LineSelection.GetEnabled);
         if (list is not null && LineSelection.GetSelectedText(list) is { Length: > 0 } cross)
+        {
+            trace = $"target={target.GetType().Name} behavior len={cross.Length}";
             return cross;
+        }
 
-        // 2) Streams / other text feeds: the native per-block selection. A
-        //    right-click inside the highlight keeps it (Avalonia collapses only
-        //    when the click lands outside the selection).
-        var block = target.GetSelfAndVisualDescendants()
+        // 2) Streams / other feeds — and the game window when its behavior
+        //    state is empty but rendered per-line selections remain. Aggregate
+        //    EVERY selected block in visual (= line) order: taking just the
+        //    first can silently truncate a visible multi-line highlight to a
+        //    single line. A right-click inside a highlight keeps it (Avalonia
+        //    collapses a block's selection only when the click lands outside
+        //    that block's selected range).
+        var parts = target.GetSelfAndVisualDescendants()
                           .OfType<SelectableTextBlock>()
-                          .FirstOrDefault(b => b.SelectionStart != b.SelectionEnd);
-        return block?.SelectedText;
+                          .Where(b => b.SelectionStart != b.SelectionEnd)
+                          .Select(b => b.SelectedText)
+                          .Where(t => !string.IsNullOrEmpty(t))
+                          .ToList();
+        trace = $"target={target.GetType().Name} behavior={(list is null ? "no list" : "empty")} blocks={parts.Count}";
+        return parts.Count == 0 ? null : string.Join('\n', parts);
     }
 
     private sealed class CopyCommand : ICommand
@@ -129,9 +161,19 @@ public static class WindowMenuBehavior
 
         public async void Execute(object? parameter)
         {
-            var text = CurrentSelection();
+            var text = CurrentSelection(out var trace);
+            // One line per menu-Copy click (a rare user action) so a "Copy
+            // grabbed the wrong thing" report comes with the resolution path.
+            Diagnostics.ErrorLog.Note("WindowCopy",
+                $"{trace} -> {(text is null ? "null" : $"{text.Length} chars, {text.Count(c => c == '\n') + 1} line(s)")}");
             if (string.IsNullOrEmpty(text)) return;
-            if (TopLevel.GetTopLevel(_currentTarget)?.Clipboard is { } cb)
+            // Anchor the clipboard lookup on the same fallback chain
+            // CurrentSelection() used to find the text — anchoring on
+            // _currentTarget alone made Copy a silent no-op whenever only the
+            // PageScroll fallback had resolved (the pre-fix state of every
+            // right-click, since PlacementTarget was never assigned).
+            var anchor = _currentTarget ?? PageScroll.CurrentTarget;
+            if (anchor is not null && TopLevel.GetTopLevel(anchor)?.Clipboard is { } cb)
                 await cb.SetTextAsync(text);
         }
     }
