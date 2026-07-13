@@ -173,12 +173,13 @@ public class ChartCanvas : Control
         double X(double x) => plot.X + (x - minX) / (maxX - minX) * plot.Width;
         double Y(double y) => plot.Bottom - (y - minY) / (maxY - minY) * plot.Height;
 
-        // Y grid + labels at nice steps.
+        // Y grid + labels at nice steps, labelled to the step's precision.
+        double yStep = NiceStep(minY, maxY, 5);
         foreach (var tick in NiceTicks(minY, maxY, 5))
         {
             double y = Y(tick);
             ctx.DrawLine(new Pen(grid, 1), new Point(plot.X, y), new Point(plot.Right, y));
-            DrawText(ctx, FormatNumber(tick), label, new Point(2, y - 7), 11);
+            DrawText(ctx, FormatTick(tick, yStep), label, new Point(2, y - 7), 11);
         }
         // X grid + labels.
         foreach (var tick in NiceTicks(minX, maxX, 5))
@@ -228,7 +229,7 @@ public class ChartCanvas : Control
             }
             if (best is { } bp && bestDist < 40)
             {
-                string text = $"{bestName}: {FormatNumber(bp.Y)}  @ {FormatX(bp.X)}";
+                string text = $"{bestName}: {FormatTick(bp.Y, yStep)}  @ {FormatX(bp.X)}";
                 DrawBadge(ctx, text, new Point(Math.Min(h.X + 8, plot.Right - 150), plot.Y + 6));
                 var marker = new Point(X(bp.X), Y(bp.Y));
                 ctx.DrawEllipse(PaletteBrush(0), null, marker, 3, 3);
@@ -279,15 +280,37 @@ public class ChartCanvas : Control
     /// 1/2/5×10ⁿ "nice step" so gridlines land on human values.</summary>
     internal static IEnumerable<double> NiceTicks(double min, double max, int target)
     {
+        double step = NiceStep(min, max, target);
+        if (step <= 0) yield break;
+        double tick = Math.Ceiling(min / step) * step;
+        for (; tick <= max + step * 0.001; tick += step)
+            yield return Math.Round(tick, 10);
+    }
+
+    /// <summary>The 1/2/5×10ⁿ spacing <see cref="NiceTicks"/> uses — exposed so
+    /// label formatting can match its precision to the spacing.</summary>
+    internal static double NiceStep(double min, double max, int target)
+    {
         double range = max - min;
-        if (range <= 0 || double.IsNaN(range)) yield break;
+        if (range <= 0 || double.IsNaN(range)) return 0;
         double rough = range / Math.Max(1, target);
         double mag   = Math.Pow(10, Math.Floor(Math.Log10(rough)));
         double norm  = rough / mag;
-        double step  = (norm < 1.5 ? 1 : norm < 3.5 ? 2 : norm < 7.5 ? 5 : 10) * mag;
-        double tick  = Math.Ceiling(min / step) * step;
-        for (; tick <= max + step * 0.001; tick += step)
-            yield return Math.Round(tick, 10);
+        return (norm < 1.5 ? 1 : norm < 3.5 ? 2 : norm < 7.5 ? 5 : 10) * mag;
+    }
+
+    /// <summary>Axis-tick label with precision derived from the tick spacing.
+    /// A sub-1 step needs decimals: <see cref="FormatNumber"/> renders values
+    /// ≥100 as integers, so a sub-rank range printed the same label on every
+    /// tick (#166 — "555" six times down the axis).</summary>
+    internal static string FormatTick(double v, double step)
+    {
+        if (step > 0 && step < 1 && Math.Abs(v) < 1000)
+        {
+            int decimals = Math.Min(3, (int)Math.Ceiling(-Math.Log10(step) - 1e-9));
+            return v.ToString("F" + decimals, CultureInfo.InvariantCulture);
+        }
+        return FormatNumber(v);
     }
 
     private string FormatX(double x)
