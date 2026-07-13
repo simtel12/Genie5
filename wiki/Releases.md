@@ -4,7 +4,23 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8.9 — Script Manager & Injuries
+## Latest: v5.0.0-alpha.8.10 — Import Integrity
+
+A bug-sweep with one theme: rules you import or save now load back exactly as written — Genie 4 imports finally survive a restart.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.10** as a delta.
+
+- **Genie 4 imports survive a restart** — per-character imports were saved into a folder the engine never read; Core and the app now share one per-character path (`Profiles/{Character}-{Account}/`), with automatic migration of the old folders. (#163)
+- **Rule files are always real cfg files** — the import had been writing JSON into `.cfg` files, which the connect-time loader replayed into the game; one shared cfg writer now, loaders dispatch only #commands, and legacy JSON saves convert themselves in place. (#168)
+- **Loads are faithful and quiet** — saved rules no longer get variable-expanded at load (patterns like `$monstercount` stay intact), and connecting prints one "Triggers Loaded" summary per file instead of announcing every rule. (#168)
+- **Typed `#action {command} when {pattern}`** parses action-first like Genie 4 instead of storing the rule transposed. (#162)
+- **File → Import from Genie 4** works on a fresh launch, before any command is typed. (#164)
+- **Mapper walk indicator** no longer shows a phantom Resume/Cancel strip on a fresh launch. (#165)
+- **Analytics** sub-rank "Rank over time" ranges get decimal y-axis labels instead of a repeated integer. (#166)
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.10)
+
+## v5.0.0-alpha.8.9 — Script Manager & Injuries
 
 The Scripts window grows into a full **Script Manager** (library tree, running-script controls, Genie 4 `#script` command parity incl. hot reload), the Injuries panel gets a sprite-based body display, and a cluster of script-variable parity gaps closes.
 

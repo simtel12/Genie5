@@ -1,3 +1,42 @@
+# Genie 5 — v5.0.0-alpha.8.10
+
+A bug-sweep release with one theme: **rules you import or save now load back
+exactly as written.** Every fix came out of a single live smoke-test evening.
+
+## 🔧 Fixed
+
+- **Genie 4 imports survive a restart** — per-character imports were saved
+  into a `Config/Profiles/{guid}/` folder the engine never read, so a "This
+  character only" import silently vanished on relaunch. Core and the app now
+  share one path contract (`Profiles/{Character}-{Account}/`), legacy GUID
+  folders migrate automatically on first use, and the Configuration dialog
+  saves to the same place the engine loads from. (#163)
+- **Rule files are always real cfg files** — the Import dialog had been
+  writing JSON into `.cfg`-named files; at connect the loader replayed those
+  lines through the command pipeline, whose fallthrough sent them to the game
+  server as typed commands. Saves and the import now share one cfg-format
+  writer; loaders dispatch only #commands (file content can never reach the
+  game) and self-heal legacy JSON saves by converting them in place on the
+  next load. (#168)
+- **Loads no longer corrupt rules or flood the login** — replaying saved
+  rules doesn't variable-expand them any more (a trigger saved with pattern
+  `$monstercount` came back as the literal `0`), and the per-rule
+  "Trigger added: …" confirmations are silent during loads — one
+  "Triggers Loaded" summary per file instead of a thousand-line wall. A class
+  literally named `list` also restores correctly again. (#168)
+- **Typed `#action {command} when {pattern}`** stored the rule transposed —
+  action `when`, your pattern in the class column — creating a trigger that
+  fired the literal command "when". Genie 4's action-first form now parses
+  correctly from the command bar, as it always did inside scripts. (#162)
+- **File → Import from Genie 4 works on a fresh launch** — it no longer
+  claims the app is "still initialising" until you type a command. (#164)
+- **Phantom walk strip** — the Mapper's walk indicator (Resume/Cancel +
+  progress bar) no longer renders on a fresh launch with no walk active. (#165)
+- **Analytics axis precision** — a "Rank over time" range spanning less than
+  one rank shows decimal y-axis labels (131.66 / 131.68 / …) instead of the
+  same integer on every tick; the hover badge matches the axis. (#166)
+- `/sort` help text mentions the accepted `all` token (CircleCalc).
+
 # Genie 5 — v5.0.0-alpha.8.9
 
 A script-management milestone: the Scripts window grows into a full **Script
