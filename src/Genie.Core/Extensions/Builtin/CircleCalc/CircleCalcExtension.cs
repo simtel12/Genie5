@@ -329,7 +329,7 @@ public sealed class CircleCalcExtension : IGameExtension
         Echo("  /calc <guild>          calculate for a guild (no spaces: moonmage, warriormage)");
         Echo("  /calc <circle>         what you need for a specific circle");
         Echo("  /calc <guild> <circle> both");
-        Echo("  /sort                  list all your skills, highest rank first");
+        Echo("  /sort [all]            list all your skills, highest rank first");
         Echo("  /sort <skillset>       armor | weapons | magic | survival | lore");
         Echo("  /sort <group>          a custom group from SortGroups.xml");
         Echo("  /sort [...] <rank>     only skills at or above <rank>");
