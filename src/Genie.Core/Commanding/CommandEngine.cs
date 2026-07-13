@@ -4,6 +4,7 @@ using Genie.Core.Config;
 using Genie.Core.Gags;
 using Genie.Core.Highlights;
 using Genie.Core.Macros;
+using Genie.Core.Persistence;
 using Genie.Core.Queue;
 using Genie.Core.Parsing;
 using Genie.Core.Runtime;
@@ -1068,13 +1069,57 @@ public sealed class CommandEngine
         if (shown == 0) _host.Echo("None.");
     }
 
+    // ── Saved-cfg loading guards ─────────────────────────────────────────────
+    // A .cfg rule file is a script of #commands, nothing else. The loaders
+    // used to replay every line through ProcessInput, whose fallthrough is
+    // send-to-game — so a wrong-format file (the Genie 4 Import dialog
+    // briefly wrote JSON into .cfg names) was transmitted to the SERVER
+    // line by line at connect. Loaders now dispatch only command lines and
+    // self-heal JSON-format saves via PersistenceService + a cfg rewrite.
+
+    /// <summary>Dispatch a cfg file's lines: only #command lines run; anything
+    /// else is counted and reported, never sent to the game. Lines keep the
+    /// normal ProcessInput pipeline (variable expansion, separator split); a
+    /// <c>#</c> line under a custom commandchar still dispatches internally —
+    /// saves always write <c>#</c>.</summary>
+    private void RunCfgFileLines(IReadOnlyList<string> lines, string fileName)
+    {
+        int skipped = 0;
+        foreach (var raw in lines)
+        {
+            var line = raw.TrimStart();
+            if (line.Length == 0) continue;
+            if (line[0] == _config.CommandChar)      ProcessInput(line);
+            else if (line[0] == '#')                 HandleInternalCommand(line[1..]);
+            else                                     skipped++;
+        }
+        if (skipped > 0)
+            _host.Echo($"{fileName}: skipped {skipped} line(s) that are not #commands.");
+    }
+
+    /// <summary>True when the file body opens a JSON array/object — a legacy
+    /// JSON-format save that must be deserialized, not replayed as commands.</summary>
+    private static bool LooksLikeJson(IReadOnlyList<string> lines)
+    {
+        foreach (var raw in lines)
+        {
+            var t = raw.TrimStart();
+            if (t.Length == 0) continue;
+            return t[0] == '[' || t[0] == '{';
+        }
+        return false;
+    }
+
+    /// <summary>Report a completed JSON-format self-heal (deserialize → apply →
+    /// the type's #save handler already rewrote the file in cfg format).</summary>
+    private void EchoJsonHealed(string fileName, int count) =>
+        _host.Echo($"{fileName} was a JSON-format save — converted {count} entr{(count == 1 ? "y" : "ies")} to cfg format.");
+
     private void SaveClasses()
     {
         if (Classes is null) return;
         var path  = Path.Combine(_config.ConfigProfileDir, "classes.cfg");
-        var lines = Classes.GetAll()
-            .Where(kvp => !kvp.Key.Equals("default", StringComparison.OrdinalIgnoreCase))
-            .Select(kvp => $"#class {kvp.Key} {(kvp.Value ? "on" : "off")}");
+        var lines = CfgFormat.ClassLines(Classes.GetAll());
         if (ConfigPersistence.WriteLines(path, lines))
             _host.Echo("Classes Saved");
         else
@@ -1086,7 +1131,20 @@ public sealed class CommandEngine
         var path  = Path.Combine(_config.ConfigProfileDir, "classes.cfg");
         var lines = ConfigPersistence.ReadLines(path);
         if (lines is null) { _host.Echo($"No classes file: {path}"); return; }
-        foreach (var line in lines) ProcessInput(line);
+        if (Classes is not null && LooksLikeJson(lines))
+        {
+            var models = new PersistenceService().LoadClasses(path);
+            if (models.Count == 0)
+            {
+                _host.Echo($"classes.cfg: JSON-format save with no readable entries — not converted: {path}");
+                return;
+            }
+            foreach (var m in models) Classes.Set(m.Name, m.IsActive);
+            SaveClasses();
+            EchoJsonHealed("classes.cfg", models.Count);
+            return;
+        }
+        RunCfgFileLines(lines, "classes.cfg");
         _host.Echo("Classes Loaded");
     }
 
@@ -1173,8 +1231,7 @@ public sealed class CommandEngine
     {
         if (Aliases is null) return;
         var path  = Path.Combine(_config.ConfigProfileDir, "aliases.cfg");
-        var lines = Aliases.Aliases.Select(a =>
-            $"#alias add {ConfigPersistence.FormatArg(a.Name)} {ConfigPersistence.FormatArg(a.Expansion)}");
+        var lines = CfgFormat.AliasLines(Aliases.Aliases);
         if (ConfigPersistence.WriteLines(path, lines))
             _host.Echo("Aliases Saved");
         else
@@ -1186,7 +1243,24 @@ public sealed class CommandEngine
         var path  = Path.Combine(_config.ConfigProfileDir, "aliases.cfg");
         var lines = ConfigPersistence.ReadLines(path);
         if (lines is null) { _host.Echo($"No aliases file: {path}"); return; }
-        foreach (var line in lines) ProcessInput(line);
+        if (Aliases is not null && LooksLikeJson(lines))
+        {
+            var models = new PersistenceService().LoadAliases(path);
+            if (models.Count == 0)
+            {
+                _host.Echo($"aliases.cfg: JSON-format save with no readable entries — not converted: {path}");
+                return;
+            }
+            foreach (var m in models)
+            {
+                Aliases.RemoveAlias(m.Name);
+                Aliases.AddAlias(m.Name, m.Expansion, m.IsEnabled);
+            }
+            SaveAliases();
+            EchoJsonHealed("aliases.cfg", models.Count);
+            return;
+        }
+        RunCfgFileLines(lines, "aliases.cfg");
         _host.Echo("Aliases Loaded");
     }
 
@@ -1351,9 +1425,7 @@ public sealed class CommandEngine
     {
         if (Variables is null) return;
         var path  = Path.Combine(_config.ConfigProfileDir, "variables.cfg");
-        var lines = Variables.Store.GetAll()
-            .Where(kvp => kvp.Value.Scope == VariableScope.User)
-            .Select(kvp => $"#var {ConfigPersistence.FormatArg(kvp.Key)} {ConfigPersistence.FormatArg(kvp.Value.Value)}");
+        var lines = CfgFormat.VariableLines(Variables.Store);
         if (ConfigPersistence.WriteLines(path, lines))
             _host.Echo("Variables Saved");
         else
@@ -1365,7 +1437,20 @@ public sealed class CommandEngine
         var path  = Path.Combine(_config.ConfigProfileDir, "variables.cfg");
         var lines = ConfigPersistence.ReadLines(path);
         if (lines is null) { _host.Echo($"No variables file: {path}"); return; }
-        foreach (var line in lines) ProcessInput(line);
+        if (Variables is not null && LooksLikeJson(lines))
+        {
+            var models = new PersistenceService().LoadVariables(path);
+            if (models.Count == 0)
+            {
+                _host.Echo($"variables.cfg: JSON-format save with no readable entries — not converted: {path}");
+                return;
+            }
+            foreach (var m in models) Variables.Store.Set(m.Name, m.Value);
+            SaveVars();
+            EchoJsonHealed("variables.cfg", models.Count);
+            return;
+        }
+        RunCfgFileLines(lines, "variables.cfg");
         _host.Echo("Variables Loaded");
     }
 
@@ -1458,8 +1543,7 @@ public sealed class CommandEngine
     {
         if (Highlights is null) return;
         var path  = Path.Combine(_config.ConfigProfileDir, "highlights.cfg");
-        var lines = Highlights.Rules.Select(r =>
-            $"#highlight add {ConfigPersistence.FormatArg(r.Pattern)} {ConfigPersistence.FormatArg(r.ForegroundColor)} {ConfigPersistence.FormatArg(r.BackgroundColor)} {ConfigPersistence.FormatArg(r.MatchType.ToString())} {ConfigPersistence.FormatArg(r.ClassName)} {ConfigPersistence.FormatArg(r.SoundFile)} {ConfigPersistence.FormatArg(r.Speak)}");
+        var lines = CfgFormat.HighlightLines(Highlights.Rules);
         if (ConfigPersistence.WriteLines(path, lines))
             _host.Echo("Highlights Saved");
         else
@@ -1472,7 +1556,26 @@ public sealed class CommandEngine
         var lines = ConfigPersistence.ReadLines(path);
         if (lines is null) { _host.Echo($"No highlights file: {path}"); return; }
         Highlights?.Clear();
-        foreach (var line in lines) ProcessInput(line);
+        if (Highlights is not null && LooksLikeJson(lines))
+        {
+            var models = new PersistenceService().LoadHighlights(path);
+            if (models.Count == 0)
+            {
+                _host.Echo($"highlights.cfg: JSON-format save with no readable entries — not converted: {path}");
+                return;
+            }
+            foreach (var m in models)
+                Highlights.AddRule(
+                    m.Pattern, m.ForegroundColor, m.BackgroundColor,
+                    Enum.TryParse<HighlightMatchType>(m.MatchType, out var mt)
+                        ? mt
+                        : (m.IsRegex ? HighlightMatchType.Regex : HighlightMatchType.String),
+                    m.CaseSensitive, m.IsEnabled, m.ClassName, m.SoundFile, m.Speak);
+            SaveHighlights();
+            EchoJsonHealed("highlights.cfg", models.Count);
+            return;
+        }
+        RunCfgFileLines(lines, "highlights.cfg");
         _host.Echo("Highlights Loaded");
     }
 
@@ -1557,13 +1660,15 @@ public sealed class CommandEngine
             _host.Echo($"Failed to save names: {path}");
     }
 
+    // Names / presets were never written by the JSON-misnamed import path, so
+    // they only need the no-send guard, not the self-heal.
     private void LoadNamesFile()
     {
         var path  = Path.Combine(_config.ConfigProfileDir, "names.cfg");
         var lines = ConfigPersistence.ReadLines(path);
         if (lines is null) { _host.Echo($"No names file: {path}"); return; }
         Names?.Clear();
-        foreach (var line in lines) ProcessInput(line);
+        RunCfgFileLines(lines, "names.cfg");
         _host.Echo("Names Loaded");
     }
 
@@ -1642,7 +1747,7 @@ public sealed class CommandEngine
         var path  = Path.Combine(_config.ConfigProfileDir, "presets.cfg");
         var lines = ConfigPersistence.ReadLines(path);
         if (lines is null) { _host.Echo($"No presets file: {path}"); return; }
-        foreach (var line in lines) ProcessInput(line);
+        RunCfgFileLines(lines, "presets.cfg");
         _host.Echo("Presets Loaded");
     }
 
@@ -1786,8 +1891,7 @@ public sealed class CommandEngine
     {
         if (Triggers is null) return;
         var path  = Path.Combine(_config.ConfigProfileDir, "triggers.cfg");
-        var lines = Triggers.Triggers.Select(t =>
-            $"#trigger add {ConfigPersistence.FormatArg(t.Pattern)} {ConfigPersistence.FormatArg(t.Action)} {ConfigPersistence.FormatArg(t.ClassName)} {ConfigPersistence.FormatArg(t.SoundFile)} {ConfigPersistence.FormatArg(t.Speak)}{(t.Eval ? " eval" : "")}{(t.MatchAll ? " matchall" : "")}");
+        var lines = CfgFormat.TriggerLines(Triggers.Triggers);
         if (ConfigPersistence.WriteLines(path, lines))
             _host.Echo("Triggers Saved");
         else
@@ -1800,7 +1904,22 @@ public sealed class CommandEngine
         var lines = ConfigPersistence.ReadLines(path);
         if (lines is null) { _host.Echo($"No triggers file: {path}"); return; }
         Triggers?.Clear();
-        foreach (var line in lines) ProcessInput(line);
+        if (Triggers is not null && LooksLikeJson(lines))
+        {
+            var models = new PersistenceService().LoadTriggers(path);
+            if (models.Count == 0)
+            {
+                _host.Echo($"triggers.cfg: JSON-format save with no readable entries — not converted: {path}");
+                return;
+            }
+            foreach (var m in models)
+                Triggers.AddTrigger(m.Pattern, m.Action, m.CaseSensitive, m.IsEnabled,
+                                    m.ClassName, m.SoundFile, m.Speak, m.Eval, m.MatchAll);
+            SaveTriggers();
+            EchoJsonHealed("triggers.cfg", models.Count);
+            return;
+        }
+        RunCfgFileLines(lines, "triggers.cfg");
         _host.Echo("Triggers Loaded");
     }
 
@@ -1886,8 +2005,7 @@ public sealed class CommandEngine
     {
         if (Substitutes is null) return;
         var path  = Path.Combine(_config.ConfigProfileDir, "substitutes.cfg");
-        var lines = Substitutes.Rules.Select(r =>
-            $"#substitute add {ConfigPersistence.FormatArg(r.Pattern)} {ConfigPersistence.FormatArg(r.Replacement)} {ConfigPersistence.FormatArg(r.ClassName)}");
+        var lines = CfgFormat.SubstituteLines(Substitutes.Rules);
         if (ConfigPersistence.WriteLines(path, lines))
             _host.Echo("Substitutes Saved");
         else
@@ -1900,7 +2018,21 @@ public sealed class CommandEngine
         var lines = ConfigPersistence.ReadLines(path);
         if (lines is null) { _host.Echo($"No substitutes file: {path}"); return; }
         Substitutes?.Clear();
-        foreach (var line in lines) ProcessInput(line);
+        if (Substitutes is not null && LooksLikeJson(lines))
+        {
+            var models = new PersistenceService().LoadSubstitutes(path);
+            if (models.Count == 0)
+            {
+                _host.Echo($"substitutes.cfg: JSON-format save with no readable entries — not converted: {path}");
+                return;
+            }
+            foreach (var m in models)
+                Substitutes.AddRule(m.Pattern, m.Replacement, m.CaseSensitive, m.IsEnabled, m.ClassName);
+            SaveSubstitutes();
+            EchoJsonHealed("substitutes.cfg", models.Count);
+            return;
+        }
+        RunCfgFileLines(lines, "substitutes.cfg");
         _host.Echo("Substitutes Loaded");
     }
 
@@ -1986,8 +2118,7 @@ public sealed class CommandEngine
     {
         if (Gags is null) return;
         var path  = Path.Combine(_config.ConfigProfileDir, "gags.cfg");
-        var lines = Gags.Rules.Select(r =>
-            $"#gag add {ConfigPersistence.FormatArg(r.Pattern)} {ConfigPersistence.FormatArg(r.ClassName)}");
+        var lines = CfgFormat.GagLines(Gags.Rules);
         if (ConfigPersistence.WriteLines(path, lines))
             _host.Echo("Gags Saved");
         else
@@ -2000,7 +2131,21 @@ public sealed class CommandEngine
         var lines = ConfigPersistence.ReadLines(path);
         if (lines is null) { _host.Echo($"No gags file: {path}"); return; }
         Gags?.Clear();
-        foreach (var line in lines) ProcessInput(line);
+        if (Gags is not null && LooksLikeJson(lines))
+        {
+            var models = new PersistenceService().LoadGags(path);
+            if (models.Count == 0)
+            {
+                _host.Echo($"gags.cfg: JSON-format save with no readable entries — not converted: {path}");
+                return;
+            }
+            foreach (var m in models)
+                Gags.AddRule(m.Pattern, m.CaseSensitive, m.IsEnabled, m.ClassName);
+            SaveGags();
+            EchoJsonHealed("gags.cfg", models.Count);
+            return;
+        }
+        RunCfgFileLines(lines, "gags.cfg");
         _host.Echo("Gags Loaded");
     }
 
@@ -2085,8 +2230,7 @@ public sealed class CommandEngine
     {
         if (Macros is null) return;
         var path  = Path.Combine(_config.ConfigProfileDir, "macros.cfg");
-        var lines = Macros.Rules.Select(m =>
-            $"#macro add {ConfigPersistence.FormatArg(m.Key)} {ConfigPersistence.FormatArg(m.Action)}");
+        var lines = CfgFormat.MacroLines(Macros.Rules);
         if (ConfigPersistence.WriteLines(path, lines))
             _host.Echo("Macros Saved");
         else
@@ -2099,7 +2243,20 @@ public sealed class CommandEngine
         var lines = ConfigPersistence.ReadLines(path);
         if (lines is null) { _host.Echo($"No macros file: {path}"); return; }
         Macros?.Clear();
-        foreach (var line in lines) ProcessInput(line);
+        if (Macros is not null && LooksLikeJson(lines))
+        {
+            var models = new PersistenceService().LoadMacros(path);
+            if (models.Count == 0)
+            {
+                _host.Echo($"macros.cfg: JSON-format save with no readable entries — not converted: {path}");
+                return;
+            }
+            foreach (var m in models) Macros.Add(m.Key, m.Action);
+            SaveMacros();
+            EchoJsonHealed("macros.cfg", models.Count);
+            return;
+        }
+        RunCfgFileLines(lines, "macros.cfg");
         _host.Echo("Macros Loaded");
     }
 

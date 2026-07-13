@@ -6,6 +6,7 @@ using Avalonia.Data.Converters;
 using Genie.Core;
 using Genie.Core.Import;
 using Genie.Core.Persistence;
+using Genie.Core.Runtime;
 using ReactiveUI;
 using ReactiveUI.Fody.Helpers;
 
@@ -322,29 +323,31 @@ public sealed class Genie4ImportViewModel : ReactiveObject
 
             // ── Persist the merged engine state to the target dir ───────
             // so the imported rules survive a restart. The choice between
-            // global and per-profile is the target-dir difference.
+            // global and per-profile is the target-dir difference. MUST be
+            // cfg format (CfgFormat): the engine replays these files through
+            // the command pipeline at connect, so a JSON serialization here
+            // isn't just unreadable — its lines get dispatched as commands.
             var targetDir = TargetIsGlobal ? _globalConfigDir : _profileConfigDir!;
             Directory.CreateDirectory(targetDir);
 
-            var persistence = new PersistenceService();
             if (ImportHighlights)
-                persistence.SaveHighlights(Path.Combine(targetDir, "highlights.cfg"), _core.Highlights.Rules);
+                ConfigPersistence.WriteLines(Path.Combine(targetDir, "highlights.cfg"), CfgFormat.HighlightLines(_core.Highlights.Rules));
             if (ImportTriggers)
                 // TriggerEngineFinal exposes its rule list as `.Triggers`
                 // (not `.Rules` like the other engines).
-                persistence.SaveTriggers(Path.Combine(targetDir, "triggers.cfg"), _core.Triggers.Triggers);
+                ConfigPersistence.WriteLines(Path.Combine(targetDir, "triggers.cfg"), CfgFormat.TriggerLines(_core.Triggers.Triggers));
             if (ImportSubstitutes)
-                persistence.SaveSubstitutes(Path.Combine(targetDir, "substitutes.cfg"), _core.Substitutes.Rules);
+                ConfigPersistence.WriteLines(Path.Combine(targetDir, "substitutes.cfg"), CfgFormat.SubstituteLines(_core.Substitutes.Rules));
             if (ImportGags)
-                persistence.SaveGags(Path.Combine(targetDir, "gags.cfg"), _core.Gags.Rules);
+                ConfigPersistence.WriteLines(Path.Combine(targetDir, "gags.cfg"), CfgFormat.GagLines(_core.Gags.Rules));
             if (ImportAliases)
-                persistence.SaveAliases(Path.Combine(targetDir, "aliases.cfg"), _core.Aliases.Aliases);
+                ConfigPersistence.WriteLines(Path.Combine(targetDir, "aliases.cfg"), CfgFormat.AliasLines(_core.Aliases.Aliases));
             if (ImportMacros)
-                persistence.SaveMacros(Path.Combine(targetDir, "macros.cfg"), _core.Macros.Rules);
+                ConfigPersistence.WriteLines(Path.Combine(targetDir, "macros.cfg"), CfgFormat.MacroLines(_core.Macros.Rules));
             if (ImportVariables)
-                persistence.SaveVariables(Path.Combine(targetDir, "variables.cfg"), _core.Variables.Store);
+                ConfigPersistence.WriteLines(Path.Combine(targetDir, "variables.cfg"), CfgFormat.VariableLines(_core.Variables.Store));
             if (ImportClasses)
-                persistence.SaveClasses(Path.Combine(targetDir, "classes.cfg"), _core.Classes);
+                ConfigPersistence.WriteLines(Path.Combine(targetDir, "classes.cfg"), CfgFormat.ClassLines(_core.Classes.GetAll()));
 
             ResultMessage = BuildResultSummary(result, targetDir);
             return true;
