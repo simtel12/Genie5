@@ -769,12 +769,14 @@
                                Background="#3a1a3a"
                                Height="14"
                                VerticalAlignment="Center"/>
+                  <!-- Single bound Text, not inline <Run>s — Run.Text changes
+                       don't reliably re-render, which froze this at the "·"
+                       separator. The service composes the full line. -->
                   <TextBlock Grid.Column="1" Margin="8,0,0,0"
                              VerticalAlignment="Center"
                              Foreground="#e0c0e8" FontSize="11"
-                             FontFamily="Consolas,Courier New,monospace">
-                    <Run Text="{Binding ViewModel.AutoWalk.CurrentWaitLabel}"/><Run Text=" · "/><Run Text="{Binding ViewModel.AutoWalk.CurrentWaitDisplay}"/>
-                  </TextBlock>
+                             FontFamily="Consolas,Courier New,monospace"
+                             Text="{Binding ViewModel.AutoWalk.CurrentWaitText}"/>
                 </Grid>
               </StackPanel>
             </Border>
@@ -819,14 +821,18 @@
                       Background="{DynamicResource Theme.PanelBg}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="1,0,0,0"
                       IsVisible="{Binding !#DetailsPanel.IsVisible}"
                       ToolTip.Tip="Hover to open the Details panel; use the pin inside to keep it open.">
-                <TextBlock Text="DETAILS" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="10"
-                           FontWeight="SemiBold"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                           RenderTransformOrigin="50%,50%">
-                  <TextBlock.RenderTransform>
+                <!-- LayoutTransformControl, not RenderTransform: a render
+                     transform doesn't affect layout, so the text was measured
+                     against the strip's 24px WIDTH and clipped to "DETA"
+                     before being rotated. A layout transform measures the
+                     rotated size (tall + narrow), which fits the strip. -->
+                <LayoutTransformControl HorizontalAlignment="Center" VerticalAlignment="Center">
+                  <LayoutTransformControl.LayoutTransform>
                     <RotateTransform Angle="-90"/>
-                  </TextBlock.RenderTransform>
-                </TextBlock>
+                  </LayoutTransformControl.LayoutTransform>
+                  <TextBlock Text="DETAILS" Foreground="{DynamicResource Theme.SectionHeader}" FontSize="10"
+                             FontWeight="SemiBold"/>
+                </LayoutTransformControl>
               </Border>
 
               <!-- Expanded panel — visible while hovered or pinned. Wrapped  -->

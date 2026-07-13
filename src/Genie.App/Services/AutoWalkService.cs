@@ -126,6 +126,14 @@ public sealed class AutoWalkService : ReactiveObject
     /// the wait kicks off.</summary>
     [Reactive] public string CurrentWaitLabel { get; private set; } = "";
 
+    /// <summary>The full "boarding boat · ~4:23 left" line next to the wait
+    /// bar, composed here rather than from three inline &lt;Run&gt;s in AXAML:
+    /// a TextBlock does not reliably re-render bound Run.Text changes, which
+    /// left the bar showing just the hardcoded "·" separator. One reactive
+    /// string on a plain TextBlock.Text always refreshes, and composing it
+    /// here also drops the separator when the step has no description.</summary>
+    [Reactive] public string CurrentWaitText { get; private set; } = "";
+
     private DispatcherTimer? _waitTimer;
 
     private readonly Subject<AutoWalkSession?> _sessionChanges = new();
@@ -772,6 +780,7 @@ public sealed class AutoWalkService : ReactiveObject
         CurrentWaitTotalSeconds = Math.Max(1, totalSeconds);
         CurrentWaitSecondsLeft  = CurrentWaitTotalSeconds;
         CurrentWaitDisplay      = FormatWait(CurrentWaitSecondsLeft);
+        UpdateWaitText();
         IsWaitingForCrossZone   = true;
 
         _waitTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -780,6 +789,7 @@ public sealed class AutoWalkService : ReactiveObject
             if (CurrentWaitSecondsLeft > 0)
                 CurrentWaitSecondsLeft--;
             CurrentWaitDisplay = FormatWait(CurrentWaitSecondsLeft);
+            UpdateWaitText();
             // We let the timer continue past 0 — the bar stays empty
             // until the room change actually arrives. The user sees
             // "any moment now…" if the boat is running late.
@@ -799,7 +809,13 @@ public sealed class AutoWalkService : ReactiveObject
         CurrentWaitSecondsLeft  = 0;
         CurrentWaitTotalSeconds = 0;
         CurrentWaitDisplay      = "";
+        CurrentWaitText         = "";
     }
+
+    private void UpdateWaitText()
+        => CurrentWaitText = string.IsNullOrEmpty(CurrentWaitLabel)
+            ? CurrentWaitDisplay
+            : $"{CurrentWaitLabel} · {CurrentWaitDisplay}";
 
     private static string FormatWait(int seconds)
     {
