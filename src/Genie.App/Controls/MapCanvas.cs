@@ -528,15 +528,7 @@ public class MapCanvas : Control
 
         // ── Pass 5: colour legend (#157) ──────────────────────────────────
         if (ShowLegend)
-        {
-            // Screen bounds of the drawn rooms, so the legend can pick a viewport
-            // corner that's clear of them (never covers a room).
-            var contentRect = new Rect(
-                Padding, Padding,
-                (maxX - minX) * GridSize + GridSize,
-                (maxY - minY) * GridSize + GridSize);
-            DrawLegend(context, contentRect);
-        }
+            DrawLegend(context, minX, minY);
     }
 
     // Legend entries — the swatch must match how the map ACTUALLY draws each
@@ -561,7 +553,7 @@ public class MapCanvas : Control
     /// busy top-left where the rooms are, and doesn't slide as the map scrolls.
     /// A trailing "*" on a label marks colours the user can change (AutoMapper
     /// Settings); the rest are fixed.</summary>
-    private void DrawLegend(DrawingContext context, Rect contentRect)
+    private void DrawLegend(DrawingContext context, int minX, int minY)
     {
         const double pad = 8, row = 16, sw = 12, gap = 8;
         var typeface = new Typeface("Segoe UI, Consolas, monospace");
@@ -583,11 +575,23 @@ public class MapCanvas : Control
         // Place the key in whichever VIEWPORT corner is clear of the drawn rooms,
         // so it never covers a room (#157 follow-up). Anchored in canvas coords to
         // the visible region (parent ScrollViewer offset) + repainted on scroll,
-        // so it stays in a clear corner as the map pans. Falls back to bottom-left
-        // when every corner has rooms (dense zoom) — the panel is semi-transparent.
+        // so it stays in a clear corner as the map pans. Each corner is tested
+        // against the ACTUAL room boxes on the current level — not the zone's
+        // whole bounding box, which on a dense map (Throne City) covers every
+        // corner and made the test always fall through even when a corner had
+        // no rooms in it. Falls back to bottom-left when every corner really
+        // does have rooms — the panel is semi-transparent for that case.
         var viewport = this.FindAncestorOfType<ScrollViewer>() is { } sv
             ? new Rect(sv.Offset.X, sv.Offset.Y, sv.Viewport.Width, sv.Viewport.Height)
             : new Rect(Bounds.Size);
+
+        bool CornerClear(Rect c)
+        {
+            foreach (var n in Zone!.Nodes.Values)
+                if (n.Z == Level && NodeRect(n, minX, minY).Intersects(c))
+                    return false;
+            return true;
+        }
 
         const double m = 8;
         var bottomLeft = new Rect(viewport.Left + m,      viewport.Bottom - h - m, w, h);
@@ -600,7 +604,7 @@ public class MapCanvas : Control
         };
         var panel = bottomLeft;
         foreach (var c in candidates)
-            if (!c.Intersects(contentRect)) { panel = c; break; }
+            if (CornerClear(c)) { panel = c; break; }
 
         context.FillRectangle(new SolidColorBrush(Color.FromArgb(0xCC, 0xff, 0xff, 0xff)), panel, 4);
         context.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)), 1.0), panel, 4, 4);
