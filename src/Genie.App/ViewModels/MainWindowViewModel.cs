@@ -1229,16 +1229,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
 
         // File -> Import from Genie 4...
         // Opens the Genie4ImportDialog with auto-detected source path +
-        // probe + per-type checkboxes + Global/Profile routing. Disabled
-        // when no GenieCore is wired (pre-connect) — the dialog needs the
-        // live engines to apply imports to.
+        // probe + per-type checkboxes + Global/Profile routing. The dialog
+        // needs the live engines to apply imports to, so build the core on
+        // demand exactly like the first typed command does — offline import
+        // into the global Config folder is a designed use case (#164).
         Genie4ImportCommand = ReactiveCommand.CreateFromTask(async () =>
         {
-            if (_core is null)
-            {
-                GameText.AddSystemLine("[import] Import is available once the app has finished initialising.");
-                return;
-            }
+            EnsureCoreBuilt(null, eagerLoadOfflineRules: true);
+            if (_core is null) return;   // EnsureCoreBuilt always assigns; guards the nullable field
             var profileDir   = ConnectedProfile is not null ? GetProfileConfigDir(ConnectedProfile) : null;
             var profileChar  = ConnectedProfile?.CharacterName;
             var importVm = new Genie4ImportViewModel(_core, _configDir, profileDir, profileChar);
