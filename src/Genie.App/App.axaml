@@ -727,8 +727,11 @@
                  wait countdown bar inline when a cross-zone hop is mid-
                  transit (matches the spell-cast bar visual pattern from
                  the Hands Strip — magenta draining bar). -->
+            <!-- FallbackValue=False on the AutoWalk-path bindings: AutoWalk is
+                 null until the core attaches, and a failed binding path leaves
+                 IsVisible at its default (true) — the phantom strip of #165. -->
             <Border Grid.Row="1"
-                    IsVisible="{Binding ViewModel.AutoWalk.Current, Converter={x:Static ObjectConverters.IsNotNull}}"
+                    IsVisible="{Binding ViewModel.AutoWalk.Current, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}"
                     Background="#1a3344" BorderBrush="#3a6688" BorderThickness="0,0,0,1"
                     Padding="8,4">
               <StackPanel Spacing="4">
@@ -745,7 +748,7 @@
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
                     <!-- Resume only visible while paused -->
                     <Button Content="Resume" FontSize="11" Padding="6,2"
-                            IsVisible="{Binding ViewModel.AutoWalk.IsCurrentPaused}"
+                            IsVisible="{Binding ViewModel.AutoWalk.IsCurrentPaused, FallbackValue=False}"
                             Command="{Binding ViewModel.AutoWalk.ResumeCommand}"/>
                     <Button Content="Cancel" FontSize="11" Padding="6,2"
                             Background="{DynamicResource Theme.DangerBg}" Foreground="{DynamicResource Theme.Danger}"
@@ -761,7 +764,7 @@
                      pegs and the walker keeps listening for the room
                      change (the actual ETA is fingerprint-driven). -->
                 <Grid ColumnDefinitions="*,Auto"
-                      IsVisible="{Binding ViewModel.AutoWalk.IsWaitingForCrossZone}">
+                      IsVisible="{Binding ViewModel.AutoWalk.IsWaitingForCrossZone, FallbackValue=False}">
                   <ProgressBar Grid.Column="0"
                                Value="{Binding ViewModel.AutoWalk.CurrentWaitSecondsLeft}"
                                Maximum="{Binding ViewModel.AutoWalk.CurrentWaitTotalSeconds}"

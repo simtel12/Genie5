@@ -360,9 +360,11 @@ public class MapperViewModel : ReactiveObject
     /// map node. Null before <see cref="Attach"/> runs; non-null once
     /// the GenieCore is wired. Surface this on the panel so XAML can
     /// bind the "Walking to X — N rooms left" indicator to
-    /// <c>AutoWalk.Current</c>.
+    /// <c>AutoWalk.Current</c>. Reactive so those bindings re-resolve when
+    /// Attach assigns it — a plain property left them stuck on the failed
+    /// pre-attach resolution, which renders as a phantom walk strip (#165).
     /// </summary>
-    public AutoWalkService? AutoWalk { get; private set; }
+    [Reactive] public AutoWalkService? AutoWalk { get; private set; }
 
     /// <summary>Cached reference to the live SkillStore — used by
     /// <see cref="MaybeShowSkillsPrompt"/> to decide whether to surface
