@@ -1661,6 +1661,7 @@ public sealed class CommandEngine
     /// <list type="bullet">
     /// <item><c>#trigger</c> — list.</item>
     /// <item><c>#trigger add {pattern} {action} [{class}]</c> — add or replace.</item>
+    /// <item><c>#action {command} when {pattern}</c> — Genie 4's action-first form (#162).</item>
     /// <item><c>#trigger remove {pattern}</c> — drop (or <c>#untrigger</c>).</item>
     /// <item><c>#trigger clear</c>, <c>#trigger save</c>, <c>#trigger load</c>.</item>
     /// </list>
@@ -1705,10 +1706,34 @@ public sealed class CommandEngine
     /// <summary>Shared #trigger add / implicit-form handler. <paramref name="args"/>
     /// is pattern, action, then optional class / sound / speak, plus an optional
     /// bare <c>eval</c> keyword (anywhere after the action) that opts the rule into
-    /// script-expression evaluation of its action (#150).</summary>
+    /// script-expression evaluation of its action (#150). A bare <c>when</c> /
+    /// <c>whenre</c> token instead selects Genie 4's action-first form —
+    /// <c>#action {command} when {pattern}</c> — mirroring the script engine's
+    /// <c>HandleAction</c>; without it the positional read below stored such
+    /// rules transposed (#162).</summary>
     private void AddTriggerFromArgs(List<string> args)
     {
         if (Triggers is null) return;
+
+        for (int i = 1; i < args.Count - 1; i++)
+        {
+            if (!args[i].Equals("when",   StringComparison.OrdinalIgnoreCase) &&
+                !args[i].Equals("whenre", StringComparison.OrdinalIgnoreCase)) continue;
+
+            var whenAction  = string.Join(" ", args.Take(i));
+            var whenPattern = string.Join(" ", args.Skip(i + 1));
+            if (whenAction.Length == 0 || whenPattern.Length == 0) break;
+
+            Triggers.RemoveTrigger(whenPattern);
+            try
+            {
+                Triggers.AddTrigger(whenPattern, whenAction, false, true, "", "", "", false, false);
+                _host.Echo($"Trigger added: {whenPattern} → {whenAction}");
+            }
+            catch (ArgumentException) { _host.Echo($"Invalid regexp in trigger: {whenPattern}"); }
+            return;
+        }
+
         var eval     = ExtractFlag(args, "eval");
         var matchAll = ExtractFlag(args, "matchall");
         var pattern  = args[0];
