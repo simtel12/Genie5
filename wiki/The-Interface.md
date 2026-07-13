@@ -2,14 +2,21 @@
 
 Genie 5's window is a set of **dockable panels** around a central game-text view. You can show, hide, drag, float, and re-dock any panel, then save the arrangement as a layout. This page is a tour of what's on screen and how to rearrange it.
 
+![Genie 5 with the default layout — Room and stream tabs on the left, Game text in the center, Inventory on the right, the Mapper floating, and the vitals / hands / command strips along the bottom](images/interface-default-layout.png)
+
 ## The default layout
 
 Out of the box you get a three-column arrangement:
 
 - **Left column** — the **Room** panel (title, description, obvious paths) and a cluster of **stream tabs** (Talk, Whispers, Thoughts, Combat, Logons).
-- **Center column** — the main **Game** text window, with the **Mapper** below it.
+- **Center column** — the main **Game** text window.
 - **Right column** — your **Inventory / Backpack**.
 - **Bottom strips** — **vitals**, the **hands** strip, and the **command bar**.
+- The **Mapper** starts **floating** in its own window; drag it onto the dock if you'd rather embed it (below the Game window is the classic Genie 4 spot).
+
+![The default layout with each region numbered ① through ⑦](images/interface-default-layout-annotated.png)
+
+① **Room** panel &nbsp;·&nbsp; ② **stream tabs** &nbsp;·&nbsp; ③ **Game** window &nbsp;·&nbsp; ④ **Mapper** (floating by default) &nbsp;·&nbsp; ⑤ **Inventory** &nbsp;·&nbsp; ⑥ **hands strip & vitals** &nbsp;·&nbsp; ⑦ **command bar** with roundtime
 
 ## The panels
 
@@ -19,9 +26,10 @@ Out of the box you get a three-column arrangement:
 | **Room** | Current room title, description, and obvious paths — split out from the game text so it's always glanceable. Creature names honor MonsterBold coloring. |
 | **Mobs / Players** | The creatures and the other players in the room, as their own glanceable lists. |
 | **Inventory / Backpack** | What you're carrying. |
-| **Mapper** | The zone map with your current room highlighted; click a room to walk there. See [The Mapper](Mapper). |
+| **Mapper** | The zone map with your current room highlighted; click a room to walk there. Starts **floating** in its own window; dock it by dragging. See [The Mapper](Mapper). |
 | **Experience** | Live skill learning states. A **Density** slider on the panel condenses each skill line to taste (**Full → No count → Numbers only → Short names → Brief**); the same setting is scriptable as `#config experiencedensity`. |
 | **Active Spells** | Your running spell effects with time remaining. |
+| **Analytics** | Charts over your experience history — session gain bars, a long-horizon rank curve per skill, and session-vs-session comparison. See [the Analytics panel](#the-analytics-panel) below. |
 | **Scripts** | A separate scrollback for script output (`[script]` lines, `#echo`, debug traces), so a busy hunt script doesn't clutter the main window. |
 | **Injuries** | A body silhouette showing per-region wounds and scars from the game's injury data, colour-coded by severity, with a text list alongside. An opt-in auto-refresh (`#config injuriespoll N`) can poll `health` every *N* seconds to refine the nervous-system reading while the panel is open. |
 | **Portrait** | DragonRealms room/scene artwork for the current area (`#config showimages`) — the panel Genie 4 called Portrait. |
@@ -30,13 +38,35 @@ Out of the box you get a three-column arrangement:
 
 Toggle any panel from the **Window** menu. Drag a panel's tab to re-dock it; drag it out to **float** it in its own window, and drag it back to re-dock.
 
+![The Experience panel shown five times, once per Density stop from Brief at the top to Full at the bottom](images/interface-experience-density.png)
+
+*The same Experience panel at each of the five **Density** stops — Brief (top) through Full (bottom).*
+
+![The Active Spells panel listing running spells with their remaining durations](images/interface-active-spells.png)
+
+*The Active Spells panel — each effect with its time remaining.*
+
 Every stream window also has an **"Also show this stream in the Main window"** toggle (Configuration → **Layout** tab, per window) that additionally echoes its lines into the main game window, Genie 4-style. The Layout tab is also where each window's font is set.
 
 Scripts can create their **own named windows** too — the Genie 4 menu-script commands (`#window`, `#link`, `#echo >window`) build clickable menu panels that dock like any other. See the [Scripting Reference](Scripting-Reference#named-windows-links-and-logging).
 
+## The Analytics panel
+
+![The Analytics panel — per-skill session gain bars above a rank-over-time chart](images/interface-analytics.png)
+
+The **Analytics** panel (toggle it from the **Window** menu) turns the experience data Genie sees into charts. It records skill ranks locally as you play — nothing is uploaded anywhere — and reads that history back across three tabs:
+
+- **This Session** — per-skill gain bars for the current session, plus a rank-over-time line for any skill you select.
+- **History** — a long-horizon gain curve per skill, with a **7 / 30 / 90 days / All** range picker.
+- **Sessions** — one summary row per past session (duration, total gain, ranks/hour), with a checkbox compare that overlays the normalized gain curves of two or three sessions.
+
+A character dropdown switches whose history you're looking at. The store lives in your data folder (see [Application Folders](Application-Folders)) and fills in as you play — a fresh install shows "no history yet" until your first session.
+
 ## The bottom strips
 
-- **Vitals** — bars for **health, mana, stamina, spirit, and concentration**, plus status badges (kneeling, prone, stunned, hidden, bleeding, …).
+![The bottom strips — vitals bars, hands strip with a prepared spell and cast bar, roundtime counter, and the command bar](images/interface-bottom-strips.png)
+
+- **Vitals** — bars for **health, mana, fatigue, spirit, and concentration** (fatigue is DR's stamina bar — Genie labels it the way the game does), plus status badges (kneeling, prone, stunned, hidden, bleeding, …).
 - **Icon Bar** — Genie 4's status strip: colour-coded chips below the vitals bar for your posture (dead / standing / kneeling / sitting / prone) plus **STUNNED**, **BLEEDING**, **HIDDEN**, **INVISIBLE**, **WEBBED**, **JOINED** — and two Genie 4 never had: **POISONED** and **DISEASED**. It dims while disconnected. Hide it via **Layout → Icon Bar**.
 - **Hands strip** — what's in your **left** and **right** hands, your **prepared spell** (with a cast-time bar), and your **stance**. Its position (top or bottom) is configurable from the **Window** menu.
 - **Command bar** — where you type. A **roundtime** indicator shows here (or on the hands strip — your choice) so you can see when you can act again.

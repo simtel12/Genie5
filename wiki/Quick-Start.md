@@ -27,12 +27,15 @@ Genie 5 logs in, finds the game server, and the room you're standing in appears 
 
 ## 3. Look around the interface
 
+![Genie 5's default layout right after connecting](images/interface-default-layout.png)
+
 The default layout is three columns:
 
 - **Left** — the current **Room** (title, description, exits) and stream tabs (Talk, Whispers, Thoughts, Combat, Logons).
-- **Center** — the main **game text** window and the **Mapper**.
+- **Center** — the main **game text** window.
 - **Right** — your **inventory / backpack**.
-- **Bottom** — the **vitals** bar (health / mana / stamina / spirit / concentration), the **hands** strip (what you're holding, your prepared spell, your stance), and the **command bar** where you type.
+- **Bottom** — the **vitals** bar (health / mana / fatigue / spirit / concentration), the **hands** strip (what you're holding, your prepared spell, your stance), and the **command bar** where you type.
+- The **Mapper** opens **floating** in its own window — dock it by dragging if you prefer it embedded.
 
 Rearrange anything by dragging panel tabs; toggle panels from the **Window** menu. See [The Interface](The-Interface) for the tour.
 

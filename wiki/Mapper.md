@@ -4,7 +4,9 @@ The mapper knows where you are, draws the zone you're in, and can walk you to an
 
 ## The map panel
 
-The Mapper panel (center column by default; float it via **Window**) shows the current zone with your room highlighted. Rooms are drawn as nodes connected by their exits, color-coded by exit type (compass directions, vertical moves, and special exits like `go gate` or `climb wall`). Scroll to zoom; drag to pan.
+![The Mapper showing all of Riverhaven — 568 rooms with guild labels, the exit-type legend, and the current room highlighted](images/mapper-panel.png)
+
+The Mapper panel (**floating** in its own window by default; dock it by dragging, or toggle it via **Window**) shows the current zone with your room highlighted. Rooms are drawn as nodes connected by their exits, color-coded by exit type (compass directions, vertical moves, and special exits like `go gate` or `climb wall`). Scroll to zoom; drag to pan.
 
 As you walk, Genie matches each new room to a node and re-centers on you. When you enter a room it doesn't recognize in the current zone, it can auto-switch to the zone that contains it.
 
@@ -21,7 +23,13 @@ Genie identifies your current room from what the game sends — the room title, 
 
 Click (or right-click → go) a room on the map and Genie plans a route and walks you there, one room at a time. Pathfinding is **skill-aware**: exits your character can't take — a climb beyond your skill, a guild-locked door, a level-gated arc — are excluded from the route, so it won't try to send you somewhere you can't go.
 
+![The Mapper's skills banner offering "Fetch skills now", "Skip", and "Don't ask again"](images/mapper-skills-banner.png)
+
+The first time skill-aware routing needs your numbers, the Mapper shows a one-time banner offering to **fetch your skills** (it sends the game's own skill command and reads the reply); **Skip** routes without skill filtering, and **Don't ask again** silences the banner.
+
 Walking goes through the normal command path (the same one your typing uses), so roundtime is handled automatically and your aliases/triggers still apply. If you get knocked off the planned route, the walk **cancels** rather than firing the wrong command.
+
+![A walk in progress — "Walking to North Road, Plains — 87 of 119 rooms · Esc to cancel" with a red Cancel button](images/mapper-walk-strip.png)
 
 ### Attended-mode rules (why it's safe)
 
@@ -37,6 +45,8 @@ See [Policy Compliance](Policy-Compliance) for the full reasoning.
 ## Less Obvious Paths
 
 DragonRealms rooms have "obvious paths," but maps also record the non-obvious connections (a trellis you can climb, an alley with no signposted exit). Genie surfaces these as clickable buttons so you can take them without memorizing the verb.
+
+![The room strip — compass exits plus go-buttons for temple, town hall, portal, and meeting portal](images/mapper-less-obvious-paths.png)
 
 ## Room notes
 

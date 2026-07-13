@@ -2,6 +2,8 @@
 
 Genie 5 is a cross-platform client for **[DragonRealms](https://www.play.net/dr)**, Simutronics' text MMO. It's a from-scratch rewrite of [Genie 4](https://github.com/GenieClient) on **.NET 8** and **[Avalonia](https://avaloniaui.net/)**, keeping Genie 4's scripting, mapping, highlighting, and triggering while running natively on **Windows, macOS, and Linux**.
 
+![Genie 5 in play — dockable panels around the game text, with the Mapper floating](images/interface-default-layout.png)
+
 > ⚠️ **Alpha.** Genie 5 is in active development, targeting the most-used ~80% of Genie 4. Expect rough edges. Pages here describe current behavior and flag 🚧 items that are still on the roadmap.
 
 > ⬇️ **Pre-built downloads are here.** As of **v5.0.0-alpha.3.1**, native builds ship for **Windows, macOS (Apple Silicon + Intel), and Linux**, with an in-app updater on each. Grab the [latest release](https://github.com/GenieClient/Genie5/releases/latest) — see [Installation](Installation) to pick the right one, and [Releases & Changelog](Releases) for what's new.

@@ -7,6 +7,8 @@ Genie 5 ships all of Genie 4's **rule engines** — the pattern-driven helpers t
 
 Either way, rules are saved to plain-text `.cfg` files and reloaded automatically next launch. Command syntax follows the **Genie 4 dialect**; when in doubt about a specific option, the Configuration dialog is the reliable surface.
 
+![The Configuration dialog's Triggers tab with several pattern → action rules listed](images/config-dialog-triggers.png)
+
 ## The rule engines
 
 | Rule | What it does | Commands |
@@ -63,6 +65,10 @@ Make important lines jump out:
 ```
 
 Highlights support foreground and background colors, whole-line vs. substring matching, and case sensitivity — all editable in the Highlights tab.
+
+![An inventory list with six different substring highlights colored, plus a clickable command link](images/config-highlights-in-action.png)
+
+*Substring highlights in action — six rules coloring an inventory list.*
 
 Two built-in colorings live alongside your own rules:
 

@@ -32,6 +32,8 @@ The wire-level details are documented for developers in [SGE_PROTOCOL.md](https:
 Genie logs in over an **encrypted TLS connection** by default (the same secure
 login Lich 5 uses). You can tell which transport a session used at a glance:
 
+![Title bar showing the 🔒 padlock next to the connected Character-Account name](images/connect-padlock.png)
+
 | Indicator | Meaning |
 | --- | --- |
 | 🔒 in the title bar + *"Connected over TLS (encrypted)"* | Your login was encrypted end-to-end — the normal, preferred case. |

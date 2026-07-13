@@ -15,6 +15,8 @@ Open it from the **Help** menu (a badge appears there when something is availabl
 
 The updater uses your system's default network settings, so OS-level proxy configuration is honored automatically.
 
+![The Updates dialog's Core tab offering a newer version, with Update and Restart enabled](images/updates-dialog-core.png)
+
 ## Core (the app)
 
 Application updates are delivered via [Velopack](https://velopack.io/): the updater fetches the new build from GitHub Releases and applies it in place, so the next launch is the new version. As of **v5.0.0-alpha.3.1** this works on **all three platforms** — Windows, macOS (Apple Silicon + Intel), and Linux (AppImage).
@@ -34,6 +36,8 @@ The plain **Portable `.zip`** builds don't register for updates — re-download 
 > **Release channel (while we're in alpha):** the Core updater has a **stable** / **beta** channel selector in the Updates dialog. Every current build ships as a GitHub **pre-release**, so during the alpha/beta period Genie defaults to the **beta** channel — that's what lets the in-app updater see new alpha builds. If you ever switch to **stable** you'll see "up to date" until the first non-prerelease (5.0.0) ships. Leave it on **beta** to ride the test releases.
 
 ## Maps
+
+![The Maps, Plugins, and Scripts tabs — subscription rows for the official maps repo, an installed plugin, and a community script repository](images/updates-dialog-tabs.png)
 
 The Maps tab (equivalently **File → Update Maps from Official Repo…**) pulls the latest zone XML from the community repository and **merges** it with your local data — upstream layout fixes come down while your stamped room ids survive. This has its own page: [Updating Maps & Scripts](Updating-Maps-and-Scripts).
 

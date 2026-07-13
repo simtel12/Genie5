@@ -26,6 +26,7 @@ Genie 4 stores its `.cfg` files in a `Config` folder, typically:
 | OS | Path |
 | --- | --- |
 | Windows (default) | `%LOCALAPPDATA%\Genie\Config\` |
+| Windows (older installs) | `%APPDATA%\Genie Client 4\Config\` |
 | Windows (portable) | the `Config\` subfolder of wherever you extracted Genie |
 | Wine on macOS/Linux | inside the wineprefix, e.g. `~/.wine/drive_c/users/<you>/Local Settings/Application Data/Genie/Config/` |
 
@@ -34,6 +35,8 @@ Look for a folder containing `aliases.cfg`, `triggers.cfg`, etc. — that's your
 > **Multiple Genie 4 profiles?** Each profile usually has its own `.cfg` set. Pick one character's folder first; you can re-run the import later against another folder to layer on more rules.
 
 ## Running the import
+
+![The Import from Genie 4 dialog — probe counts per category, the category checkboxes, Apply-To and merge-mode choices, and the post-import results](images/import-genie4-dialog.png)
 
 1. Launch Genie 5 and choose **File → Import from Genie 4…**.
 2. **Source folder** — click **Browse…** and select your Genie 4 `Config` directory. Genie 5 **probes** the folder and shows a count next to each category (e.g. "Triggers: 45"), so you can confirm it found the right place before committing.
