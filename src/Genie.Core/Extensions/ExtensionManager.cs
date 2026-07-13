@@ -69,7 +69,8 @@ public sealed class ExtensionManager
         }
     }
 
-    /// <summary>Offer a typed <c>/command</c> to each extension in turn; the first to
+    /// <summary>Offer a <c>/command</c> (typed, or sent from a script via
+    /// <c>put</c>/<c>send</c>/bare line) to each extension in turn; the first to
     /// claim it (return true) swallows it. Returns true if any extension handled it.</summary>
     public bool DispatchSlashCommand(string input)
     {

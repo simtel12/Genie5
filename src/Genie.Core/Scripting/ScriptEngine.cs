@@ -1224,6 +1224,10 @@ public sealed class ScriptEngine
                 {
                     HandleMetaCommand(next, inst);
                 }
+                else if (TrySlashCommand(next))
+                {
+                    // claimed by an extension — client-side, no _inFlight bump.
+                }
                 else
                 {
                     _inFlight++;
@@ -1497,6 +1501,11 @@ public sealed class ScriptEngine
                     // `put .scriptname args` — never goes to game, so no
                     // _inFlight bump.
                     _handleHashCmd?.Invoke(first);
+                }
+                else if (TrySlashCommand(first))
+                {
+                    // `put /sort …` claimed by an extension — client-side,
+                    // so no _inFlight bump either.
                 }
                 else
                 {
@@ -1994,6 +2003,9 @@ public sealed class ScriptEngine
                     inst.Pc--; // re-execute next tick when the budget frees up
                     return false;
                 }
+                // A bare `/sort …` line works like `put /sort …` — extension
+                // console commands are claimable from scripts too.
+                if (TrySlashCommand(text)) return true;
                 _inFlight++;
                 EchoCommand?.Invoke(inst.Name, text);
                 Extensions.DispatchCommand(text);
@@ -2002,6 +2014,15 @@ public sealed class ScriptEngine
             }
         }
     }
+
+    /// <summary>Offer a game-bound <c>/…</c> segment to the extensions' console
+    /// command dispatch (/calc, /sort, /tt, …) so scripts can drive them the way
+    /// typed input can. A claimed command is client-side: the text never reaches
+    /// the game, so callers must NOT bump <c>_inFlight</c> — no game prompt will
+    /// ever release the budget. Unclaimed slashes return false and are sent to
+    /// the game verbatim, mirroring the typed-input fall-through.</summary>
+    private bool TrySlashCommand(string cmd) =>
+        cmd.Length > 0 && cmd[0] == '/' && Extensions.DispatchSlashCommand(cmd);
 
     /// <summary>
     /// Evaluate a condition, treating empty input and parse errors as false.
