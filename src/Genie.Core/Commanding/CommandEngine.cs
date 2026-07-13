@@ -981,7 +981,13 @@ public sealed class CommandEngine
         // a class-name filter / class name — `#class list` filtered by "list" and
         // `#class set foo on` was silently ignored. Recognise them explicitly.
         var firstLower = first.ToLowerInvariant();
-        if (firstLower == "list")
+        // `#class list on|off` is a CLASS NAMED "list" being toggled (classes.cfg
+        // replays exactly that shape), not "list filtered by on" — a filter of
+        // on/off would be meaningless anyway. Everything else keeps the #97
+        // explicit-list behaviour.
+        bool listToggle = parts.Count == 3 &&
+                          parts[2].ToLowerInvariant() is "on" or "off" or "true" or "false" or "1" or "0";
+        if (firstLower == "list" && !listToggle)
         {
             ListClasses(parts.Count > 2 ? parts[2] : null);
             return;
@@ -1090,18 +1096,33 @@ public sealed class CommandEngine
     private void RunCfgFileLines(IReadOnlyList<string> lines, string fileName)
     {
         int skipped = 0;
-        foreach (var raw in lines)
+        _quietLoad = true;
+        try
         {
-            var line = raw.TrimStart();
-            if (line.Length == 0) continue;
-            if (line[0] == _config.CommandChar || line[0] == '#')
-                HandleInternalCommand(line[1..]);
-            else
-                skipped++;
+            foreach (var raw in lines)
+            {
+                var line = raw.TrimStart();
+                if (line.Length == 0) continue;
+                if (line[0] == _config.CommandChar || line[0] == '#')
+                    HandleInternalCommand(line[1..]);
+                else
+                    skipped++;
+            }
         }
+        finally { _quietLoad = false; }
         if (skipped > 0)
             _host.Echo($"{fileName}: skipped {skipped} line(s) that are not #commands.");
     }
+
+    /// <summary>True while replaying a saved cfg file. Per-rule add
+    /// confirmations ("Alias added: …") are suppressed then — a per-character
+    /// profile replays a couple thousand rules at every connect, and the
+    /// login screen is not the place to announce each one. Warnings and the
+    /// per-file "X Loaded" summaries still print.</summary>
+    private bool _quietLoad;
+
+    /// <summary>Echo an add/set confirmation — silenced during cfg loads.</summary>
+    private void EchoRule(string text) { if (!_quietLoad) _host.Echo(text); }
 
     /// <summary>True when the file body opens a JSON array/object — a legacy
     /// JSON-format save that must be deserialized, not replayed as commands.</summary>
@@ -1202,7 +1223,7 @@ public sealed class CommandEngine
             var expansion = string.Join(" ", parts.Skip(3));
             Aliases.RemoveAlias(name);                 // upsert
             Aliases.AddAlias(name, expansion);
-            _host.Echo($"Alias added: {name}={expansion}");
+            EchoRule($"Alias added: {name}={expansion}");
             return;
         }
 
@@ -1211,7 +1232,7 @@ public sealed class CommandEngine
         var implicitExpansion = string.Join(" ", parts.Skip(2));
         Aliases.RemoveAlias(implicitName);
         Aliases.AddAlias(implicitName, implicitExpansion);
-        _host.Echo($"Alias added: {implicitName}={implicitExpansion}");
+        EchoRule($"Alias added: {implicitName}={implicitExpansion}");
     }
 
     private void ListAliases(string? filter)
@@ -1312,7 +1333,7 @@ public sealed class CommandEngine
             var setValue = ResolveValueCommand(string.Join(" ", parts.Skip(3)));
             Variables.Store.Set(setName, setValue);
             if (_processInputDepth == 1 && _interactive)
-                _host.Echo($"Variable set: {setName}={setValue}");
+                EchoRule($"Variable set: {setName}={setValue}");
             return;
         }
 
@@ -1343,7 +1364,7 @@ public sealed class CommandEngine
             var value = ResolveValueCommand(string.Join(" ", parts.Skip(3)));
             Variables.Store.Set(name, value);
             if (_processInputDepth == 1 && _interactive)
-                _host.Echo($"Variable set: {name}={value}");
+                EchoRule($"Variable set: {name}={value}");
             return;
         }
 
@@ -1351,7 +1372,7 @@ public sealed class CommandEngine
         var implicitValue = ResolveValueCommand(string.Join(" ", parts.Skip(2)));
         Variables.Store.Set(implicitName, implicitValue);
         if (_processInputDepth == 1 && _interactive)
-            _host.Echo($"Variable set: {implicitName}={implicitValue}");
+            EchoRule($"Variable set: {implicitName}={implicitValue}");
     }
 
     /// <summary>
@@ -1508,7 +1529,7 @@ public sealed class CommandEngine
             var speak    = parts.Count > 8 ? parts[8] : "";
             Highlights.RemoveRule(pattern);            // upsert
             Highlights.AddRule(pattern, fg, bg, match, false, true, cls, sound, speak);
-            _host.Echo($"Highlight added: {pattern} fg={fg}{(string.IsNullOrEmpty(bg) ? "" : $" bg={bg}")}");
+            EchoRule($"Highlight added: {pattern} fg={fg}{(string.IsNullOrEmpty(bg) ? "" : $" bg={bg}")}");
             return;
         }
 
@@ -1522,7 +1543,7 @@ public sealed class CommandEngine
         var pSpeak   = parts.Count > 7 ? parts[7] : "";
         Highlights.RemoveRule(pPattern);
         Highlights.AddRule(pPattern, pFg, pBg, pMatch, false, true, pCls, pSound, pSpeak);
-        _host.Echo($"Highlight added: {pPattern} fg={pFg}{(string.IsNullOrEmpty(pBg) ? "" : $" bg={pBg}")}");
+        EchoRule($"Highlight added: {pPattern} fg={pFg}{(string.IsNullOrEmpty(pBg) ? "" : $" bg={pBg}")}");
     }
 
     private void ListHighlights(string? filter)
@@ -1633,7 +1654,7 @@ public sealed class CommandEngine
     }
 
     private void EchoNameAdded(string name, string fg, string bg) =>
-        _host.Echo($"Name added: {name}{(string.IsNullOrEmpty(fg) ? "" : $" fg={fg}")}{(string.IsNullOrEmpty(bg) ? "" : $" bg={bg}")}");
+        EchoRule($"Name added: {name}{(string.IsNullOrEmpty(fg) ? "" : $" fg={fg}")}{(string.IsNullOrEmpty(bg) ? "" : $" bg={bg}")}");
 
     private void ListNames(string? filter)
     {
@@ -1715,7 +1736,7 @@ public sealed class CommandEngine
             BackgroundColor = bg,
             HighlightLine   = existing.HighlightLine,
         });
-        _host.Echo($"Preset {existing.Id} → {fg}{(string.IsNullOrEmpty(bg) ? "" : $"/{bg}")}");
+        EchoRule($"Preset {existing.Id} → {fg}{(string.IsNullOrEmpty(bg) ? "" : $"/{bg}")}");
     }
 
     private void ListPresets(string? filter)
@@ -1839,7 +1860,7 @@ public sealed class CommandEngine
             try
             {
                 Triggers.AddTrigger(whenPattern, whenAction, false, true, "", "", "", false, false);
-                _host.Echo($"Trigger added: {whenPattern} → {whenAction}");
+                EchoRule($"Trigger added: {whenPattern} → {whenAction}");
             }
             catch (ArgumentException) { _host.Echo($"Invalid regexp in trigger: {whenPattern}"); }
             return;
@@ -1857,7 +1878,7 @@ public sealed class CommandEngine
         {
             Triggers.AddTrigger(pattern, action, false, true, cls, sound, speak, eval, matchAll);
             var flags = (eval ? " (eval)" : "") + (matchAll ? " (matchall)" : "");
-            _host.Echo($"Trigger added: {pattern} → {action}{flags}");
+            EchoRule($"Trigger added: {pattern} → {action}{flags}");
         }
         catch (ArgumentException) { _host.Echo($"Invalid regexp in trigger: {pattern}"); }
     }
@@ -1972,7 +1993,7 @@ public sealed class CommandEngine
             var cls         = parts.Count > 4 ? parts[4] : "";
             Substitutes.RemoveRule(pattern);
             Substitutes.AddRule(pattern, replacement, false, true, cls);
-            _host.Echo($"Substitute added: {pattern} → {replacement}");
+            EchoRule($"Substitute added: {pattern} → {replacement}");
             return;
         }
 
@@ -1984,7 +2005,7 @@ public sealed class CommandEngine
             var cls         = parts.Count > 3 ? parts[3] : "";
             Substitutes.RemoveRule(pattern);
             Substitutes.AddRule(pattern, replacement, false, true, cls);
-            _host.Echo($"Substitute added: {pattern} → {replacement}");
+            EchoRule($"Substitute added: {pattern} → {replacement}");
         }
     }
 
@@ -2071,7 +2092,7 @@ public sealed class CommandEngine
                     // Two args, not a subcommand → treat as implicit "add this pattern".
                     Gags.RemoveRule(parts[1]);
                     Gags.AddRule(parts[1]);
-                    _host.Echo($"Gag added: {parts[1]}");
+                    EchoRule($"Gag added: {parts[1]}");
                     return;
             }
         }
@@ -2089,7 +2110,7 @@ public sealed class CommandEngine
             var cls     = parts.Count > 3 ? parts[3] : "";
             Gags.RemoveRule(pattern);
             Gags.AddRule(pattern, false, true, cls);
-            _host.Echo($"Gag added: {pattern}");
+            EchoRule($"Gag added: {pattern}");
             return;
         }
 
@@ -2098,7 +2119,7 @@ public sealed class CommandEngine
         var clsImp = parts[2];
         Gags.RemoveRule(pImp);
         Gags.AddRule(pImp, false, true, clsImp);
-        _host.Echo($"Gag added: {pImp}");
+        EchoRule($"Gag added: {pImp}");
     }
 
     private void ListGags(string? filter)
@@ -2201,7 +2222,7 @@ public sealed class CommandEngine
             var key    = parts[2];
             var action = string.Join(" ", parts.Skip(3));
             Macros.Add(key, action);
-            _host.Echo($"Macro added: {key} → {action}");
+            EchoRule($"Macro added: {key} → {action}");
             return;
         }
 
@@ -2211,7 +2232,7 @@ public sealed class CommandEngine
             var key    = parts[1];
             var action = string.Join(" ", parts.Skip(2));
             Macros.Add(key, action);
-            _host.Echo($"Macro added: {key} → {action}");
+            EchoRule($"Macro added: {key} → {action}");
         }
     }
 

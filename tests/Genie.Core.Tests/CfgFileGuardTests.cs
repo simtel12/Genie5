@@ -164,6 +164,41 @@ public class CfgFileGuardTests : IDisposable
     }
 
     [Fact]
+    public void Loading_is_quiet_but_typed_adds_still_announce()
+    {
+        var (host, cmd, trig, _) = Make();
+        WriteCfg("triggers.cfg",
+            "#trigger add {^You fall} {stand}\n" +
+            "#trigger add {^You stumble} {stand}\n");
+
+        cmd.ProcessInput("#trigger load");
+
+        // No per-rule announcements at load — just the summary.
+        Assert.Equal(2, trig.Triggers.Count);
+        Assert.DoesNotContain(host.Echoes, e => e.StartsWith("Trigger added:"));
+        Assert.Contains(host.Echoes, e => e == "Triggers Loaded");
+
+        // Typed adds keep their confirmation.
+        cmd.ProcessInput("#trigger add {^You trip} {stand}");
+        Assert.Contains(host.Echoes, e => e.StartsWith("Trigger added: ^You trip"));
+    }
+
+    [Fact]
+    public void Class_named_list_toggles_instead_of_listing()
+    {
+        var (host, cmd, _, _) = Make();
+        var classes = new Genie.Core.Classes.ClassEngine();
+        cmd.Classes = classes;
+
+        cmd.ProcessInput("#class list on");     // classes.cfg replays exactly this
+        Assert.True(classes.GetAll().TryGetValue("list", out var active) && active);
+        Assert.DoesNotContain(host.Echoes, e => e.Contains("Filter: on"));
+
+        cmd.ProcessInput("#class list");        // explicit list command still works
+        Assert.Contains(host.Echoes, e => e.StartsWith("Active classes:"));
+    }
+
+    [Fact]
     public void Corrupt_json_cfg_is_reported_and_not_dispatched()
     {
         var (host, cmd, _, subs) = Make();
