@@ -294,16 +294,22 @@
                       VerticalScrollBarVisibility="Auto"
                       Width="{Binding $parent[Grid].Bounds.Width}"
                       Height="{Binding $parent[Grid].Bounds.Height}">
+        <!-- Every field renders as inlines through DefaultHighlights.Tokenize so
+             user highlight rules, name colours and MonsterBold apply in this
+             panel (previously only the objects line did); each block's
+             Foreground is the default for characters no rule claims. -->
         <StackPanel Spacing="4" Margin="8">
-          <SelectableTextBlock Text="{Binding ViewModel.Title}"       FontWeight="Bold" Foreground="{DynamicResource Theme.TextPrimary}" TextWrapping="Wrap"/>
-          <SelectableTextBlock Text="{Binding ViewModel.Description}" Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+          <SelectableTextBlock controls:InlinesBehavior.Source="{Binding ViewModel.TitleInlines}"
+                               FontWeight="Bold" Foreground="{DynamicResource Theme.TextPrimary}" TextWrapping="Wrap"/>
+          <SelectableTextBlock controls:InlinesBehavior.Source="{Binding ViewModel.DescriptionInlines}"
+                               Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
                                IsVisible="{Binding ViewModel.Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-          <SelectableTextBlock Text="{Binding ViewModel.Exits}"   Foreground="{DynamicResource Theme.Accent}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+          <SelectableTextBlock controls:InlinesBehavior.Source="{Binding ViewModel.ExitsInlines}"
+                               Foreground="{DynamicResource Theme.Accent}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
                                IsVisible="{Binding ViewModel.Exits,   Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-          <SelectableTextBlock Text="{Binding ViewModel.Players}" Foreground="{DynamicResource Theme.Success}" FontSize="11" TextWrapping="Wrap"
+          <SelectableTextBlock controls:InlinesBehavior.Source="{Binding ViewModel.PlayersInlines}"
+                               Foreground="{DynamicResource Theme.Success}" FontSize="11" TextWrapping="Wrap"
                                IsVisible="{Binding ViewModel.Players, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-          <!-- #131: render room objects as inlines so <pushBold> creatures gold
-               via the MonsterBold path; Foreground is the default for the rest. -->
           <SelectableTextBlock controls:InlinesBehavior.Source="{Binding ViewModel.ObjectsInlines}"
                                Foreground="{DynamicResource Theme.TextSecondary}" FontSize="11" TextWrapping="Wrap"
                                IsVisible="{Binding ViewModel.Objects, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
@@ -343,7 +349,10 @@
                           IsVisible="{Binding !ViewModel.IsEmpty}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="vm:MobItem">
-                  <SelectableTextBlock Text="{Binding Text}" Foreground="{DynamicResource Theme.Warning}"
+                  <!-- Inlines = the shared highlight pipeline (user rules paint
+                       creature names here too); Warning stays the default. -->
+                  <SelectableTextBlock controls:InlinesBehavior.Source="{Binding Inlines}"
+                                       Foreground="{DynamicResource Theme.Warning}"
                                        FontSize="12" TextWrapping="Wrap" Margin="0,1">
                     <SelectableTextBlock.ContextMenu>
                       <ContextMenu>
@@ -422,8 +431,12 @@
             <ItemsControl ItemsSource="{Binding ViewModel.Players}"
                           IsVisible="{Binding !ViewModel.IsEmpty}">
               <ItemsControl.ItemTemplate>
-                <DataTemplate DataType="x:String">
-                  <SelectableTextBlock Text="{Binding}" Foreground="{DynamicResource Theme.Success}"
+                <DataTemplate DataType="vm:PlayerRow">
+                  <!-- Inlines = the shared highlight pipeline, so #154 name
+                       colours and user rules paint player names here like in
+                       the game window; Success stays the default. -->
+                  <SelectableTextBlock controls:InlinesBehavior.Source="{Binding Inlines}"
+                                       Foreground="{DynamicResource Theme.Success}"
                                        FontSize="12" TextWrapping="Wrap" Margin="0,1"/>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>

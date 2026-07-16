@@ -199,11 +199,16 @@ public sealed class MobsViewModel : ReactiveObject
 public sealed class MobItem
 {
     public string Text { get; }
+    /// <summary>The row tokenized through the shared highlight pipeline, so a
+    /// user rule on a creature name colours it here too (the row's default
+    /// Warning foreground covers whatever no rule claims).</summary>
+    public IReadOnlyList<Avalonia.Controls.Documents.Inline> Inlines { get; }
     public ReactiveCommand<Unit, Unit> IgnoreCommand { get; }
 
     public MobItem(string text, MobsViewModel owner)
     {
         Text          = text;
+        Inlines       = Genie.App.Highlighting.DefaultHighlights.Tokenize(text);
         IgnoreCommand = ReactiveCommand.Create(() => owner.IgnoreCreature(text));
     }
 }

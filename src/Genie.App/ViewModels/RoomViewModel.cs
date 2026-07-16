@@ -16,15 +16,22 @@ public class RoomViewModel : ReactiveObject
     [Reactive] public string Players     { get; private set; } = "";
     [Reactive] public string Objects     { get; private set; } = "";
 
-    /// <summary>
-    /// The room-objects line rendered as styled inlines (#131 Room-panel
-    /// MonsterBold): DR's &lt;pushBold&gt; creature/NPC names are golded via the
-    /// same <see cref="DefaultHighlights.Tokenize"/> path the game streams use,
-    /// so it honours the MonsterBold toggle + the `creatures` preset colour. The
-    /// panel binds this via InlinesBehavior; plain <see cref="Objects"/> is kept
-    /// for the IsVisible gate and copy.
-    /// </summary>
-    [Reactive] public IReadOnlyList<Inline> ObjectsInlines { get; private set; } = System.Array.Empty<Inline>();
+    // Every field renders as styled inlines through the same
+    // DefaultHighlights.Tokenize path the game streams use, so user highlight
+    // rules, name colours (#154) and MonsterBold (#131) all apply in the Room
+    // panel — previously only the objects line was tokenized, which is why
+    // imported "room" highlights did nothing here. The plain string twins stay
+    // for the IsVisible gates and copy. Each panel keeps its own default
+    // Foreground; unclaimed characters inherit it.
+    [Reactive] public IReadOnlyList<Inline> TitleInlines       { get; private set; } = System.Array.Empty<Inline>();
+    [Reactive] public IReadOnlyList<Inline> DescriptionInlines { get; private set; } = System.Array.Empty<Inline>();
+    [Reactive] public IReadOnlyList<Inline> ExitsInlines       { get; private set; } = System.Array.Empty<Inline>();
+    [Reactive] public IReadOnlyList<Inline> PlayersInlines     { get; private set; } = System.Array.Empty<Inline>();
+    [Reactive] public IReadOnlyList<Inline> ObjectsInlines     { get; private set; } = System.Array.Empty<Inline>();
+
+    // Last-seen content per component, so a highlight-rules change can repaint
+    // the panel without waiting for the next room.
+    private readonly Dictionary<string, (string Content, IReadOnlyList<BoldSpan>? Bold)> _last = new();
 
     public void Attach(GenieCore core)
     {
@@ -34,16 +41,38 @@ public class RoomViewModel : ReactiveObject
             {
                 switch (e.ComponentId)
                 {
-                    case "room title":   Title       = e.Content; break;
-                    case "room desc":    Description = e.Content; break;
-                    case "room exits":   Exits       = e.Content; break;
-                    case "room players": Players     = e.Content; break;
+                    case "room title":
+                    case "room desc":
+                    case "room exits":
+                    case "room players":
                     case "room objs":
-                        Objects        = e.Content;
-                        ObjectsInlines = DefaultHighlights.Tokenize(e.Content, links: null,
-                                                                    boldSpans: e.BoldSpans, presetSpans: null);
+                        _last[e.ComponentId] = (e.Content, e.BoldSpans);
+                        Apply(e.ComponentId, e.Content, e.BoldSpans);
                         break;
                 }
             });
+
+        // Highlight/name rules edited mid-session repaint the current room in
+        // place (the same seam the game window uses for its re-render).
+        UserHighlights.RulesChanged += () =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                foreach (var (id, (content, bold)) in _last)
+                    Apply(id, content, bold);
+            });
+    }
+
+    private void Apply(string componentId, string content, IReadOnlyList<BoldSpan>? boldSpans)
+    {
+        var inlines = DefaultHighlights.Tokenize(content, links: null,
+                                                 boldSpans: boldSpans, presetSpans: null);
+        switch (componentId)
+        {
+            case "room title":   Title       = content; TitleInlines       = inlines; break;
+            case "room desc":    Description = content; DescriptionInlines = inlines; break;
+            case "room exits":   Exits       = content; ExitsInlines       = inlines; break;
+            case "room players": Players     = content; PlayersInlines     = inlines; break;
+            case "room objs":    Objects     = content; ObjectsInlines     = inlines; break;
+        }
     }
 }

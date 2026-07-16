@@ -22,7 +22,7 @@ namespace Genie.App.ViewModels;
 public sealed class PlayersViewModel : ReactiveObject
 {
     /// <summary>Individual player entries parsed from the room-players line.</summary>
-    public ObservableCollection<string> Players { get; } = new();
+    public ObservableCollection<PlayerRow> Players { get; } = new();
 
     /// <summary>The raw <c>room players</c> text, e.g. "Also here: Naper." Kept
     /// as a subtitle / debugging aid alongside the parsed list.</summary>
@@ -60,7 +60,7 @@ public sealed class PlayersViewModel : ReactiveObject
     {
         RawText = content ?? "";
         Players.Clear();
-        foreach (var name in ParseNames(RawText)) Players.Add(name);
+        foreach (var name in ParseNames(RawText)) Players.Add(new PlayerRow(name));
         Count   = Players.Count;
         IsEmpty = Players.Count == 0;
     }
@@ -99,5 +99,20 @@ public sealed class PlayersViewModel : ReactiveObject
             if (who >= 0) name = name[..who].Trim();
             if (name.Length > 0) yield return name;
         }
+    }
+}
+
+/// <summary>One player row, tokenized through the shared highlight pipeline so
+/// name colours (#154) and user highlight rules paint here like they do in the
+/// game window (the panel's default Success foreground covers the rest).</summary>
+public sealed class PlayerRow
+{
+    public string Text { get; }
+    public IReadOnlyList<Avalonia.Controls.Documents.Inline> Inlines { get; }
+
+    public PlayerRow(string text)
+    {
+        Text    = text;
+        Inlines = Genie.App.Highlighting.DefaultHighlights.Tokenize(text);
     }
 }
