@@ -1,3 +1,29 @@
+# Genie 5 — v5.0.0-alpha.8.13
+
+A quick follow-up to 8.12, all about highlights: **they now paint in every
+window — and you can choose exactly which ones.**
+
+## 🔧 Fixed
+
+- **Highlights work in the Room, Mobs, and Players panels** — user highlight
+  rules (and Names colors) previously painted only in the game window and
+  the stream tabs; in the Room panel only the objects line was styled, and
+  the Mobs / Players panels rendered plain. All three now run the same
+  highlight pipeline as the game window, and the Room panel repaints in
+  place when you edit rules mid-session. (From a field report: imported
+  Genie 4 highlights worked everywhere except on room text.)
+
+## 🆕 New
+
+- **Per-window highlight scoping** — every highlight rule has an optional
+  **Windows** list (Highlights tab, new field + column): leave it blank and
+  the rule paints everywhere (the default — existing and imported rules are
+  unchanged), or list window ids (`main`, `room`, `mobs`, `players`,
+  `backpack`, or a stream tab like `thoughts`) to restrict it. Also
+  available as the last argument of `#highlight add`, and shown by
+  `#highlight list` as `@room,main`. The scope is stored on the Genie 5
+  side — `highlights.cfg` stays byte-compatible with Genie 4.
+
 # Genie 5 — v5.0.0-alpha.8.12
 
 The headline: **Inventory View is now a first-class window** — your

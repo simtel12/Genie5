@@ -4,7 +4,18 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8.12 — Inventory View
+## Latest: v5.0.0-alpha.8.13 — Highlights Everywhere
+
+A quick follow-up to 8.12: highlights now paint in every window — and you can choose exactly which ones.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.13** as a delta.
+
+- **Highlights work in the Room, Mobs, and Players panels** — user rules and Names colors now paint there like they do in the game window and stream tabs (only the Room panel's objects line was styled before; Mobs/Players were plain).
+- **Per-window highlight scoping** — a new **Windows** field on each highlight rule: blank = every window (the default, so existing and imported rules are unchanged), or a comma-separated list like `room, main` to restrict where it paints. Also the last argument of `#highlight add`. See [Highlights](Configuration#highlights--coloring-text).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.13)
+
+## v5.0.0-alpha.8.12 — Inventory View
 
 Your characters' belongings as one searchable, sortable catalog — plus two Genie 4 parity commands.
 
