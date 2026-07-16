@@ -122,8 +122,15 @@ public sealed class CombatState
 
 public sealed class InventoryState
 {
+    /// <summary>Full display name of the held item ("razor-edged scimitar"),
+    /// from the &lt;left&gt;/&lt;right&gt; body text — Genie 4's <c>$lefthand</c>/
+    /// <c>$righthand</c> (#172). "Empty" when the hand is empty.</summary>
     public string LeftHand  { get; set; } = "";
     public string RightHand { get; set; } = "";
+    /// <summary>Bare noun from the <c>noun</c> attribute ("scimitar") —
+    /// Genie 4's <c>$lefthandnoun</c>/<c>$righthandnoun</c>.</summary>
+    public string LeftHandNoun  { get; set; } = "";
+    public string RightHandNoun { get; set; } = "";
     public string LeftExistId  { get; set; } = "";
     public string RightExistId { get; set; } = "";
 }
@@ -236,7 +243,8 @@ public sealed class GameState
         Combat.SpellTimeStart = null;
         Combat.Stance        = Stance.Neutral;
 
-        Inventory.LeftHand = Inventory.RightHand = Inventory.LeftExistId = Inventory.RightExistId = "";
+        Inventory.LeftHand = Inventory.RightHand = Inventory.LeftHandNoun = Inventory.RightHandNoun =
+            Inventory.LeftExistId = Inventory.RightExistId = "";
 
         // Status / misc
         ActiveStatuses.Clear();

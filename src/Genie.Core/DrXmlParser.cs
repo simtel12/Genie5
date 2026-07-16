@@ -47,7 +47,9 @@ public sealed class DrXmlParser : IDisposable
     private readonly System.Text.StringBuilder _componentBuffer = new();
     private bool _inComponent = false;
     private bool _inSpell     = false;
-    private bool _inHand      = false;   // <left>…</left> / <right>…</right> body — discard
+    private bool _inHand      = false;   // <left>…</left> / <right>…</right> body — display name, emitted on close
+    private string _handNoun  = "";      // <left>/<right> attrs stashed at the open tag; the
+    private string _handExist = "";      // HeldItemEvent fires at the close tag with the body text (#172)
     private bool _inCompass   = false;
     private bool _inPrompt    = false;   // <prompt>…</prompt> body — route to _promptBuffer, fire on close
     private string _currentPresetId = "";
@@ -1016,18 +1018,26 @@ public sealed class DrXmlParser : IDisposable
             }
 
             // ── Held items ───────────────────────────────────────────────
-            // Emit the event from attributes immediately; body text (display name)
-            // is absorbed by _inHand and discarded — we have noun from the attribute.
+            // Stash the attributes; the HeldItemEvent fires at the CLOSE tag,
+            // once the body text — the display name Genie 4 exposes as
+            // $lefthand/$righthand ("razor-edged scimitar" vs noun "scimitar")
+            // — has been buffered (public #172). A self-closing form has no
+            // body, so it emits immediately with an empty display name.
             case "left":
-                _events.OnNext(new HeldItemEvent(Hand.Left,  r["noun"] ?? "", r["exist"] ?? ""));
-                _componentBuffer.Clear();
-                _inHand = true;
-                break;
             case "right":
-                _events.OnNext(new HeldItemEvent(Hand.Right, r["noun"] ?? "", r["exist"] ?? ""));
+            {
+                _handNoun  = r["noun"]  ?? "";
+                _handExist = r["exist"] ?? "";
+                var hand = name == "left" ? Hand.Left : Hand.Right;
+                if (rawTag.TrimEnd().EndsWith("/>", StringComparison.Ordinal))
+                {
+                    _events.OnNext(new HeldItemEvent(hand, _handNoun, _handExist, ""));
+                    break;
+                }
                 _componentBuffer.Clear();
                 _inHand = true;
                 break;
+            }
 
             // ── Prepared spell ───────────────────────────────────────────
             case "spell":
@@ -1520,17 +1530,26 @@ public sealed class DrXmlParser : IDisposable
                 _inHand = false;
                 var handBody = _componentBuffer.ToString();
                 _componentBuffer.Clear();
-                // Normally the body is just the display name ("razor-edged
-                // scimitar"), which we discard — the noun came from the
-                // attribute. But the server sometimes merges a response INTO
-                // the hand body with no separator:
+                // The body is the display name ("razor-edged scimitar", or
+                // "Empty") — Genie 4's $lefthand/$righthand (#172). But the
+                // server sometimes merges a response INTO the hand body with
+                // no separator:
                 //   <right noun='ledger'>black ledgerYou unlock and open…</right>
-                // Splitting on the first lower→upper seam recovers the
-                // appended game text, which would otherwise be silently lost.
-                // The prefix (the item name) is still discarded here; capturing
-                // it as $righthand is a separate enhancement.
+                // Splitting on the first lower→upper seam separates them: the
+                // prefix is the display name, the suffix is appended game text
+                // (re-emitted so it isn't silently lost).
                 var handSeam = FindMergeSeam(handBody);
-                if (handSeam > 0) EmitLine(handBody[handSeam..]);
+                var handAppended = "";
+                if (handSeam > 0)
+                {
+                    handAppended = handBody[handSeam..];
+                    handBody     = handBody[..handSeam];
+                }
+                var display = System.Net.WebUtility.HtmlDecode(StripBasicXml(handBody)).Trim();
+                _events.OnNext(new HeldItemEvent(
+                    name.Equals("left", StringComparison.OrdinalIgnoreCase) ? Hand.Left : Hand.Right,
+                    _handNoun, _handExist, display));
+                if (handAppended.Length > 0) EmitLine(handAppended);
                 break;
             }
 

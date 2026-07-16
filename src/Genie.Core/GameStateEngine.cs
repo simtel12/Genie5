@@ -91,13 +91,15 @@ public sealed class GameStateEngine : IDisposable
             case HeldItemEvent held:
                 if (held.Hand == Hand.Left)
                 {
-                    _state.Inventory.LeftHand    = held.Noun;
-                    _state.Inventory.LeftExistId = held.ExistId;
+                    _state.Inventory.LeftHand     = held.Display;
+                    _state.Inventory.LeftHandNoun = held.Noun;
+                    _state.Inventory.LeftExistId  = held.ExistId;
                 }
                 else
                 {
-                    _state.Inventory.RightHand    = held.Noun;
-                    _state.Inventory.RightExistId = held.ExistId;
+                    _state.Inventory.RightHand     = held.Display;
+                    _state.Inventory.RightHandNoun = held.Noun;
+                    _state.Inventory.RightExistId  = held.ExistId;
                 }
                 break;
 

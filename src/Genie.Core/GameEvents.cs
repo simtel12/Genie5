@@ -202,8 +202,14 @@ public sealed record InjuryEvent(string Area, InjuryKind Kind, int Severity) : G
 
 public enum Hand { Left, Right }
 
-/// <summary>&lt;left noun="sword" exist="12345"/&gt; or &lt;right .../&gt;</summary>
-public sealed record HeldItemEvent(Hand Hand, string Noun, string ExistId) : GameEvent;
+/// <summary>
+/// &lt;left exist="12345" noun="scimitar"&gt;razor-edged scimitar&lt;/left&gt; (or
+/// &lt;right …&gt;). <paramref name="Noun"/>/<paramref name="ExistId"/> come from the
+/// attributes; <paramref name="Display"/> is the element's body text — the full
+/// display name ("razor-edged scimitar", or "Empty" for an empty hand), which is
+/// what Genie 4 exposes as <c>$lefthand</c>/<c>$righthand</c> (public #172).
+/// </summary>
+public sealed record HeldItemEvent(Hand Hand, string Noun, string ExistId, string Display) : GameEvent;
 
 // ── Spell ────────────────────────────────────────────────────────────────────
 

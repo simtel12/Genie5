@@ -239,8 +239,13 @@ public class VitalsViewModel : ReactiveObject
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(e =>
             {
-                if (e.Hand == Hand.Left)  LeftHand  = string.IsNullOrEmpty(e.Noun) ? "Empty" : e.Noun;
-                if (e.Hand == Hand.Right) RightHand = string.IsNullOrEmpty(e.Noun) ? "Empty" : e.Noun;
+                // Full display name from the tag body (#172) — what Genie 4's
+                // hands bar shows; noun attribute as fallback.
+                var shown = !string.IsNullOrEmpty(e.Display) ? e.Display
+                          : !string.IsNullOrEmpty(e.Noun)    ? e.Noun
+                          : "Empty";
+                if (e.Hand == Hand.Left)  LeftHand  = shown;
+                if (e.Hand == Hand.Right) RightHand = shown;
             });
 
         // ── Compass exits ─────────────────────────────────────────────────

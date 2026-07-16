@@ -116,8 +116,8 @@ public sealed class ScriptGlobalsSync : IDisposable
         Set("stance",        _state.Combat.Stance.ToString().ToLowerInvariant());
 
         // Hands — "Empty" matches Genie 4 convention.
-        SetHand(Hand.Left,  _state.Inventory.LeftHand,  _state.Inventory.LeftExistId);
-        SetHand(Hand.Right, _state.Inventory.RightHand, _state.Inventory.RightExistId);
+        SetHand(Hand.Left,  _state.Inventory.LeftHand,  _state.Inventory.LeftHandNoun,  _state.Inventory.LeftExistId);
+        SetHand(Hand.Right, _state.Inventory.RightHand, _state.Inventory.RightHandNoun, _state.Inventory.RightExistId);
 
         // Status flags — all 0 initially; indicator events flip them.
         foreach (var flag in StatusFlagNames) Set(flag, "0");
@@ -247,7 +247,7 @@ public sealed class ScriptGlobalsSync : IDisposable
     }
 
     private void OnHeldItem(HeldItemEvent held)
-        => SetHand(held.Hand, held.Noun, held.ExistId);
+        => SetHand(held.Hand, held.Display, held.Noun, held.ExistId);
 
     /// <summary>
     /// Re-mirror <c>$monstercount</c>/<c>$monsterlist</c> from the (just
@@ -310,14 +310,15 @@ public sealed class ScriptGlobalsSync : IDisposable
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
-    private void SetHand(Hand hand, string noun, string existId)
+    private void SetHand(Hand hand, string display, string noun, string existId)
     {
-        var name = string.IsNullOrEmpty(noun) ? "Empty" : noun;
-        // Our parser exposes the NOUN attribute (and exist id) on the
-        // <left>/<right> element; the body text (display name like
-        // "razor-edged scimitar") is currently discarded. So for now both
-        // $righthand and $righthandnoun resolve to the same value. Capturing
-        // the body text is a separate parser enhancement.
+        // Genie 4 parity (#172): $Xhand is the FULL display name from the
+        // <left>/<right> body text ("whiskey jug", or "Empty"); $Xhandnoun is
+        // the bare noun attribute ("jug"). Fall back to the noun for streams
+        // that only carried attributes, then to "Empty".
+        var name = !string.IsNullOrEmpty(display) ? display
+                 : !string.IsNullOrEmpty(noun)    ? noun
+                 : "Empty";
         var prefix = hand == Hand.Left ? "left" : "right";
         Set($"{prefix}hand",     name);
         Set($"{prefix}handnoun", string.IsNullOrEmpty(noun) ? "" : noun);
