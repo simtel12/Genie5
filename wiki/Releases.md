@@ -4,7 +4,19 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8.13 — Highlights Everywhere
+## Latest: v5.0.0-alpha.8.14 — Script & Hand Parity
+
+Three community-reported fixes: script variables and your hands now behave exactly like Genie 3/4.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.14** as a delta.
+
+- **`$righthand` / `$lefthand` carry the full display name** ("whiskey jug"), with `$righthandnoun`/`$lefthandnoun` staying the bare noun ("jug") — Genie 3/4 parity; both used to be the noun. The hands display in the status bar shows the full name too.
+- **Undefined skill / spell variables no longer error** — `if ($Outdoorsmanship.Ranks >= 1750)` before your Experience window has seen the skill used to throw `bad condition … missing ')'`; it now just evaluates false (like Genie 3/4) and resolves normally once the data arrives.
+- **`roomname` preset colors the room title**, matching Genie 4.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.14)
+
+## v5.0.0-alpha.8.13 — Highlights Everywhere
 
 A quick follow-up to 8.12: highlights now paint in every window — and you can choose exactly which ones.
 

@@ -1,3 +1,27 @@
+# Genie 5 — v5.0.0-alpha.8.14
+
+Three community-reported fixes, all in Genie 4 parity territory: **script
+variables and your hands now behave exactly like Genie 3/4.**
+
+## 🔧 Fixed
+
+- **`$righthand` / `$lefthand` carry the full display name** (#172) — Genie
+  3/4 set these from the item's display name ("whiskey jug") and
+  `$righthandnoun`/`$lefthandnoun` from the bare noun ("jug"); Genie 5 had
+  both as the noun. The hands display in the status bar shows the full name
+  now too. Live-verified in-game.
+- **Undefined skill / spell variables no longer error** (#171) — lines like
+  `if ($Outdoorsmanship.Ranks >= 1750)` or
+  `if ($SpellTimer.Sanctuary.active = 1)` threw
+  `bad condition … missing ')'` when the Experience or Active Spells window
+  hadn't populated the variable yet. The engine's variable-name matching
+  could stop mid-word and splice a shorter variable (`$out`, `$spelltime`)
+  into the middle of the name; it now only matches at word boundaries. An
+  unpopulated variable simply evaluates false — same as Genie 3/4 — and
+  resolves normally once the skill or spell data arrives.
+- **`roomname` preset colors the room title** (#174) — a preset rule for
+  `roomname` now paints the room-title line, matching Genie 4.
+
 # Genie 5 — v5.0.0-alpha.8.13
 
 A quick follow-up to 8.12, all about highlights: **they now paint in every
