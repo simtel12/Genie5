@@ -2671,18 +2671,44 @@ public sealed class ScriptEngine
             j++;
         if (j == nameStart) return (c.ToString(), nameStart);   // bare sigil — leave literal
 
+        // $0..$9 numeric slots: Genie 4 replaces these as a flat text pass
+        // BEFORE the variable loop (Script.cs ParseVariables), so `$1s`
+        // is arg1 + literal "s" — the slot consumes exactly ONE digit and
+        // never participates in the name shrink-search below.
+        if (c == '$' && char.IsDigit(s[nameStart]))
+        {
+            var slot = inst.DollarStack.Count > 0
+                ? inst.DollarStack.Peek()[s[nameStart] - '0'] ?? string.Empty
+                : string.Empty;
+            return (slot, nameStart + 1);
+        }
+
         // Genie 4 parity: shrink the candidate from the right until a defined
         // var is found. So `%caravan-there` resolves the full name when it
         // exists, but `%count-1` falls back to `%count` followed by literal
         // "-1" when only `count` is defined. If nothing resolves, the full
         // candidate is consumed and substituted as empty.
+        //
+        // A shrunk candidate must end at a word boundary — the remainder may
+        // start with '.', '-', or a digit, but never a letter/underscore
+        // (public #171). Without this, an UNDEFINED dotted name gets eaten
+        // mid-word by any shorter defined var: `$Outdoorsmanship.Ranks`
+        // matched the compass boolean `$out` → "0doorsmanship.Ranks", and
+        // `$SpellTimer.X.active` matched the reserved `$spelltime` →
+        // "0r.X.active" — both parse errors downstream. (Genie 4 dodges this
+        // only because its VariableList lookup is case-sensitive; our globals
+        // are deliberately case-insensitive.) The community-documented shrink
+        // `%%spell.Prep` → `%spell` + ".Prep" still works — '.' is a boundary.
         int nameEnd = j;
         string value = string.Empty;
         bool resolved = false;
         while (nameEnd > nameStart)
         {
-            var name = s[nameStart..nameEnd];
-            if (TryResolveVar(name, c, inst, out value)) { resolved = true; break; }
+            if (nameEnd == j || !(char.IsLetter(s[nameEnd]) || s[nameEnd] == '_'))
+            {
+                var name = s[nameStart..nameEnd];
+                if (TryResolveVar(name, c, inst, out value)) { resolved = true; break; }
+            }
             nameEnd--;
         }
         if (!resolved) { value = string.Empty; nameEnd = j; }
