@@ -64,8 +64,18 @@ public class RoomViewModel : ReactiveObject
 
     private void Apply(string componentId, string content, IReadOnlyList<BoldSpan>? boldSpans)
     {
+        // The title paints through the roomname preset — same palette entry
+        // the game window uses for its <style id="roomName"/> line (#174).
+        // ComponentEvents carry no preset spans, so synthesize a full-length
+        // one; user highlight rules still win (presets are the ??= base
+        // layer), and a "Default" preset leaves the panel's themed foreground.
+        // The other fields keep the theme colour — only the title has a
+        // dedicated preset identity in the Genie 4 palette.
+        var presetSpans = componentId == "room title" && content.Length > 0
+            ? new[] { new PresetSpan(0, content.Length, "roomName") }
+            : null;
         var inlines = DefaultHighlights.Tokenize(content, links: null,
-                                                 boldSpans: boldSpans, presetSpans: null, window: "room");
+                                                 boldSpans: boldSpans, presetSpans: presetSpans, window: "room");
         switch (componentId)
         {
             case "room title":   Title       = content; TitleInlines       = inlines; break;

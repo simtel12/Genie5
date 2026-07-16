@@ -450,7 +450,9 @@ public sealed class DrXmlParser : IDisposable
         int nlPos;
         while ((nlPos = buf.IndexOf('\n')) >= 0)
         {
-            EmitLine(buf[..nlPos].TrimEnd('\r'));
+            var line = buf[..nlPos].TrimEnd('\r');
+            SplitOpenStyleSpan(line.Length);
+            EmitLine(line);
             buf = buf[(nlPos + 1)..];
         }
         _textLineBuffer.Clear();
@@ -461,8 +463,27 @@ public sealed class DrXmlParser : IDisposable
     private void FlushTextLine()
     {
         if (_textLineBuffer.Length == 0) return;
+        SplitOpenStyleSpan(_textLineBuffer.Length);
         EmitLine(_textLineBuffer.ToString());
         _textLineBuffer.Clear();
+    }
+
+    // A <style> toggle open across a line boundary spans the emitted line's
+    // tail — record it before the line flushes, the same treatment open
+    // <preset> blocks get in HandleEndElement. DR closes the room-title
+    // toggle on the line AFTER the title (<style id="roomName"/>[Title]\n
+    // <style id=""/>…), so without this the title's TextEvent carried no
+    // span and the close then computed zero length against the fresh buffer:
+    // the roomname preset never painted anywhere (public #174). Re-anchoring
+    // at 0 keeps the still-open toggle colouring follow-on lines until its
+    // close arrives.
+    private void SplitOpenStyleSpan(int lineLength)
+    {
+        if (_styleStart < 0) return;
+        if (lineLength > _styleStart)
+            _pendingPresetSpans.Add(new PresetSpan(
+                _styleStart, lineLength - _styleStart, _styleId));
+        _styleStart = 0;
     }
 
     // Find the index of the first lowercase→uppercase adjacency (e.g. the "Y"
@@ -610,8 +631,10 @@ public sealed class DrXmlParser : IDisposable
     //   "You also see …"                     → room objs   (bold = creatures)
     //   "Also here: …"                       → room players
     //   "Obvious paths|exits: …"             → room exits  (completes capture)
-    // The roomName style toggle closes on the LINE AFTER the title, so at
-    // flush time the span isn't recorded yet — check the live toggle too.
+    // The roomName style toggle closes on the LINE AFTER the title; since the
+    // #174 fix FlushTextLine records the open toggle's span at flush, so the
+    // presetSpans check normally matches. The live-toggle check stays as a
+    // guard for flush paths that emit before the span split runs.
     private void TryCaptureRoomSeed(string stripped,
                                     IReadOnlyList<BoldSpan>? boldSpans,
                                     IReadOnlyList<PresetSpan>? presetSpans)
