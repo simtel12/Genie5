@@ -1,3 +1,56 @@
+# Genie 5 — v5.0.0-alpha.8.12
+
+The headline: **Inventory View is now a first-class window** — your
+characters' belongings as one searchable, sortable catalog.
+
+## 🆕 New
+
+- **Inventory View window** (Window menu, or `/iv open`) — run `/iv scan`
+  while connected and Genie catalogs everything you own: items on your
+  person, your **vault** (if you're holding a vault book), your **deed
+  register**, your **home**, and **Trader storage**, per character, saved
+  between sessions in the same `InventoryView.xml` format the Genie 4
+  plugin used (existing files carry over — old catalogs damaged by DR's
+  newer merged `INV LIST` output are repaired automatically on load).
+  - **Search all characters** — live filter; matches highlight, their
+    container chain stays visible.
+  - **Wt / Size columns** — weight (stones) and dimensions per item,
+    resolved from Elanthipedia's item database in the background the
+    first time and cached locally after that. Undocumented items stay
+    blank.
+  - **Sortable columns** — click **Item**, **Wt**, or **Size** to sort
+    within each container; click again to flip.
+  - **Wiki Lookup** — jumps straight to the item's Elanthipedia page
+    when one exists, else the wiki's search.
+  - **Find in Shops** (also `/iv shops <text>`) — searches current
+    player-shop listings, with data from the community-run
+    [DR Service Plaza](https://drservice.info/Plaza/): price, shop,
+    room, owner, and town. Fetched at most once per 6 hours.
+  - **Export** to CSV, and per-character **Remove** (two-step confirm).
+  - Replaces the external `Plugin_InventoryViewV5` DLL — a leftover copy
+    in your Plugins folder is skipped automatically. `/iv help` lists
+    every command; a scan still ends with the scriptable
+    `InventoryView scan complete` line.
+- **`#browser <url>`** — opens your OS-default browser (Genie 4 parity;
+  previously "Unknown command: browser").
+- **`#queue clear`** — flushes every queued-but-unsent command: the
+  RT-gated command queue and running scripts' pending `put`/`send`
+  segments (Genie 4 parity; travel.cmd's `RETURN_CLEAR` relies on it).
+
+## 🔧 Fixed
+
+- **`$game` / `$charactername` now come from the server** — the login
+  stream's identity tag corrects them a few lines into any connection,
+  which matters most for Lich sessions where the connect dialog can't
+  know the instance (scripts branch on `$game` for Platinum/Fallen). The
+  Lich tab also gains an **Instance** picker to seed the value.
+- **Script diagnostics** — the `[script] name started` line now shows
+  the resolved file path (running the *other* copy of a script is the
+  classic "my fix didn't take"), a malformed `waiteval` warns once
+  instead of hanging silently, and conditions accept Genie 4's
+  trailing-paren leniency (`if (exists("x")) ) then` no longer reads as
+  false).
+
 # Genie 5 — v5.0.0-alpha.8.11
 
 A small, focused release: **scripts can now run client /commands.**

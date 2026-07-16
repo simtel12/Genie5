@@ -4,7 +4,20 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8.11 — Scriptable /commands
+## Latest: v5.0.0-alpha.8.12 — Inventory View
+
+Your characters' belongings as one searchable, sortable catalog — plus two Genie 4 parity commands.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.12** as a delta.
+
+- **Inventory View window** — `/iv scan` catalogs everything you own (person, vault, deed register, home, Trader storage) per character into a searchable tree with **weight/size columns** (from Elanthipedia, cached locally), **sortable headers**, **Wiki Lookup**, **Find in Shops** (player-shop prices via the community-run DR Service Plaza), and CSV export. Replaces the external InventoryView plugin; Genie 4 `InventoryView.xml` files carry over. See [The Inventory View window](The-Interface#the-inventory-view-window).
+- **`#browser <url>`** opens your default browser and **`#queue clear`** flushes queued-but-unsent commands (travel.cmd's `RETURN_CLEAR`) — both Genie 4 parity.
+- **`$game`/`$charactername` corrected from the server's identity tag** — matters for Lich sessions; the Lich tab gains an Instance picker.
+- **Script diagnostics** — start lines show the resolved script path, malformed `waiteval` warns instead of hanging silently, and Genie 4's trailing-paren leniency is honored.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.12)
+
+## v5.0.0-alpha.8.11 — Scriptable /commands
 
 A small, focused release: scripts can now run client /commands.
 
