@@ -86,16 +86,18 @@ public class GrabBagParityTests : IDisposable
     }
 
     [Fact]
-    public void IgnoreScriptWarnings_suppresses_the_bad_condition_warning()
+    public void IgnoreScriptWarnings_suppresses_the_condition_warnings()
     {
-        const string body = "if ((\"%a\" = \"%b\") then echo M\nelse echo N\n";   // unbalanced parens
+        // Unbalanced parens — auto-balanced (G4 compat) to ("" = "") = true, so
+        // the then-branch runs either way; only the advisory is gated by #151.
+        const string body = "if ((\"%a\" = \"%b\") then echo M\nelse echo N\n";
 
         var suppressed = RunScript(body, e => e.WarningsSuppressed = () => true);
-        Assert.DoesNotContain(suppressed, l => l.Contains("bad condition"));
-        Assert.Contains("N", suppressed);   // still evaluates false, else branch runs
+        Assert.DoesNotContain(suppressed, l => l.Contains("unbalanced parentheses"));
+        Assert.Contains("M", suppressed);   // leniency applies even when quiet
 
         var shown = RunScript(body);        // default — warnings visible
-        Assert.Contains(shown, l => l.Contains("bad condition"));
+        Assert.Contains(shown, l => l.Contains("auto-balanced"));
     }
 
     // ── #ignore command + config ─────────────────────────────────────────────

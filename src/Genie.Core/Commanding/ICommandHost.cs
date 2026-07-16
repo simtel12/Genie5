@@ -358,6 +358,16 @@ public interface ICommandHost
     void Beep() { }
 
     /// <summary>
+    /// Drop every script-queued command that has not yet been sent to the game
+    /// (each instance's pending put/send segments). Part of <c>#queue clear</c>
+    /// (Genie 4 parity) — the CommandEngine clears its own RT-gated
+    /// <c>CommandQueue</c> and calls this for the script side. Default no-op for
+    /// the same reason as <see cref="Beep"/>: test doubles and headless hosts
+    /// lose nothing by not implementing it.
+    /// </summary>
+    void ClearSendQueue() { }
+
+    /// <summary>
     /// Handle a <c>#connect</c> / <c>#reconnect</c> / <c>#lichconnect</c> command
     /// (Genie 4 parity). The connection lifecycle, saved profiles, and the
     /// Connect dialog all live in the App layer, so <see cref="Genie.Core"/>

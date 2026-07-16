@@ -8,13 +8,14 @@ using Xunit;
 namespace Genie.Core.Tests;
 
 /// <summary>
-/// A condition that fails to PARSE (script typo) surfaces a one-time
-/// "[script] … bad condition …" warning instead of silently evaluating false.
-/// From a community report: <c>if (("%a" = "%b") then</c> — unbalanced parens —
-/// printed the else branch with no hint the expression never parsed, and cost
-/// the author days of variable-value debugging. Conditions that merely evaluate
-/// false, and the benign empty-substitution case (<c>if (%unset)</c> → "()"),
-/// stay silent as before.
+/// Conditions that fail to PARSE surface a one-time "[script] …" advisory
+/// instead of failing silently. Unbalanced parentheses additionally get
+/// Genie 4's tolerance — the expression is auto-balanced and evaluated
+/// (community scripts shipped both too-few- and too-many-close shapes for
+/// years; see ConditionParenLeniencyTests) — while anything still unparseable
+/// after balancing is treated as false with the "bad condition" warning.
+/// Conditions that merely evaluate false, and the benign empty-substitution
+/// case (<c>if (%unset)</c> → "()"), stay silent as before.
 /// </summary>
 public class ConditionParseWarningTests
 {
@@ -36,22 +37,24 @@ public class ConditionParseWarningTests
     }
 
     [Fact]
-    public void Unbalanced_parens_warn_and_evaluate_false()
+    public void Unbalanced_parens_auto_balance_and_warn()
     {
-        // The community repro, verbatim shape: two '(' one ')'.
+        // The original community repro: two '(' one ')'. G4 evaluated it (the
+        // values DO match), G5 used to false it silently — now it auto-balances
+        // and says so.
         var o = RunFixture(
             "var a armband\n" +
             "var b armband\n" +
             "if ((\"%a\" = \"%b\") then echo MATCH\n" +
             "else echo NOMATCH\n");
 
-        Assert.Contains(o, l => l.Contains("bad condition") && l.Contains("missing ')'"));
-        Assert.DoesNotContain("MATCH", o);
-        Assert.Contains("NOMATCH", o);
+        Assert.Contains(o, l => l.Contains("auto-balanced"));
+        Assert.Contains("MATCH", o);
+        Assert.DoesNotContain("NOMATCH", o);
     }
 
     [Fact]
-    public void Bad_condition_in_a_loop_warns_once()
+    public void Unbalanced_condition_in_a_loop_warns_once()
     {
         var o = RunFixture(
             "var i 0\n" +
@@ -62,7 +65,22 @@ public class ConditionParseWarningTests
             "echo done\n");
 
         Assert.Contains("done", o);
-        Assert.Equal(1, o.Count(l => l.Contains("bad condition")));
+        Assert.DoesNotContain("NEVER", o);   // auto-balanced, still false
+        Assert.Equal(1, o.Count(l => l.Contains("auto-balanced")));
+    }
+
+    [Fact]
+    public void Still_unparseable_after_balancing_warns_bad_condition()
+    {
+        // Balancing appends '))' but the stray '((' group is trailing junk the
+        // grammar rejects either way → hard "bad condition", treated as false.
+        var o = RunFixture(
+            "if (1 = 1) (( then echo HIT\n" +
+            "echo done\n");
+
+        Assert.Contains("done", o);
+        Assert.DoesNotContain("HIT", o);
+        Assert.Contains(o, l => l.Contains("bad condition"));
     }
 
     [Fact]
@@ -77,6 +95,7 @@ public class ConditionParseWarningTests
         Assert.Contains("after", o);
         Assert.DoesNotContain("Y", o);
         Assert.DoesNotContain(o, l => l.Contains("bad condition"));
+        Assert.DoesNotContain(o, l => l.Contains("auto-balanced"));
     }
 
     [Fact]
@@ -107,5 +126,6 @@ public class ConditionParseWarningTests
         Assert.Contains("MATCH", o);
         Assert.DoesNotContain("NOMATCH", o);
         Assert.DoesNotContain(o, l => l.Contains("bad condition"));
+        Assert.DoesNotContain(o, l => l.Contains("auto-balanced"));
     }
 }

@@ -569,6 +569,29 @@ public sealed class CommandEngine
                 // background.
                 _host.FlashWindow();
                 break;
+            case "browser":
+                // #browser <url> — open the OS-default browser (Genie 4 parity;
+                // G4 prepends http:// when no scheme is given). Used by wiki
+                // lookups (Inventory View) and scripts.
+                if (parts.Count > 1)
+                {
+                    var url = string.Join(" ", parts.Skip(1)).Trim();
+                    if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                        !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                        url = "https://" + url;
+                    try
+                    {
+                        System.Diagnostics.Process.Start(
+                            new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+                    }
+                    catch (Exception ex)
+                    {
+                        _host.Echo($"#browser: could not open the browser ({ex.Message}). Visit {url} manually.");
+                    }
+                }
+                else
+                    _host.Echo("Usage: #browser <url>");
+                break;
             case "beep":
             case "bell":
                 // #beep / #bell — sound the system alert (Genie 4 parity, gated
@@ -623,6 +646,25 @@ public sealed class CommandEngine
                 int sp = command.IndexOf(' ');
                 var tail = sp >= 0 ? command[(sp + 1)..] : string.Empty;
                 if (tail.Length > 0) _host.InjectParsedLine(tail);
+                break;
+            }
+            case "queue":
+            {
+                // #queue clear (Genie 4 Core/Command.cs) — flush every command
+                // waiting to be sent: the RT-gated CommandQueue (mapper walks,
+                // #put delays) and each running script's pending put/send
+                // segments. Commands already on the wire are untouched — this
+                // clears what WOULD be sent, it can't unsend. travel.cmd's
+                // RETURN_CLEAR depends on it before rerouting.
+                var qsub = parts.Count > 1 ? parts[1].ToLowerInvariant() : "";
+                if (qsub == "clear")
+                {
+                    _commandQueue.Clear();
+                    _host.ClearSendQueue();
+                    _host.Echo("[queue] cleared");
+                }
+                else
+                    _host.Echo("Usage: #queue clear");
                 break;
             }
             case "mapper":

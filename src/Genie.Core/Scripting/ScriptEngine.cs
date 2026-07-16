@@ -189,6 +189,10 @@ public sealed class ScriptEngine
         // No dock panel and always on (like InfoTracker), so it isn't in the
         // settings tracker-toggle gate.
         Extensions.Register(new global::Genie.Core.Extensions.Builtin.CircleCalc.CircleCalcExtension());
+        // Inventory View: command-driven (/iv) cross-character item catalog with a
+        // first-class dock window fed by CatalogChanged (not the text-window seam).
+        // Always on — it costs nothing until a scan runs.
+        Extensions.Register(new global::Genie.Core.Extensions.Builtin.InventoryView.InventoryViewExtension());
         Directory.CreateDirectory(_scriptsDir);
 
         _js = new JsScriptRuntime(
@@ -226,6 +230,9 @@ public sealed class ScriptEngine
         public void Log(string message)             => _engine._echo(message);
         public string? GetUserVar(string name)      => _engine.UserVarLookup?.Invoke(name);
         public string? GetConfig(string key)        => _engine.Config?.GetSetting(key);
+        public string DataRoot                      => _engine.Config?.DataRoot ?? ConfigDir;
+        public void InjectParsedLine(string line)   => _engine._injectGameLine?.Invoke(line);
+        public void RunHashCommand(string command)  => _engine._handleHashCmd?.Invoke(command);
     }
 
     /// <summary>Wired by the host to the named-window seam (GenieCore's
@@ -416,7 +423,11 @@ public sealed class ScriptEngine
         inst.DollarCounts.Push(args.Count);
 
         _instances.Add(inst);
-        _echo($"[script] {name} started");
+        // The resolved path is part of the start line: multiple copies of a
+        // community script commonly exist side by side, and "my fix didn't
+        // take" is usually the OTHER copy running (a Discord report lost half
+        // an hour to exactly that).
+        _echo($"[script] {name} started ({inst.SourcePath})");
         ScriptStarted?.Invoke(name);
         Tick();
         return true;
@@ -435,6 +446,20 @@ public sealed class ScriptEngine
             if (File.Exists(p)) return p;
         }
         return null;
+    }
+
+    /// <summary>
+    /// Drop every not-yet-sent put/send segment across all running instances
+    /// (the script side of Genie 4's <c>#queue clear</c>). In-flight type-ahead
+    /// accounting is untouched — those commands are already on the wire.
+    /// </summary>
+    public void ClearPendingSends()
+    {
+        foreach (var inst in _instances)
+        {
+            inst.PendingSends.Clear();
+            inst.NextSendAt = DateTime.MinValue;
+        }
     }
 
     public void StopAll()
@@ -1003,15 +1028,10 @@ public sealed class ScriptEngine
                     // expression is stored raw so $/%/etc vars pick up live
                     // values; substitute each tick before passing to
                     // ScriptExpression, which doesn't itself parse $var refs.
-                    bool done = false;
+                    // A malformed waiteval warns ONCE (inside EvalConditionSafe)
+                    // — otherwise it reads as a silent hang until the deadline.
                     var waitCond = SubstituteVars(inst.WaitEvalExpr, inst);
-                    try { done = ScriptExpression.EvalBool(waitCond, inst, Globals, UserVarLookup); }
-                    catch (Exception ex)
-                    {
-                        // Still-waiting, but say so ONCE — a malformed waiteval
-                        // otherwise reads as a silent hang until the deadline.
-                        WarnBadCondition(inst, "waiteval", waitCond, ex);
-                    }
+                    bool done = EvalConditionSafe(waitCond, inst, "waiteval", out _);
                     if (done || DateTime.UtcNow >= inst.WaitEvalDeadline)
                     { inst.WaitEvalExpr = null; inst.WaitEvalDeadline = DateTime.MaxValue; }
                     else continue;
@@ -1390,8 +1410,9 @@ public sealed class ScriptEngine
                 }
                 var condText  = rest[..thenIdx].Trim();
                 var afterThen = rest[(thenIdx + 4)..].Trim();
-                bool cond = EvalConditionSafe(condText, inst, lineNo);
-                DbgEcho(inst, 3, $"{lower} ({condText}) = {cond}");
+                bool cond = EvalConditionSafe(condText, inst, $"line {lineNo}", out var dbgNote);
+                DbgEcho(inst, 3, $"{lower} ({condText}) = {cond}" +
+                                 (dbgNote is null ? "" : $"  ⚠ {dbgNote}"));
                 return HandleConditional(cond, afterThen, inst, lineNo, currentIdx);
             }
 
@@ -1717,6 +1738,7 @@ public sealed class ScriptEngine
                 var (label, pat) = SplitCmd(rest);
                 if (!string.IsNullOrEmpty(label))
                 {
+                    WarnUnknownMatchLabel(inst, label.Trim(), lineNo);
                     inst.PendingMatches.Add((label.Trim(), pat, false));
                     DbgEcho(inst, 2, $"match {label.Trim()} \"{pat}\"");
                 }
@@ -1728,6 +1750,7 @@ public sealed class ScriptEngine
                 var (label, pat) = SplitCmd(rest);
                 if (!string.IsNullOrEmpty(label))
                 {
+                    WarnUnknownMatchLabel(inst, label.Trim(), lineNo);
                     inst.PendingMatches.Add((label.Trim(), pat, true));
                     DbgEcho(inst, 2, $"matchre {label.Trim()} \"{pat}\"");
                 }
@@ -2028,14 +2051,28 @@ public sealed class ScriptEngine
     /// Evaluate a condition, treating empty input and parse errors as false.
     /// Genie scripts routinely test variables that are not yet set; an undefined
     /// <c>$hidden</c> substitutes to <c>""</c> and we want <c>if ($hidden)</c>
-    /// to silently mean false rather than crashing. A PARSE error, though, is
-    /// almost always a script typo (a community report spent days on
-    /// <c>if (("%a" = "%b") then</c> — unbalanced parens — reading its silent
-    /// false as "the variables don't match"), so it is surfaced as a one-time
-    /// warning per line per run rather than swallowed.
+    /// to silently mean false rather than crashing.
+    ///
+    /// Unbalanced parentheses get Genie 4's tolerance: G4's evaluator ignored a
+    /// stray trailing <c>)</c> and implicitly closed unfinished groups at end of
+    /// text, and community scripts shipped with both shapes for years —
+    /// travel.cmd's ferry/exchange/bank checks are all missing a close
+    /// (<c>if ("%lirums" != "0" then</c>), and uber-script loop exits carry an
+    /// extra one (<c>if (%i >= %n) && (%loop = 0)) then</c>). Those evaluated
+    /// fine in G4 and false-forever here, which reads as broken routing, not as
+    /// a typo. So on a parse failure we retry once with the parens balanced
+    /// (quote-aware count) and warn that we did; only a condition that is still
+    /// unparseable after balancing is treated as false.
+    ///
+    /// Both warnings are once per source per run; <paramref name="dbgNote"/>
+    /// carries the same information on EVERY evaluation so the #debug trace can
+    /// mark it — the once-only warning scrolls away hours before a stuck loop
+    /// gets looked at.
     /// </summary>
-    private bool EvalConditionSafe(string condText, ScriptInstance inst, int lineNo)
+    private bool EvalConditionSafe(string condText, ScriptInstance inst, string where,
+                                    out string? dbgNote)
     {
+        dbgNote = null;
         if (string.IsNullOrWhiteSpace(condText)) return false;
 
         // Strip a single layer of empty parens / whitespace; "(  )" → false.
@@ -2049,9 +2086,67 @@ public sealed class ScriptEngine
         try { return ScriptExpression.EvalBool(condText, inst, Globals, UserVarLookup); }
         catch (Exception ex)
         {
-            WarnBadCondition(inst, $"line {lineNo}", condText, ex);
+            var balanced = BalanceParens(condText);
+            if (balanced is not null)
+            {
+                try
+                {
+                    bool v = ScriptExpression.EvalBool(balanced, inst, Globals, UserVarLookup);
+                    dbgNote = "unbalanced parens (auto-balanced, G4 compat)";
+                    if (inst.WarnedBadConditions.Add(where) &&
+                        WarningsSuppressed?.Invoke() != true)
+                    {
+                        _echo($"[script] {inst.Name} {where}: unbalanced parentheses in " +
+                              $"'{condText}' — auto-balanced (Genie 4 compat)");
+                    }
+                    return v;
+                }
+                catch { /* still unparseable — fall through to the hard error */ }
+            }
+            dbgNote = $"parse error: {ex.Message} — treated as false";
+            WarnBadCondition(inst, where, condText, ex);
             return false;
         }
+    }
+
+    /// <summary>
+    /// Rebalance a condition whose parentheses don't pair up: append the missing
+    /// <c>)</c>s at the end, or strip that many stray <c>)</c>s off the end.
+    /// Counting is quote-aware (parens inside "…" are text, and \" doesn't end
+    /// the string). Returns null when the text is already balanced (the parse
+    /// error lies elsewhere) or when the surplus closes aren't a trailing tail;
+    /// other malformations survive rebalancing and fail the retry parse instead.
+    /// </summary>
+    private static string? BalanceParens(string s)
+    {
+        int net = 0;
+        bool inQuote = false;
+        for (int i = 0; i < s.Length; i++)
+        {
+            char c = s[i];
+            if (inQuote)
+            {
+                if (c == '\\' && i + 1 < s.Length) i++;      // skip escaped char
+                else if (c == '"') inQuote = false;
+                continue;
+            }
+            if      (c == '"') inQuote = true;
+            else if (c == '(') net++;
+            else if (c == ')') net--;
+        }
+        if (net > 0)
+            return s + new string(')', net);
+        if (net < 0)
+        {
+            // Only strip if the surplus closes sit at the very end.
+            var trimmed = s.TrimEnd();
+            int strip = -net;
+            if (trimmed.Length < strip) return null;
+            for (int i = trimmed.Length - strip; i < trimmed.Length; i++)
+                if (trimmed[i] != ')') return null;
+            return trimmed[..^strip];
+        }
+        return null;
     }
 
     /// <summary>
@@ -2066,6 +2161,23 @@ public sealed class ScriptEngine
         if (WarningsSuppressed?.Invoke() == true) return;   // #151 ignorescriptwarnings
         _echo($"[script] {inst.Name} {where}: bad condition '{condText}' — " +
               $"{ex.Message}; treated as false");
+    }
+
+    /// <summary>
+    /// One-time (per label per run) warning when a <c>match</c>/<c>matchre</c>
+    /// registers a label the script doesn't define. The matchwait scanner skips
+    /// unknown labels, so such a match can NEVER fire — every hit becomes a
+    /// silent matchwait timeout (a community travel script pastes a combat
+    /// block whose target label never came along, costing 7s + error spam at
+    /// every loaded-crossbow stow). Warn at registration, where the typo is.
+    /// </summary>
+    private void WarnUnknownMatchLabel(ScriptInstance inst, string label, int lineNo)
+    {
+        if (inst.Labels.ContainsKey(label)) return;
+        if (!inst.WarnedBadConditions.Add($"matchlabel:{label}")) return;
+        if (WarningsSuppressed?.Invoke() == true) return;   // #151 ignorescriptwarnings
+        _echo($"[script] {inst.Name}:{lineNo} match label '{label}' not found — " +
+              "this match can never fire");
     }
 
     private bool HandleConditional(bool cond, string afterThen,
