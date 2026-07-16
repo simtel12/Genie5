@@ -387,6 +387,11 @@
                   IsChecked="{Binding TimeTrackerVisible, Mode=OneWay}"
                   Command="{Binding ToggleTimeTrackerCommand}"
                   ToolTip.Tip="Elanthian date, moon/sun rise-set countdowns and observed sky, tracked by the built-in Time Tracker (/tt help)."/>
+        <MenuItem Header="In_ventory View"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding InventoryViewVisible, Mode=OneWay}"
+                  Command="{Binding ToggleInventoryViewCommand}"
+                  ToolTip.Tip="Searchable catalog of every scanned character's items — person, vault, deeds, home, trader (/iv scan)."/>
         <MenuItem Header="P_ortrait"
                   ToggleType="CheckBox"
                   IsChecked="{Binding SceneVisible, Mode=OneWay}"

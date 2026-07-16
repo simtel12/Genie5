@@ -191,6 +191,7 @@ public class GenieDockFactory : Factory
         var analytics  = new AnalyticsTool (_vm.Analytics,           ws.Get("analytics"));
         var activeSpells = new ActiveSpellsTool(_vm.ActiveSpells,    ws.Get("active-spells"));
         var timeTracker = new TimeTrackerTool(_vm.TimeTracker,       ws.Get("time-tracker"));
+        var inventoryView = new InventoryViewTool(_vm.InventoryView, ws.Get("inventory-view"));
         var scripts    = new ScriptsTool   (_vm.Scripts,            ws.Get("scripts"));
         var scene      = new SceneTool     (_vm.Scene,              ws.Get("scene"));
         var mobs       = new MobsTool      (_vm.Mobs,               ws.Get("mobs"));
@@ -358,6 +359,10 @@ public class GenieDockFactory : Factory
         // First-class tool (not a plugin window) for the same reasons as
         // Active Spells: top-level menu entry, no self-re-open on repaint.
         _tools[timeTracker.Id] = (timeTracker, backpackDock.Id);
+        // Inventory View: registered but hidden by default — re-opens beside the
+        // Backpack via Window → Inventory View, /iv open, or a scan completing.
+        // First-class tool for the same reasons as Active Spells / Time Tracker.
+        _tools[inventoryView.Id] = (inventoryView, backpackDock.Id);
         // Scripts: registered but hidden by default (like Vitals/Experience) —
         // re-opens beside the Backpack via Window → Scripts.
         _tools[scripts.Id]    = (scripts,    backpackDock.Id);
@@ -443,6 +448,7 @@ public class GenieDockFactory : Factory
         var analytics  = new AnalyticsTool   (_vm.Analytics,           ws.Get("analytics"));
         var activeSpells = new ActiveSpellsTool(_vm.ActiveSpells,       ws.Get("active-spells"));
         var timeTracker = new TimeTrackerTool (_vm.TimeTracker,        ws.Get("time-tracker"));
+        var inventoryView = new InventoryViewTool(_vm.InventoryView,   ws.Get("inventory-view"));
         var scene      = new SceneTool        (_vm.Scene,              ws.Get("scene"));
         var mobs       = new MobsTool         (_vm.Mobs,               ws.Get("mobs"));
         var players    = new PlayersTool      (_vm.Players,            ws.Get("players"));
@@ -458,7 +464,7 @@ public class GenieDockFactory : Factory
             ("atmospherics", atmospherics), ("log", log), ("itemlog", itemlog),
             ("vitals", vitals), ("experience", experience), ("analytics", analytics),
             ("active-spells", activeSpells),
-            ("time-tracker", timeTracker), ("scene", scene),
+            ("time-tracker", timeTracker), ("inventory-view", inventoryView), ("scene", scene),
             ("mobs", mobs), ("players", players), ("raw-xml", rawXml),
             ("injuries", injuries),
         };
@@ -788,8 +794,9 @@ public class GenieDockFactory : Factory
                     // no extension will ever write to again.
                     var migrated = n.Id.Substring(PluginWindowPrefix.Length) switch
                     {
-                        "time tracker" => "time-tracker",
-                        _              => null,
+                        "time tracker"   => "time-tracker",
+                        "inventory view" => "inventory-view",   // was the external DLL's panel
+                        _                => null,
                     };
                     if (migrated is not null)
                         return _tools.TryGetValue(migrated, out var m) ? m.Dockable : null;

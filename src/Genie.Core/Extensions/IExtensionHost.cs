@@ -32,4 +32,21 @@ public interface IExtensionHost
     /// <c>#config</c> setting at render time without depending on <c>GenieConfig</c>
     /// directly. Default returns null for hosts that don't expose config.</summary>
     string? GetConfig(string key) => null;
+
+    /// <summary>App-level shared data root (the Genie5 folder itself — the per-user
+    /// data dir or the portable dir), for state shared across characters and
+    /// profiles: the Genie-4-compatible <c>InventoryView.xml</c> catalog lives here.
+    /// Distinct from <see cref="ConfigDir"/>, which is per-profile when profiles are
+    /// in effect. Default falls back to <see cref="ConfigDir"/>.</summary>
+    string DataRoot => ConfigDir;
+
+    /// <summary>Re-emit a line through the parse pipeline (the <c>#parse</c> seam),
+    /// so scripts can <c>waitfor</c> an extension-generated marker. Default no-op
+    /// for hosts without a pipeline.</summary>
+    void InjectParsedLine(string line) { }
+
+    /// <summary>Run a <c>#command</c> (e.g. <c>#browser &lt;url&gt;</c>) through the
+    /// host's command engine — <see cref="SendCommand"/> is game-bound and would leak
+    /// a hash command to the server. Default no-op.</summary>
+    void RunHashCommand(string command) { }
 }

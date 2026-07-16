@@ -84,11 +84,12 @@ public class PluginInputDispatchTests
     [Fact]
     public async Task Swallowed_input_never_reaches_the_command_engine()
     {
-        // The InventoryView case: "/iv open" is the plugin's own command —
-        // OnInput returns null and the line must go nowhere else.
-        var (plugin, observed) = await RunAsync("/iv open", transform: _ => null);
+        // The command-driven-plugin case (originally InventoryView's "/iv open",
+        // now a neutral name — /iv belongs to the builtin extension since the
+        // absorption): OnInput returns null and the line must go nowhere else.
+        var (plugin, observed) = await RunAsync("/fakeplug open", transform: _ => null);
 
-        Assert.Contains("/iv open", plugin.SeenInputs);
+        Assert.Contains("/fakeplug open", plugin.SeenInputs);
         Assert.Empty(observed);
     }
 
@@ -104,9 +105,9 @@ public class PluginInputDispatchTests
     [Fact]
     public async Task Disabled_plugin_is_skipped_and_input_flows_through()
     {
-        var (plugin, observed) = await RunAsync("/iv open", transform: _ => null, enabled: false);
+        var (plugin, observed) = await RunAsync("/fakeplug open", transform: _ => null, enabled: false);
 
-        Assert.Empty(plugin.SeenInputs);          // disabled → no callback
-        Assert.Contains("/iv open", observed);    // line proceeds untouched
+        Assert.Empty(plugin.SeenInputs);              // disabled → no callback
+        Assert.Contains("/fakeplug open", observed);  // line proceeds untouched
     }
 }

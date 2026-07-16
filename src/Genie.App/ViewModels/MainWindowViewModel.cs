@@ -39,6 +39,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ExperienceViewModel Experience { get; } = new();
     public ActiveSpellsViewModel ActiveSpells { get; } = new();
     public TimeTrackerViewModel TimeTracker { get; } = new();
+    public InventoryViewViewModel InventoryView { get; } = new();
     public ScriptBarViewModel  ScriptBar  { get; } = new();
 
     /// <summary>Backs the dockable Scripts panel (running list with per-script
@@ -536,6 +537,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     [Reactive] public bool AnalyticsVisible  { get; private set; }   // hidden by default (opt-in)
     [Reactive] public bool ActiveSpellsVisible { get; private set; } // hidden by default (opt-in)
     [Reactive] public bool TimeTrackerVisible { get; private set; }  // hidden by default (opt-in)
+    [Reactive] public bool InventoryViewVisible { get; private set; } // hidden by default (opt-in)
     [Reactive] public bool LogonsVisible   { get; private set; } = true;
     [Reactive] public bool TalkVisible     { get; private set; } = true;
     [Reactive] public bool WhispersVisible { get; private set; } = true;
@@ -564,6 +566,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> ToggleAnalyticsCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleActiveSpellsCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleTimeTrackerCommand { get; }
+    public ReactiveCommand<Unit, Unit> ToggleInventoryViewCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleLogonsCommand   { get; }
     public ReactiveCommand<Unit, Unit> ToggleTalkCommand     { get; }
     public ReactiveCommand<Unit, Unit> ToggleWhispersCommand { get; }
@@ -1123,6 +1126,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         WindowSettings.Register("analytics",  "Analytics");
         WindowSettings.Register("active-spells", "Active Spells");
         WindowSettings.Register("time-tracker", "Time Tracker");
+        WindowSettings.Register("inventory-view", "Inventory View");
         WindowSettings.Register("scripts",   "Script Manager");   // id predates the panel's evolution into the manager
         WindowSettings.Register("scene",     "Portrait");   // Genie 4's Portrait window (room/scene art); id predates the rename
         WindowSettings.Register("mobs",      "Mobs");
@@ -1839,6 +1843,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleAnalyticsCommand  = MakeToggleCommand("analytics",  v => AnalyticsVisible  = v);
         ToggleActiveSpellsCommand = MakeToggleCommand("active-spells", v => ActiveSpellsVisible = v);
         ToggleTimeTrackerCommand = MakeToggleCommand("time-tracker", v => TimeTrackerVisible = v);
+        ToggleInventoryViewCommand = MakeToggleCommand("inventory-view", v => InventoryViewVisible = v);
         ToggleLogonsCommand   = MakeToggleCommand("logons",    v => LogonsVisible   = v);
         ToggleTalkCommand     = MakeToggleCommand("talk",      v => TalkVisible     = v);
         ToggleWhispersCommand = MakeToggleCommand("whispers",  v => WhispersVisible = v);
@@ -2767,6 +2772,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         SetVisibilityBool("analytics",  factory.IsToolVisible("analytics"));
         SetVisibilityBool("active-spells", factory.IsToolVisible("active-spells"));
         SetVisibilityBool("time-tracker", factory.IsToolVisible("time-tracker"));
+        SetVisibilityBool("inventory-view", factory.IsToolVisible("inventory-view"));
         SetVisibilityBool("logons",    factory.IsToolVisible("logons"));
         SetVisibilityBool("talk",      factory.IsToolVisible("talk"));
         SetVisibilityBool("whispers",  factory.IsToolVisible("whispers"));
@@ -2803,7 +2809,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     private static readonly HashSet<string> ReservedWindowNames =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            "experience", "analytics", "active spells", "time tracker", "main", "game", "game-text", "room", "vitals",
+            "experience", "analytics", "active spells", "time tracker", "inventory view", "main", "game", "game-text", "room", "vitals",
             "backpack", "mapper", "scripts", "scene",
             "logons", "talk", "whispers", "thoughts", "combat",
             "log", "itemlog",
@@ -3353,6 +3359,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             case "analytics": ForceSet(visible, v => AnalyticsVisible = v, () => AnalyticsVisible); break;
             case "active-spells": ForceSet(visible, v => ActiveSpellsVisible = v, () => ActiveSpellsVisible); break;
             case "time-tracker": ForceSet(visible, v => TimeTrackerVisible = v, () => TimeTrackerVisible); break;
+            case "inventory-view": ForceSet(visible, v => InventoryViewVisible = v, () => InventoryViewVisible); break;
             case "logons":    ForceSet(visible, v => LogonsVisible   = v, () => LogonsVisible);   break;
             case "talk":      ForceSet(visible, v => TalkVisible     = v, () => TalkVisible);     break;
             case "whispers":  ForceSet(visible, v => WhispersVisible = v, () => WhispersVisible); break;
@@ -4145,6 +4152,15 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         Experience.Attach(_core);
         ActiveSpells.Attach(_core);
         TimeTracker.Attach(_core);
+        InventoryView.Attach(_core);
+        // /iv open, /iv search, and scan completion pop the Inventory View
+        // window (the VM raises this on the UI thread).
+        InventoryView.OpenRequested += () =>
+        {
+            if (DockFactory is not GenieDockFactory ivFactory) return;
+            ivFactory.SetToolVisibility("inventory-view", true);
+            InventoryViewVisible = true;
+        };
         Scripts.Attach(_core);
         Scene.Attach(_core);
         IconBar.Attach(_core);

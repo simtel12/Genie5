@@ -1,0 +1,181 @@
+<!-- Inventory View dock tool: the cross-character item catalog (/iv scan) as a
+     real TreeView — search across characters, expand/collapse, wiki lookup,
+     CSV export, per-character removal. Feature parity with the Genie 4
+     plugin's WinForms window (its Dark Mode toggle is subsumed by app themes).
+     Data comes from Core's InventoryViewExtension via InventoryViewViewModel. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Genie.App.ViewModels"
+             x:Class="Genie.App.Views.InventoryViewPanel"
+             x:DataType="vm:InventoryViewViewModel">
+
+  <UserControl.Styles>
+    <!-- Persist per-node expansion (and auto-expand while filtering).
+         Reflection binding by necessity: style setters have no x:DataType
+         context, and the item's DataContext IS the InventoryNode. -->
+    <Style Selector="TreeViewItem">
+      <Setter Property="IsExpanded" Value="{ReflectionBinding IsExpanded, Mode=TwoWay}"/>
+      <Setter Property="Padding" Value="2,0"/>
+      <Setter Property="MinHeight" Value="20"/>
+    </Style>
+    <Style Selector="Button.ivaction">
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="Padding" Value="8,2"/>
+      <Setter Property="MinWidth" Value="0"/>
+      <Setter Property="MinHeight" Value="0"/>
+    </Style>
+    <Style Selector="TextBlock.ivmatch">
+      <Setter Property="Foreground" Value="{DynamicResource Theme.Accent}"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style Selector="TextBlock.ivheader">
+      <Setter Property="Foreground" Value="{DynamicResource Theme.SectionHeader}"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style Selector="TextBlock.ivmeta">
+      <Setter Property="Foreground" Value="{DynamicResource Theme.TextSecondary}"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="TextAlignment" Value="Right"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <!-- Flat, borderless column-header buttons (the TextBlock inside carries
+         the ivmeta look; the button only adds the click affordance). -->
+    <Style Selector="Button.ivcolhdr">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="MinWidth" Value="0"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="HorizontalContentAlignment" Value="Right"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.ivcolhdr:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.ivcolhdr:pointerover TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Theme.TextPrimary}"/>
+    </Style>
+    <!-- Stretch each row's header content so the right-docked weight/size
+         columns align at the panel edge regardless of tree depth. -->
+    <Style Selector="TreeViewItem /template/ ContentPresenter#PART_HeaderPresenter">
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Margin="4">
+
+    <!-- ── Toolbar: search + tree/actions ─────────────────────────────────── -->
+    <DockPanel Grid.Row="0" Margin="0,0,0,4" LastChildFill="True">
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+        <Button Classes="ivaction" Content="Expand All"   Command="{Binding ExpandAllCommand}"/>
+        <Button Classes="ivaction" Content="Collapse All" Command="{Binding CollapseAllCommand}"/>
+        <Button Classes="ivaction" Content="Wiki Lookup"  Command="{Binding WikiCommand}"
+                ToolTip.Tip="Open the selected item's wiki page in your browser"/>
+        <Button Classes="ivaction" Content="Find in Shops" Command="{Binding FindInShopsCommand}"
+                ToolTip.Tip="Search player-shop listings for the selected item (DR Service Plaza data)"/>
+        <Button Classes="ivaction" Content="Export"       Command="{Binding ExportCommand}"
+                ToolTip.Tip="Export the whole catalog to a CSV file"/>
+        <Button Classes="ivaction" Content="Scan"         Command="{Binding ScanCommand}"
+                ToolTip.Tip="Scan the current character (person, vault, deeds, home, trader) — /iv scan"/>
+        <Button Classes="ivaction" Content="Reload"       Command="{Binding ReloadCommand}"
+                ToolTip.Tip="Reload InventoryView.xml from disk (after scanning on another instance)"/>
+        <Button Classes="ivaction" Content="{Binding RemoveHeader}" Command="{Binding RemoveCommand}"
+                ToolTip.Tip="Two-step: pick once to arm, again to remove the selected character's catalog"/>
+      </StackPanel>
+      <TextBlock DockPanel.Dock="Right" Text="{Binding CountText}"
+                 VerticalAlignment="Center" Margin="8,0"
+                 Foreground="{DynamicResource Theme.TextSecondary}"/>
+      <TextBox Watermark="Search all characters…" FontSize="12"
+               Text="{Binding SearchText, Mode=TwoWay}"
+               MinWidth="160"/>
+    </DockPanel>
+
+    <!-- ── Column header strip: click to sort, click again to flip ────────── -->
+    <DockPanel Grid.Row="1" Margin="2,0,2,2" LastChildFill="True">
+      <Button DockPanel.Dock="Right" Classes="ivcolhdr" Width="72" Margin="0,0,16,0"
+              Command="{Binding SortCommand}" CommandParameter="size"
+              ToolTip.Tip="Length × width × height, from Elanthipedia — click to sort by volume">
+        <TextBlock Classes="ivmeta" Text="{Binding SizeHeader}"/>
+      </Button>
+      <Button DockPanel.Dock="Right" Classes="ivcolhdr" Width="46"
+              Command="{Binding SortCommand}" CommandParameter="weight"
+              ToolTip.Tip="Weight in stones, from Elanthipedia — click to sort">
+        <TextBlock Classes="ivmeta" Text="{Binding WtHeader}"/>
+      </Button>
+      <Button Classes="ivcolhdr" HorizontalAlignment="Left"
+              Command="{Binding SortCommand}" CommandParameter="name"
+              ToolTip.Tip="Click to sort items alphabetically">
+        <TextBlock Classes="ivmeta" TextAlignment="Left" Text="{Binding ItemHeader}"/>
+      </Button>
+    </DockPanel>
+
+    <!-- ── Catalog tree ────────────────────────────────────────────────────── -->
+    <TreeView Grid.Row="2" ItemsSource="{Binding Roots}"
+              SelectedItem="{Binding SelectedNode, Mode=TwoWay}"
+              PointerPressed="OnTreePointerPressed"
+              FontSize="12">
+      <TreeView.ItemTemplate>
+        <TreeDataTemplate DataType="vm:InventoryNode" ItemsSource="{Binding Children}">
+          <DockPanel LastChildFill="True">
+            <!-- Right margin keeps the size clear of the vertical scrollbar. -->
+            <TextBlock DockPanel.Dock="Right" Classes="ivmeta" Width="72" Margin="0,0,16,0"
+                       Text="{Binding SizeText}"/>
+            <TextBlock DockPanel.Dock="Right" Classes="ivmeta" Width="46"
+                       Text="{Binding WeightText}"/>
+            <TextBlock Text="{Binding Text}" VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Classes.ivmatch="{Binding IsMatch}"
+                       Classes.ivheader="{Binding IsHeader}"
+                       Foreground="{DynamicResource Theme.TextPrimary}"/>
+          </DockPanel>
+        </TreeDataTemplate>
+      </TreeView.ItemTemplate>
+    </TreeView>
+
+    <!-- ── Player-shop results (Find in Shops / DR Service Plaza) ─────────── -->
+    <Border Grid.Row="3" IsVisible="{Binding ShopPanelVisible}"
+            BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0,1,0,0"
+            Margin="0,4,0,0" Padding="0,4,0,0">
+      <Grid RowDefinitions="Auto,140">
+        <DockPanel Grid.Row="0" LastChildFill="True">
+          <Button DockPanel.Dock="Right" Classes="ivaction" Content="✕"
+                  Command="{Binding CloseShopsCommand}" ToolTip.Tip="Close shop results"/>
+          <TextBlock Text="{Binding ShopStatus}" FontSize="11" Margin="2,0"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource Theme.TextSecondary}"/>
+        </DockPanel>
+        <ListBox Grid.Row="1" ItemsSource="{Binding ShopResults}" FontSize="11"
+                 Margin="0,4,0,0">
+          <!-- Non-virtualizing panel: VirtualizingStackPanel collapses to zero
+               height inside Dock content (see the dock lessons); results are
+               capped at 100 rows so this stays cheap. -->
+          <ListBox.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel/></ItemsPanelTemplate>
+          </ListBox.ItemsPanel>
+          <ListBox.ItemTemplate>
+            <DataTemplate DataType="vm:ShopListingRow">
+              <DockPanel LastChildFill="True">
+                <TextBlock DockPanel.Dock="Right" Text="{Binding City}" Margin="8,0,0,0"
+                           Foreground="{DynamicResource Theme.TextSecondary}"/>
+                <TextBlock DockPanel.Dock="Right" Text="{Binding Price}" Margin="8,0,0,0"
+                           Foreground="{DynamicResource Theme.Accent}"/>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="{Binding Tap}" Foreground="{DynamicResource Theme.TextPrimary}"
+                             TextTrimming="CharacterEllipsis"/>
+                  <TextBlock Text="{Binding Where}" Foreground="{DynamicResource Theme.TextMuted}"/>
+                  <TextBlock Text="{Binding Owner}" Foreground="{DynamicResource Theme.TextMuted}"/>
+                </StackPanel>
+              </DockPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Grid>
+    </Border>
+
+    <!-- ── Status strip ────────────────────────────────────────────────────── -->
+    <TextBlock Grid.Row="4" Text="{Binding StatusText}" Margin="2,4,2,0" FontSize="11"
+               Foreground="{DynamicResource Theme.TextMuted}"
+               IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+  </Grid>
+</UserControl>

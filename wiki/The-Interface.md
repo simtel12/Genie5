@@ -26,6 +26,7 @@ Out of the box you get a three-column arrangement:
 | **Room** | Current room title, description, and obvious paths — split out from the game text so it's always glanceable. Creature names honor MonsterBold coloring. |
 | **Mobs / Players** | The creatures and the other players in the room, as their own glanceable lists. |
 | **Inventory / Backpack** | What you're carrying. |
+| **Inventory View** | A searchable catalog of everything your characters own — person, vault, deed register, home, and Trader storage — with item weight/size columns and a player-shop price search. See [the Inventory View window](#the-inventory-view-window) below. |
 | **Mapper** | The zone map with your current room highlighted; click a room to walk there. Starts **floating** in its own window; dock it by dragging. See [The Mapper](Mapper). |
 | **Experience** | Live skill learning states. A **Density** slider on the panel condenses each skill line to taste (**Full → No count → Numbers only → Short names → Brief**); the same setting is scriptable as `#config experiencedensity`. |
 | **Active Spells** | Your running spell effects with time remaining. |
@@ -61,6 +62,20 @@ The **Analytics** panel (toggle it from the **Window** menu) turns the experienc
 - **Sessions** — one summary row per past session (duration, total gain, ranks/hour), with a checkbox compare that overlays the normalized gain curves of two or three sessions.
 
 A character dropdown switches whose history you're looking at. The store lives in your data folder (see [Application Folders](Application-Folders)) and fills in as you play — a fresh install shows "no history yet" until your first session.
+
+## The Inventory View window
+
+**Inventory View** (toggle it from the **Window** menu, or type `/iv open`) catalogs everything your characters own. Run `/iv scan` while connected and it walks your possessions — items on your person, your **vault** (if you're holding a vault book), your **deed register**, your **home**, and **Trader storage** — into a per-character tree that persists between sessions and across characters, so you can finally answer "which character has the …?" without logging everyone in.
+
+- **Search all characters** — type in the search box to filter the tree live; matching items highlight, their container chain stays visible, and the count shows how many matched.
+- **Wt / Size columns** — each item's weight (stones) and dimensions, filled in automatically from [Elanthipedia's](https://elanthipedia.play.net) item database the first time an item is seen, then cached locally. Items the wiki doesn't document stay blank.
+- **Sortable columns** — click **Item**, **Wt**, or **Size** in the header to sort within each container (click again to flip). Handy for spotting what's weighing you down.
+- **Wiki Lookup** — opens the selected item's Elanthipedia page in your browser (or the wiki's search when there's no exact page).
+- **Find in Shops** — searches current player-shop listings (data from the community-run [DR Service Plaza](https://drservice.info/Plaza/)) for the selected item: price, shop, room, owner, and town. Also available as `/iv shops <text>`.
+- **Export** — writes the whole catalog to a CSV file.
+- **Remove** — drops the selected character's data from the catalog (two-step confirm).
+
+The catalog is saved to `InventoryView.xml` in your data folder in the same format the Genie 4 InventoryView plugin used, so an existing file carries over as-is. Scans finish with a `InventoryView scan complete` line through the parse pipeline, so a login script can `waitforre` it. Type `/iv help` for the full command list.
 
 ## The bottom strips
 

@@ -1380,6 +1380,14 @@
       </ScrollViewer>
     </DataTemplate>
 
+    <!-- ── Inventory View (cross-character item catalog, /iv scan) ────────── -->
+    <!-- A real TreeView with search / wiki / export — layout lives in Views/   -->
+    <!-- InventoryViewPanel.axaml. Typed data from Core's InventoryViewExtension -->
+    <!-- (not the text named-window seam the other trackers use).               -->
+    <DataTemplate DataType="docking:InventoryViewTool">
+      <views:InventoryViewPanel DataContext="{Binding ViewModel}"/>
+    </DataTemplate>
+
     <!-- ── Plugin-created windows (generic) ───────────────────────────────── -->
     <!-- One template serves EVERY plugin window. A plugin calls               -->
     <!-- IPluginHost.SetWindow("My Panel", text) and the dock factory spins up -->

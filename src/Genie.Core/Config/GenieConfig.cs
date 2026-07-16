@@ -369,6 +369,12 @@ public sealed class GenieConfig
 
     /// <inheritdoc cref="MapDir"/>
     public string PluginDir => _localDirectory.Shared.ResolvePath(PluginDirRaw);
+
+    /// <summary>The shared data root itself (the Genie5 folder — per-user data dir
+    /// or the portable dir), for files shared across characters and profiles, e.g.
+    /// the Genie-4-compatible <c>InventoryView.xml</c> catalog.</summary>
+    public string DataRoot => _localDirectory.Shared.ResolvePath("");
+
     public string ConfigDir => _localDirectory.Current.ResolvePath(ConfigDirRaw);
     public string ConfigProfileDir => _localDirectory.Current.ResolvePath(ProfileConfigDirRaw);
 
