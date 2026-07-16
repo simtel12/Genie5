@@ -308,10 +308,11 @@ public class InventoryViewServicesTests : IDisposable
     [Fact]
     public void Plaza_parses_the_real_export_when_available()
     {
-        // Integration check against the actual downloaded export, when the
-        // session scratchpad copy exists (skipped silently elsewhere/CI).
-        var real = @"C:\Users\TSR-JA~1\AppData\Local\Temp\claude\D--Genie5Project\355f7874-d746-400f-91df-93c3b680b61d\scratchpad\plaza\latest.xlsx";
-        if (!File.Exists(real)) return;
+        // Opt-in integration check against a real downloaded export: set
+        // GENIE_PLAZA_EXPORT to an xlsx saved from Export.asmx/Latest.
+        // Skipped silently when unset (CI, other machines).
+        var real = Environment.GetEnvironmentVariable("GENIE_PLAZA_EXPORT");
+        if (string.IsNullOrEmpty(real) || !File.Exists(real)) return;
 
         using var fs = File.OpenRead(real);
         var listings = PlazaShopService.ParseXlsx(fs);
