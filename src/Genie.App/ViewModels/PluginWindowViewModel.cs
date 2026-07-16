@@ -46,7 +46,7 @@ public class PluginWindowViewModel : ReactiveObject
         Lines.Clear();
         if (string.IsNullOrEmpty(content)) return;
         foreach (var line in content.Replace("\r\n", "\n").Split('\n'))
-            Lines.Add(new TextLine(line, StreamColor.Main));
+            Lines.Add(new TextLine(line, StreamColor.Main, Window: Title));
         Trim();
     }
 
@@ -54,7 +54,7 @@ public class PluginWindowViewModel : ReactiveObject
     /// Keeps the panel growing like a log.</summary>
     public void AppendLine(string text)
     {
-        Lines.Add(new TextLine(text ?? "", StreamColor.Main));
+        Lines.Add(new TextLine(text ?? "", StreamColor.Main, Window: Title));
         Trim();
     }
 
@@ -64,7 +64,7 @@ public class PluginWindowViewModel : ReactiveObject
     public void AppendLink(string text, string command)
     {
         Lines.Add(new TextLine(text, StreamColor.Main,
-                               Links: new[] { new LinkSpan(0, text.Length, command) }));
+                               Links: new[] { new LinkSpan(0, text.Length, command) }, Window: Title));
         Trim();
     }
 

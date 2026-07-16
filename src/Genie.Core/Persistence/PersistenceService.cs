@@ -100,6 +100,7 @@ public sealed class PersistenceService
             ClassName = r.ClassName,
             SoundFile = r.SoundFile,
             Speak = r.Speak,
+            Windows = r.Windows.ToList(),
         });
         File.WriteAllText(path, JsonSerializer.Serialize(data, _options));
     }

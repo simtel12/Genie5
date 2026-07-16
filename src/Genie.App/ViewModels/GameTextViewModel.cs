@@ -408,7 +408,8 @@ public record TextLine(string Text, StreamColor Color,
                        IReadOnlyList<BoldSpan>? BoldSpans = null,
                        IReadOnlyList<PresetSpan>? PresetSpans = null,
                        string? EchoColor = null,
-                       bool Mono = false)
+                       bool Mono = false,
+                       string Window = "main")
 {
     public bool IsEcho => Color == StreamColor.System;
 
@@ -438,7 +439,7 @@ public record TextLine(string Text, StreamColor Color,
                 return [run];
             }
             return IsEcho ? [new Run(Text)]
-                          : DefaultHighlights.Tokenize(Text, Links, BoldSpans, PresetSpans);
+                          : DefaultHighlights.Tokenize(Text, Links, BoldSpans, PresetSpans, Window);
         }
     }
 

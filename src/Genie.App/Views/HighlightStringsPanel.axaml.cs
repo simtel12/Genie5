@@ -23,7 +23,7 @@ public partial class HighlightStringsPanel : UserControl
 {
     public sealed record HighlightRow(
         string EnabledGlyph, string MatchType, string ForegroundColor, string BackgroundColor,
-        string Pattern, string ClassName)
+        string Pattern, string ClassName, string Windows)
     {
         /// <summary>Brush parsed from <see cref="ForegroundColor"/> so the
         /// Pattern cell can render in the actual highlight colour.</summary>
@@ -80,7 +80,8 @@ public partial class HighlightStringsPanel : UserControl
                 r.ForegroundColor,
                 r.BackgroundColor,
                 r.Pattern,
-                r.ClassName))
+                r.ClassName,
+                FormatWindows(r.Windows)))
             .Where(r => PanelFilterHelpers.Matches(
                 _filter, r.Pattern, r.ForegroundColor, r.BackgroundColor, r.MatchType, r.ClassName))
             .ToList();
@@ -100,6 +101,9 @@ public partial class HighlightStringsPanel : UserControl
         ColorPickerHelpers.LoadColor(BgColorPicker, BgNoneCheck,    rule.BackgroundColor, "");
         MatchTypeBox.SelectedItem    = rule.MatchType.ToString();
         ClassBox.Text                = rule.ClassName;
+        WindowsBox.Text              = rule.Windows.Count == 0
+            ? string.Empty
+            : string.Join(", ", rule.Windows.OrderBy(w => w, StringComparer.OrdinalIgnoreCase));
         CaseSensitiveCheck.IsChecked = rule.CaseSensitive;
         EnabledCheck.IsChecked       = rule.IsEnabled;
         StatusText.Text              = string.Empty;
@@ -114,6 +118,7 @@ public partial class HighlightStringsPanel : UserControl
         var matchTypeStr  = MatchTypeBox.SelectedItem as string ?? "String";
         var matchType     = Enum.TryParse<HighlightMatchType>(matchTypeStr, out var mt) ? mt : HighlightMatchType.String;
         var className     = ClassBox.Text?.Trim() ?? string.Empty;
+        var windows       = ParseWindows(WindowsBox.Text);
         var caseSensitive = CaseSensitiveCheck.IsChecked == true;
         var enabled       = EnabledCheck.IsChecked == true;
 
@@ -142,7 +147,7 @@ public partial class HighlightStringsPanel : UserControl
             _engine.RemoveRule(pattern);
 
         _engine.AddRule(pattern, color, bgColor, matchType, caseSensitive, enabled, className,
-                        existing?.SoundFile ?? "", existing?.Speak ?? "");
+                        existing?.SoundFile ?? "", existing?.Speak ?? "", windows);
         _editingPattern = pattern;   // keep the editor pointed at the saved rule
         Refresh();
         // Re-select the saved row so the editor stays consistent after a rename
@@ -231,8 +236,21 @@ public partial class HighlightStringsPanel : UserControl
         BgNoneCheck.IsChecked        = true;
         MatchTypeBox.SelectedIndex   = 0;
         ClassBox.Text                = string.Empty;
+        WindowsBox.Text              = string.Empty;
         CaseSensitiveCheck.IsChecked = false;
         EnabledCheck.IsChecked       = true;
         StatusText.Text              = string.Empty;
     }
+
+    /// <summary>Editor text ("main, room") → the window-id set for a rule.
+    /// Blank / whitespace = empty set = "every window".</summary>
+    private static IEnumerable<string> ParseWindows(string? text) =>
+        (text ?? string.Empty)
+            .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(w => w.ToLowerInvariant());
+
+    /// <summary>A rule's window set → editor/column text. Empty set (every
+    /// window) shows as "All" in the list and blank in the editor.</summary>
+    private static string FormatWindows(IReadOnlySet<string> windows) =>
+        windows.Count == 0 ? "All" : string.Join(", ", windows.OrderBy(w => w, StringComparer.OrdinalIgnoreCase));
 }

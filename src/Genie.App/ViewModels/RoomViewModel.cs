@@ -65,7 +65,7 @@ public class RoomViewModel : ReactiveObject
     private void Apply(string componentId, string content, IReadOnlyList<BoldSpan>? boldSpans)
     {
         var inlines = DefaultHighlights.Tokenize(content, links: null,
-                                                 boldSpans: boldSpans, presetSpans: null);
+                                                 boldSpans: boldSpans, presetSpans: null, window: "room");
         switch (componentId)
         {
             case "room title":   Title       = content; TitleInlines       = inlines; break;

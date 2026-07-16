@@ -113,6 +113,6 @@ public sealed class PlayerRow
     public PlayerRow(string text)
     {
         Text    = text;
-        Inlines = Genie.App.Highlighting.DefaultHighlights.Tokenize(text);
+        Inlines = Genie.App.Highlighting.DefaultHighlights.Tokenize(text, window: "players");
     }
 }

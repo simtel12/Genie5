@@ -34,7 +34,7 @@ public class InventoryViewModel : ReactiveObject
             {
                 var line = e.Text?.TrimEnd();
                 if (!string.IsNullOrWhiteSpace(line))
-                    Items.Add(new TextLine(line, StreamColor.Main));
+                    Items.Add(new TextLine(line, StreamColor.Main, Window: "backpack"));
             });
 
         core.GameEvents

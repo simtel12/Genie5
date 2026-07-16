@@ -193,7 +193,8 @@ public static class DefaultHighlights
     public static IReadOnlyList<Inline> Tokenize(string text,
                                                  IReadOnlyList<LinkSpan>? links = null,
                                                  IReadOnlyList<BoldSpan>? boldSpans = null,
-                                                 IReadOnlyList<PresetSpan>? presetSpans = null)
+                                                 IReadOnlyList<PresetSpan>? presetSpans = null,
+                                                 string window = "main")
     {
         if (string.IsNullOrEmpty(text))
             return new[] { new Run(string.Empty) };
@@ -263,6 +264,10 @@ public static class DefaultHighlights
                 {
                     if (!rule.IsEnabled) continue;
                     if (engine.Classes is { } classes && !classes.IsActive(rule.ClassName)) continue;
+                    // Per-window scope: an empty Windows set means "everywhere"
+                    // (the default); otherwise the rule paints only in the
+                    // windows it lists.
+                    if (!rule.AppliesToWindow(window)) continue;
 
                     // A rule may carry a foreground, a background, a sound, or
                     // any mix — so we detect the match even with no brush at all

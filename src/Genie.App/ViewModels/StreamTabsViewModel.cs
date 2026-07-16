@@ -147,7 +147,7 @@ public class StreamBuffer(string name) : ReactiveObject
         // raw text is safe here.
         if (Settings?.Timestamp == true)
             line = WindowTimestamp.Prefix() + line;
-        Lines.Add(new TextLine(line, StreamColor.Main));
+        Lines.Add(new TextLine(line, StreamColor.Main, Window: Name));
         while (Lines.Count > Max)
             Lines.RemoveAt(0);
     }

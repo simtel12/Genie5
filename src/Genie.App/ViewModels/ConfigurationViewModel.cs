@@ -361,7 +361,7 @@ public class ConfigurationViewModel : ReactiveObject
                 _draftHighlights.AddRule(
                     m.Pattern, m.ForegroundColor, m.BackgroundColor,
                     Enum.TryParse<HighlightMatchType>(m.MatchType, out var mt) ? mt : HighlightMatchType.String,
-                    m.CaseSensitive, m.IsEnabled, m.ClassName, m.SoundFile, m.Speak);
+                    m.CaseSensitive, m.IsEnabled, m.ClassName, m.SoundFile, m.Speak, m.Windows);
         }
         catch { }
         return _draftHighlights;

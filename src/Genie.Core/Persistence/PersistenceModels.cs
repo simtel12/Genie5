@@ -50,6 +50,11 @@ public sealed class HighlightPersistenceModel
     public string SoundFile { get; set; } = string.Empty;
     /// <summary>Per-rule TTS: "" = off, "*" = speak the matched line, else the text to speak.</summary>
     public string Speak { get; set; } = string.Empty;
+
+    /// <summary>Windows this rule paints in (canonical ids). Empty / absent =
+    /// every window — so older highlights.json files and Genie 4 cfg imports
+    /// (which have no window column) load as apply-everywhere, unchanged.</summary>
+    public List<string> Windows { get; set; } = new();
 }
 
 public sealed class ClassPersistenceModel

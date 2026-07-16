@@ -1561,7 +1561,7 @@ public sealed class CommandEngine
 
         if (sub == "add")
         {
-            if (parts.Count < 4) { _host.Echo("Usage: #highlight add {pattern} {fg} [{bg}] [{matchType}] [{class}] [{sound}] [{speak: * = line, or text}]"); return; }
+            if (parts.Count < 4) { _host.Echo("Usage: #highlight add {pattern} {fg} [{bg}] [{matchType}] [{class}] [{sound}] [{speak: * = line, or text}] [{windows: comma-separated, blank = all}]"); return; }
             var pattern  = parts[2];
             var fg       = parts[3];
             var bg       = parts.Count > 4 ? parts[4] : "";
@@ -1569,8 +1569,9 @@ public sealed class CommandEngine
             var cls      = parts.Count > 6 ? parts[6] : "";
             var sound    = parts.Count > 7 ? parts[7] : "";
             var speak    = parts.Count > 8 ? parts[8] : "";
+            var windows  = ParseWindowList(parts.Count > 9 ? parts[9] : "");
             Highlights.RemoveRule(pattern);            // upsert
-            Highlights.AddRule(pattern, fg, bg, match, false, true, cls, sound, speak);
+            Highlights.AddRule(pattern, fg, bg, match, false, true, cls, sound, speak, windows);
             EchoRule($"Highlight added: {pattern} fg={fg}{(string.IsNullOrEmpty(bg) ? "" : $" bg={bg}")}");
             return;
         }
@@ -1602,7 +1603,8 @@ public sealed class CommandEngine
             var flag = r.IsEnabled ? "" : " (disabled)";
             var cls  = string.IsNullOrEmpty(r.ClassName) ? "" : $" [{r.ClassName}]";
             var bg   = string.IsNullOrEmpty(r.BackgroundColor) ? "" : $"/{r.BackgroundColor}";
-            _host.Echo($"{r.Pattern} → {r.ForegroundColor}{bg} ({r.MatchType}){cls}{flag}");
+            var win  = r.Windows.Count == 0 ? "" : $" @{string.Join(",", r.Windows)}";
+            _host.Echo($"{r.Pattern} → {r.ForegroundColor}{bg} ({r.MatchType}){cls}{win}{flag}");
             shown++;
         }
         if (shown == 0) _host.Echo("None.");
@@ -1639,7 +1641,7 @@ public sealed class CommandEngine
                     Enum.TryParse<HighlightMatchType>(m.MatchType, out var mt)
                         ? mt
                         : (m.IsRegex ? HighlightMatchType.Regex : HighlightMatchType.String),
-                    m.CaseSensitive, m.IsEnabled, m.ClassName, m.SoundFile, m.Speak);
+                    m.CaseSensitive, m.IsEnabled, m.ClassName, m.SoundFile, m.Speak, m.Windows);
             SaveHighlights();
             EchoJsonHealed("highlights.cfg", models.Count);
             return;
@@ -1827,6 +1829,18 @@ public sealed class CommandEngine
         "beginswith" => HighlightMatchType.BeginsWith,
         _            => HighlightMatchType.String,
     };
+
+    /// <summary>A comma/semicolon-separated window list ("main,room") → ids.
+    /// Empty / "all" = no restriction (paints everywhere).</summary>
+    private static IEnumerable<string> ParseWindowList(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token) ||
+            token.Trim().Equals("all", StringComparison.OrdinalIgnoreCase))
+            return Array.Empty<string>();
+        return token.Split(new[] { ',', ';' },
+                           StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(w => w.ToLowerInvariant());
+    }
 
     // ── #trigger / #action ──────────────────────────────────────────────────
 

@@ -208,7 +208,7 @@ public sealed class MobItem
     public MobItem(string text, MobsViewModel owner)
     {
         Text          = text;
-        Inlines       = Genie.App.Highlighting.DefaultHighlights.Tokenize(text);
+        Inlines       = Genie.App.Highlighting.DefaultHighlights.Tokenize(text, window: "mobs");
         IgnoreCommand = ReactiveCommand.Create(() => owner.IgnoreCreature(text));
     }
 }

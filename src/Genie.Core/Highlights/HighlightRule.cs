@@ -14,7 +14,8 @@ public sealed class HighlightRule
     public HighlightRule(string pattern, string foregroundColor, string backgroundColor = "",
                          HighlightMatchType matchType = HighlightMatchType.String,
                          bool caseSensitive = false, bool isEnabled = true, string className = "",
-                         bool safe = true, string soundFile = "", string speak = "")
+                         bool safe = true, string soundFile = "", string speak = "",
+                         IEnumerable<string>? windows = null)
     {
         Pattern         = pattern;
         ForegroundColor = foregroundColor;
@@ -25,8 +26,36 @@ public sealed class HighlightRule
         ClassName       = className;
         SoundFile       = soundFile;
         Speak           = speak;
+        Windows         = NormalizeWindows(windows);
         Rebuild(safe);
     }
+
+    /// <summary>The windows this rule paints in, by canonical id ("main",
+    /// "room", "mobs", "players", a stream id like "thoughts", a plugin window
+    /// name). <b>Empty = every window</b> (the default, so existing and
+    /// Genie 4-imported rules apply everywhere). Case-insensitive.</summary>
+    public IReadOnlySet<string> Windows { get; private set; }
+
+    /// <summary>Replace the window scope (from the config panel). Empty clears
+    /// it back to "every window".</summary>
+    public void SetWindows(IEnumerable<string>? windows) => Windows = NormalizeWindows(windows);
+
+    private static IReadOnlySet<string> NormalizeWindows(IEnumerable<string>? windows)
+    {
+        if (windows is null) return EmptyWindows;
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var w in windows)
+            if (!string.IsNullOrWhiteSpace(w)) set.Add(w.Trim());
+        return set.Count == 0 ? EmptyWindows : set;
+    }
+
+    private static readonly IReadOnlySet<string> EmptyWindows =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Does this rule paint in <paramref name="window"/>? True when the
+    /// rule has no window restriction (empty = all) or explicitly lists it.</summary>
+    public bool AppliesToWindow(string window) =>
+        Windows.Count == 0 || Windows.Contains(window);
 
     public string             Pattern         { get; }
     public string             ForegroundColor { get; }
