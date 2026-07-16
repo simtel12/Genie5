@@ -268,6 +268,18 @@ public sealed record EndSetupEvent() : GameEvent;
 public sealed record NavEvent(string RoomId) : GameEvent;
 
 /// <summary>
+/// Session identity from the login stream's <c>&lt;app char="Renucci" game="DR"
+/// title="[DR: Renucci] Wrayth"/&gt;</c> tag — the server's authoritative word on
+/// which character and game instance (<c>DR</c>/<c>DRX</c>/<c>DRF</c>/<c>DRT</c>)
+/// this connection serves. Matters most for Lich sessions, where the connect
+/// dialog can't know which instance Lich logged into but community scripts
+/// branch on <c>$game</c> (Platinum portals, Fallen shortcuts). Genie 4 parity:
+/// Core/Game.cs:1903 reads the same attributes. The settings-dump form
+/// <c>&lt;app maximized='t'/&gt;</c> (no <c>char</c>) never emits this.
+/// </summary>
+public sealed record AppEvent(string Character, string Game, string Title) : GameEvent;
+
+/// <summary>
 /// Character's guild, parsed from the <c>info</c> verb output line
 /// (<c>Name: … Race: … Guild: X</c>). DR doesn't push guild in a structured
 /// tag, so this only fires when the player runs <c>info</c>. <see cref="Guild"/>

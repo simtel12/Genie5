@@ -843,7 +843,10 @@ public sealed class DrXmlParser : IDisposable
         "mode", "settings", "presets", "p", "macros", "keys", "k",
         "palette", "i", "stream", "w", "cmdline", "strings", "names",
         "ignores", "vars", "scripts", "dialog", "builtin", "panels",
-        "group", "toggles", "misc", "m", "app", "display", "options", "o",
+        // "app" is NOT here — <app char=… game=…/> carries the session identity
+        // (AppEvent → $game/$charactername); its settings-dump form
+        // <app maximized='t'/> is filtered by the char-attr guard in HandleElement.
+        "group", "toggles", "misc", "m", "display", "options", "o",
         "font", "s",
         // ── Session/connection info ─────────────────────────────────────────
         "playerid",
@@ -888,7 +891,7 @@ public sealed class DrXmlParser : IDisposable
     // Keep <see cref="_handledTags"/> in sync with the HandleElement switch.
     private static readonly HashSet<string> _handledTags = new(StringComparer.OrdinalIgnoreCase)
     {
-        "a", "b", "casttime", "clearstream", "compass", "component", "container",
+        "a", "app", "b", "casttime", "clearstream", "compass", "component", "container",
         "d", "dialogdata", "dir", "endsetup", "image", "indicator", "inv",
         "left", "nav", "openwindow", "output", "popbold", "popstream",
         "preset", "progressbar", "prompt", "pushbold", "pushstream",
@@ -1254,6 +1257,17 @@ public sealed class DrXmlParser : IDisposable
                 _roomSeedArmed = false;
                 if (r["rm"] is { Length: > 0 } navRm)
                     _events.OnNext(new NavEvent(navRm));
+                break;
+
+            // ── Session identity ─────────────────────────────────────────────
+            // <app char="Renucci" game="DR" title="[DR: Renucci] Wrayth"/> —
+            // the server's authoritative character + game-instance code. The
+            // char guard matches Genie 4 (Core/Game.cs:1907): the Wrayth
+            // settings dump also contains bare <app maximized='t'/> forms,
+            // which carry no identity and stay ignored.
+            case "app":
+                if (r["char"] is { Length: > 0 } appChar)
+                    _events.OnNext(new AppEvent(appChar, r["game"] ?? "", r["title"] ?? ""));
                 break;
 
             // ── Inventory container declaration ──────────────────────────────

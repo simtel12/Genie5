@@ -132,7 +132,7 @@
       </Grid>
 
       <!-- Lich proxy fields -->
-      <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto,Auto"
+      <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
             IsVisible="{Binding IsLichMode}">
 
         <TextBlock Grid.Row="0" Grid.Column="0" Text="Host"      VerticalAlignment="Center"/>
@@ -153,7 +153,18 @@
                    Text="{Binding Character}"
                    Watermark="Optional — used for the title bar / profile name"/>
 
-        <TextBlock Grid.Row="3" Grid.Column="1"
+        <!-- Seeds $game for scripts until the server's <app game=…> tag
+             confirms the real instance a few lines into the stream. -->
+        <TextBlock Grid.Row="3" Grid.Column="0" Text="Instance"  VerticalAlignment="Center" Margin="0,8,0,0"/>
+        <ComboBox  Grid.Row="3" Grid.Column="1" Margin="0,8,0,0"
+                   AutomationProperties.Name="Instance"
+                   AutomationProperties.HelpText="Which DR instance Lich is logged into. Scripts read this as $game; the server corrects it automatically after connect."
+                   ItemsSource="{x:Static vm:ConnectDialogViewModel.Instances}"
+                   SelectedItem="{Binding Instance}"
+                   HorizontalAlignment="Stretch"
+                   ToolTip.Tip="Which DR instance Lich is logged into. Scripts read this as $game; the server corrects it automatically after connect."/>
+
+        <TextBlock Grid.Row="4" Grid.Column="1"
                    Text="Lich must already be running and authenticated for this character. Genie just attaches to its local port."
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" Margin="0,6,0,0"/>

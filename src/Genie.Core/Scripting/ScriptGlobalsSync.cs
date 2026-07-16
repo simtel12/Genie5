@@ -165,6 +165,29 @@ public sealed class ScriptGlobalsSync : IDisposable
             case CastTimeEvent ct:     { var s = SecondsRemaining(ct.ExpiresAt); Set("casttime",  s); Set("casttimeremaining",  s); break; }
             case SpellEvent sp:        Set("preparedspell", sp.SpellName ?? string.Empty); break;
             case PromptEvent p:        OnPrompt(p);                                           break;
+            case AppEvent app:         OnApp(app);                                            break;
+        }
+    }
+
+    /// <summary>
+    /// Session identity from the server's <c>&lt;app char=… game=…/&gt;</c> tag.
+    /// This corrects the construction-time seed — critical for Lich sessions,
+    /// where <c>cfg.GameCode</c> is only the connect dialog's guess but scripts
+    /// branch on <c>$game</c> (Platinum portals, Fallen shortcuts). Genie 4
+    /// (Core/Game.cs:1922) refreshes only <c>$gamename</c> here because its
+    /// <c>$game</c> comes from the launcher file, which Lich supplies; we have
+    /// no launcher file, so the server's word corrects <c>$game</c> too.
+    /// </summary>
+    private void OnApp(AppEvent app)
+    {
+        if (!string.IsNullOrWhiteSpace(app.Character))
+            Set("charactername", app.Character.Trim());
+        if (!string.IsNullOrWhiteSpace(app.Game))
+        {
+            // Genie 4 normalization: strip ':' and spaces from the attr value.
+            var code = app.Game.Replace(":", "").Replace(" ", "");
+            Set("gamename", code);
+            Set("game",     code);
         }
     }
 

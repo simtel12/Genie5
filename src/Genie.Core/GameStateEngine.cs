@@ -137,6 +137,11 @@ public sealed class GameStateEngine : IDisposable
                 _state.CharacterName = cn.Name.Trim();
                 break;
 
+            // ── Session identity (<app char=… game=…/>) ───────────────────
+            case AppEvent app when !string.IsNullOrWhiteSpace(app.Character):
+                _state.CharacterName = app.Character.Trim();
+                break;
+
             // ── Compass exits ──────────────────────────────────────────────
             case CompassEvent compass:
                 _state.Room.CompassExits = compass.RawXml;

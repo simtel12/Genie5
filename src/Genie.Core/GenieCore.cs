@@ -1203,6 +1203,8 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         }
     }
 
+    void ICommandHost.ClearSendQueue() => Scripts.ClearPendingSends();
+
     void ICommandHost.StopAllScripts() => Scripts.StopAll();
 
     void ICommandHost.PauseAllScripts() => Scripts.PauseAll();
