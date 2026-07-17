@@ -202,10 +202,17 @@ public sealed class ScriptGlobalsSync : IDisposable
         if (p.ServerTime > DateTimeOffset.UnixEpoch)
             Set("gametime", p.ServerTime.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture));
 
-        // $spellpreptime — seconds since the spell was prepared. Ticks up on each
-        // prompt while a spell is held; resets when cleared. Genie 4 parity (#151).
-        var sec = (int)Math.Max(0, _state.Combat.SpellTimeSeconds);
-        Set("spellpreptime", sec.ToString(CultureInfo.InvariantCulture));
+        // $spellpreptime — the spell's FULL prep length in seconds. Genie 4
+        // (Globals.cs ParseSpecialVariables): @spellpreptime@ = casttime −
+        // spellstarttime, i.e. the epoch when the cast will be fully prepared
+        // minus the epoch prep began — a constant per spell, NOT the elapsed
+        // count-up (that's $spelltime). 0 when nothing is being prepared or
+        // the server sent no castTime.
+        var prepLen = _state.Combat.SpellTimeStart is { } prepStart
+                      && _state.Combat.CastTimeEnd > prepStart
+            ? (int)Math.Max(0, (_state.Combat.CastTimeEnd - prepStart).TotalSeconds)
+            : 0;
+        Set("spellpreptime", prepLen.ToString(CultureInfo.InvariantCulture));
     }
 
     private void OnProgressBar(ProgressBarEvent bar)
