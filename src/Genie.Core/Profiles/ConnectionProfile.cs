@@ -36,9 +36,11 @@ public sealed class ConnectionProfile
     public string FrontEndId      { get; set; } = "GENIE";
 
     /// <summary>
-    /// Name of the layout preset to auto-apply when this profile connects.
-    /// Resolved against the profile's own layout store first; empty means
-    /// fall back to the global default, then the built-in layout.
+    /// Name of the layout preset to auto-apply when this profile connects —
+    /// settable from the Connect dialog's Layout picker or the Layout menu.
+    /// Resolved against the profile's own layout store first, then the global
+    /// store; empty means keep the current layout (then the global default
+    /// rules apply, else the built-in layout).
     /// </summary>
     public string DefaultLayoutName { get; set; } = string.Empty;
 

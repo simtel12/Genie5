@@ -164,7 +164,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                         ViewModel.Profiles,
                         ViewModel.SaveProfiles,
                         ViewModel.LastConnectionConfig,
-                        ViewModel.ReportConnectionFailure)
+                        ViewModel.ReportConnectionFailure,
+                        ViewModel.ListLayoutNamesFor)
                 };
                 var result = await dlg.ShowDialog<ConnectResult?>(this);
                 ctx.SetOutput(result);

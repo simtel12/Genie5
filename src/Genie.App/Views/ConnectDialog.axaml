@@ -5,7 +5,7 @@
         x:Class="Genie.App.Views.ConnectDialog"
         x:DataType="vm:ConnectDialogViewModel"
         Title="Connect to DragonRealms"
-        Width="460" Height="500"
+        Width="460" Height="540"
         CanResize="False"
         WindowStartupLocation="CenterOwner">
 
@@ -42,7 +42,7 @@
     <StackPanel Grid.Row="2" Spacing="8">
 
       <!-- Shared: profile name + connection method + data folder (always visible) -->
-      <Grid ColumnDefinitions="90,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto">
+      <Grid ColumnDefinitions="90,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
         <TextBlock Grid.Row="0" Grid.Column="0" Text="Name"   VerticalAlignment="Center"/>
         <TextBox   Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2"
                    AutomationProperties.Name="Profile name"
@@ -72,6 +72,15 @@
                    Text="Leave blank for the default location. Set it to keep this character's data in a folder you choose."
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource Theme.TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+
+        <TextBlock Grid.Row="4" Grid.Column="0" Text="Layout" VerticalAlignment="Center" Margin="0,8,0,0"/>
+        <ComboBox  Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,8,0,0"
+                   AutomationProperties.Name="Startup layout"
+                   AutomationProperties.HelpText="Saved layout applied automatically when this character connects. Save layouts from the Layout menu."
+                   ItemsSource="{Binding AvailableLayouts}"
+                   SelectedItem="{Binding SelectedLayout}"
+                   HorizontalAlignment="Stretch"
+                   ToolTip.Tip="Saved layout applied automatically when this character connects. Save layouts from the Layout menu."/>
       </Grid>
 
       <!-- Direct (SGE) fields -->

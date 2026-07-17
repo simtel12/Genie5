@@ -3100,6 +3100,33 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     }
 
     /// <summary>
+    /// Saved-layout names offered by the Connect dialog's startup-Layout
+    /// picker: the global store's layouts plus (when a profile is selected)
+    /// that profile's own store, de-duplicated case-insensitively. The profile
+    /// store is resolved fresh here — the dialog can browse profiles we're not
+    /// connected to, so <see cref="_profileLayouts"/> (the CONNECTED scope)
+    /// can't be used.
+    /// </summary>
+    public IReadOnlyList<string> ListLayoutNamesFor(ConnectionProfile? profile)
+    {
+        var names = new List<string>(_globalLayouts.List());
+        if (profile is not null)
+        {
+            try
+            {
+                var store = new Settings.LayoutStore(
+                    Path.Combine(GetProfileConfigDir(profile), "Layouts"));
+                foreach (var n in store.List())
+                    if (!names.Contains(n, StringComparer.OrdinalIgnoreCase))
+                        names.Add(n);
+            }
+            catch { /* unreadable profile dir — offer globals only */ }
+        }
+        names.Sort(StringComparer.OrdinalIgnoreCase);
+        return names;
+    }
+
+    /// <summary>
     /// Replay every saved rule file from the connected profile's config dir
     /// (or the global dir for an ad-hoc connection) into the live engines so
     /// anything configured offline via the Configuration dialog is active
@@ -4893,11 +4920,21 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     private void ApplyDefaultLayoutForConnect(ConnectionProfile? profile)
     {
         var profileDefault = profile?.DefaultLayoutName;
-        if (!string.IsNullOrWhiteSpace(profileDefault)
-            && _profileLayouts?.Load(profileDefault) is { } pl)
+        if (!string.IsNullOrWhiteSpace(profileDefault))
         {
-            ApplyLayout(pl);
-            return;
+            // The profile's own store wins; fall back to the global store —
+            // the Connect dialog's Layout picker offers both, so a global
+            // layout name stored on the profile must resolve too.
+            if (_profileLayouts?.Load(profileDefault) is { } pl)
+            {
+                ApplyLayout(pl);
+                return;
+            }
+            if (_globalLayouts.Load(profileDefault) is { } pgl)
+            {
+                ApplyLayout(pgl);
+                return;
+            }
         }
 
         var globalDefault = Display.GlobalDefaultLayout;

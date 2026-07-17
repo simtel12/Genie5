@@ -68,6 +68,33 @@ public class ConnectDialogViewModel : ReactiveObject
     /// </summary>
     [Reactive] public string DataDirectory { get; set; } = "";
 
+    // ── Startup layout (per profile) ───────────────────────────────────────
+    /// <summary>Sentinel first entry of <see cref="AvailableLayouts"/> —
+    /// selecting it stores an empty <see cref="ConnectionProfile.DefaultLayoutName"/>
+    /// (keep whatever layout is showing, then the global default rules apply).</summary>
+    public const string KeepCurrentLayout = "(keep current layout)";
+
+    /// <summary>Saved-layout names offered for the Layout dropdown: the
+    /// sentinel plus the global store's layouts and (when a profile is
+    /// selected) that profile's own layouts. Provided by the host window via
+    /// the <c>listLayouts</c> constructor callback.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<string> AvailableLayouts { get; } = new();
+
+    /// <summary>The chosen startup layout for this profile — applied
+    /// automatically on connect (<c>ApplyDefaultLayoutForConnect</c>).</summary>
+    [Reactive] public string SelectedLayout { get; set; } = KeepCurrentLayout;
+
+    private readonly Func<ConnectionProfile?, IReadOnlyList<string>>? _listLayouts;
+
+    private void RefreshLayouts(ConnectionProfile? profile)
+    {
+        AvailableLayouts.Clear();
+        AvailableLayouts.Add(KeepCurrentLayout);
+        if (_listLayouts is null) return;
+        foreach (var n in _listLayouts(profile))
+            if (!AvailableLayouts.Contains(n)) AvailableLayouts.Add(n);
+    }
+
     /// <summary>Opens the OS folder picker for <see cref="DataDirectory"/>.
     /// The command raises <see cref="BrowseDataDirRequested"/>; the view does
     /// the actual pick (it needs a TopLevel) and calls
@@ -164,11 +191,14 @@ public class ConnectDialogViewModel : ReactiveObject
         ProfileStore? store,
         Action? onStoreChanged,
         ConnectionConfig? lastConnection,
-        Action<string>? onAuthFailure = null)
+        Action<string>? onAuthFailure = null,
+        Func<ConnectionProfile?, IReadOnlyList<string>>? listLayouts = null)
     {
         _store          = store;
         _onStoreChanged = onStoreChanged;
         _onAuthFailure  = onAuthFailure;
+        _listLayouts    = listLayouts;
+        RefreshLayouts(null);
 
         // ── Load profiles into the dropdown ────────────────────────────────
         if (_store is not null)
@@ -230,7 +260,14 @@ public class ConnectDialogViewModel : ReactiveObject
         // OK returns both the assembled ConnectionConfig AND the selected
         // saved profile (if any) so callers can attach per-profile state.
         OkCommand     = ReactiveCommand.Create(
-            () => (ConnectResult?)new ConnectResult(BuildConfig(), SelectedProfile), canOk);
+            () =>
+            {
+                // A changed layout choice on a saved profile sticks even when
+                // the user hits Connect without Save — the dropdown reads as a
+                // profile setting, so silently discarding it would surprise.
+                PersistLayoutChoice();
+                return (ConnectResult?)new ConnectResult(BuildConfig(), SelectedProfile);
+            }, canOk);
         CancelCommand = ReactiveCommand.Create(() => (ConnectResult?)null);
         SaveProfileCommand     = ReactiveCommand.Create(SaveProfile,   canSave);
         BrowseDataDirCommand   = ReactiveCommand.Create(() => BrowseDataDirRequested?.Invoke());
@@ -292,6 +329,8 @@ public class ConnectDialogViewModel : ReactiveObject
             AvailableCharacters.Add(cfg.CharacterName);
         Character   = cfg.CharacterName;
         DataDirectory = "";
+        RefreshLayouts(null);
+        SelectedLayout = KeepCurrentLayout;
         FetchStatus = "";
     }
 
@@ -323,6 +362,22 @@ public class ConnectDialogViewModel : ReactiveObject
             AvailableCharacters.Add(p.CharacterName);
         Character        = p.CharacterName;
         DataDirectory    = p.DataDirectory;
+
+        // Startup layout: offer this profile's layouts too, and pre-select its
+        // stored choice. A stored name whose file is gone is still shown (so
+        // the choice isn't silently discarded by opening the dialog).
+        RefreshLayouts(p);
+        if (!string.IsNullOrWhiteSpace(p.DefaultLayoutName))
+        {
+            if (!AvailableLayouts.Contains(p.DefaultLayoutName))
+                AvailableLayouts.Add(p.DefaultLayoutName);
+            SelectedLayout = p.DefaultLayoutName;
+        }
+        else
+        {
+            SelectedLayout = KeepCurrentLayout;
+        }
+
         FetchStatus      = "";
     }
 
@@ -447,11 +502,27 @@ public class ConnectDialogViewModel : ReactiveObject
         // store save (_onStoreChanged) persists it.
         target.DataDirectory = (DataDirectory ?? "").Trim();
 
+        // Per-profile startup layout — same direct-set pattern as DataDirectory.
+        target.DefaultLayoutName = SelectedLayout == KeepCurrentLayout ? "" : SelectedLayout;
+
         // FE:STORM checkbox was removed (May 25, 2026); we no longer write
         // the FrontEndId from the dialog. Any pre-existing profile keeps
         // whatever value it had, but new profiles will use the
         // ConnectionProfile.FrontEndId default ("GENIE").
 
+        _onStoreChanged?.Invoke();
+    }
+
+    /// <summary>Persist the Layout dropdown's choice onto the selected saved
+    /// profile if it changed — used by Connect so the choice survives without
+    /// an explicit Save (SaveProfile writes it as part of the full save).</summary>
+    private void PersistLayoutChoice()
+    {
+        if (_store is null || SelectedProfile is null) return;
+        var chosen = SelectedLayout == KeepCurrentLayout ? "" : SelectedLayout;
+        if (string.Equals(SelectedProfile.DefaultLayoutName, chosen, StringComparison.Ordinal))
+            return;
+        SelectedProfile.DefaultLayoutName = chosen;
         _onStoreChanged?.Invoke();
     }
 
