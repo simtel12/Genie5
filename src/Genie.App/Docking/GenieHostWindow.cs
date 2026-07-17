@@ -1,9 +1,11 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Platform;
+using Avalonia.Reactive;
 using Dock.Avalonia.Controls;
 
 namespace Genie.App.Docking;
@@ -28,22 +30,58 @@ public sealed class GenieHostWindow : HostWindow
         // #170: floated panels are secondary tool windows of the one Genie
         // instance — they must not each claim a taskbar button (a layout with
         // several floats filled the taskbar with identical Genie entries).
-        // One instance = one button (the main window's). Floats remain
-        // reachable through the Window menu even if minimized — the dock
-        // factory's floating-window lookups (FindByIdInTree recursing floating
-        // windows) restore them.
+        // One instance = one button (the main window's).
         ShowInTaskbar = false;
 
-        // Window-level fallback (bubbles from any child). Only acts when we couldn't
-        // bind PART_TitleBar directly (see OnApplyTemplate); gated on the top band so
-        // a double-tap in the panel content never maximizes.
+        // The other half of the tool-window model: with no taskbar button of
+        // their own (and no minimize button in Dock's chrome — the button that
+        // USED to minimize a float was its taskbar entry), floats minimize and
+        // restore WITH the main window, like IDE tool palettes. Minimize Genie
+        // → the whole layout goes; restore Genie → floats come back in their
+        // prior state (a maximized float restores maximized). Individual
+        // dismissal stays what it was: Close, then reopen from the Window menu.
         DoubleTapped += OnWindowDoubleTapped;
 
         // Issue #3: a floated panel that was maximized then closed can reopen
         // off-screen (saved restore-bounds land beyond the visible desktop on a
         // multi-monitor setup — seen as a sliver at a monitor's far edge). On open,
         // pull it back fully onto a visible screen so it can never vanish.
-        Opened += (_, _) => EnsureOnVisibleScreen();
+        Opened += (_, _) => { EnsureOnVisibleScreen(); FollowMainWindowMinimize(); };
+        Closed += (_, _) => { _mainStateSub?.Dispose(); _mainStateSub = null; };
+    }
+
+    private IDisposable? _mainStateSub;
+    private WindowState  _stateBeforeMainMinimize = WindowState.Normal;
+    private bool         _minimizedWithMain;
+
+    /// <summary>Mirror the main window's minimize/restore onto this float
+    /// (#170 follow-up). Floats have no taskbar button and Dock's chrome has no
+    /// minimize button, so main-window minimize is the one gesture that hides
+    /// them — and the one that brings them back.</summary>
+    private void FollowMainWindowMinimize()
+    {
+        if (_mainStateSub is not null) return;
+        if (Application.Current?.ApplicationLifetime is not
+                IClassicDesktopStyleApplicationLifetime desktop
+            || desktop.MainWindow is not { } main || ReferenceEquals(main, this))
+            return;
+
+        _mainStateSub = main.GetObservable(WindowStateProperty)
+            .Subscribe(new AnonymousObserver<WindowState>(s =>
+            {
+                if (s == WindowState.Minimized)
+                {
+                    if (WindowState == WindowState.Minimized) return;
+                    _stateBeforeMainMinimize = WindowState;
+                    _minimizedWithMain       = true;
+                    WindowState = WindowState.Minimized;
+                }
+                else if (_minimizedWithMain)
+                {
+                    _minimizedWithMain = false;
+                    WindowState = _stateBeforeMainMinimize;
+                }
+            }));
     }
 
     /// <summary>Clamp a normal-state floating window's bounds onto the working area
