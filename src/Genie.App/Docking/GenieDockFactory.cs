@@ -1089,7 +1089,20 @@ public class GenieDockFactory : Factory
 
         var current = _root is null ? null : FindByIdInTree(_root, id);
         var currentlyVisible = current is not null;
-        if (currentlyVisible == visible) return;
+        if (currentlyVisible == visible)
+        {
+            // "Show" on a tool that's already visible but floating in a
+            // MINIMIZED host window must restore that window — floats have no
+            // taskbar button or Alt-Tab entry (#170), so the Window menu is
+            // the only way back after the chrome's minimize button.
+            if (visible && FindWindowHosting(id)?.Host is Avalonia.Controls.Window host
+                && host.WindowState == Avalonia.Controls.WindowState.Minimized)
+            {
+                host.WindowState = Avalonia.Controls.WindowState.Normal;
+                host.Activate();
+            }
+            return;
+        }
 
         if (visible)
         {
@@ -1426,13 +1439,28 @@ public class GenieDockFactory : Factory
             var ids = new List<string>();
             CollectLeafToolIds(layout, ids);
             if (ids.Count == 0) continue;
+
+            // Read geometry from the REALIZED host window, not the IDockWindow
+            // model — Dock doesn't reliably sync X/Y/Width/Height back from the
+            // OS window (a moved/resized float can leave the model at 0/NaN,
+            // which restored as a giant default-sized window). Same convention
+            // on both ends: Position is physical pixels, Width/Height DIPs.
+            double x = w.X, y = w.Y, width = w.Width, height = w.Height;
+            if (w.Host is Avalonia.Controls.Window host)
+            {
+                x = host.Position.X;
+                y = host.Position.Y;
+                if (host.Bounds.Width  > 0) width  = host.Bounds.Width;
+                if (host.Bounds.Height > 0) height = host.Bounds.Height;
+            }
+
             list.Add(new FloatingWindowSnapshot
             {
                 ToolIds = ids,
-                X       = w.X,
-                Y       = w.Y,
-                Width   = w.Width,
-                Height  = w.Height,
+                X       = x,
+                Y       = y,
+                Width   = width,
+                Height  = height,
             });
         }
         return list;
@@ -1479,18 +1507,28 @@ public class GenieDockFactory : Factory
 
                 if (FindWindowHosting(id) is { } w)
                 {
-                    w.X      = f.X + cascade * 28;
-                    w.Y      = f.Y + cascade * 28;
-                    w.Width  = f.Width;
-                    w.Height = f.Height;
+                    // Apply only sane, finite geometry — a snapshot captured
+                    // from a degenerate model must not blow the float up to a
+                    // giant default or park it off-screen. Position and size
+                    // are validated independently.
+                    bool sizeOk = double.IsFinite(f.Width)  && f.Width  >= 100
+                               && double.IsFinite(f.Height) && f.Height >= 80;
+                    bool posOk  = double.IsFinite(f.X) && double.IsFinite(f.Y);
+
+                    if (sizeOk) { w.Width = f.Width; w.Height = f.Height; }
+                    if (posOk)  { w.X = f.X + cascade * 28; w.Y = f.Y + cascade * 28; }
+
                     // The HostWindow is already presented; push the geometry
-                    // through to the realized OS window as well.
+                    // through to the realized OS window as well, then clamp it
+                    // onto a visible screen (the Opened-time clamp already ran
+                    // with the pre-geometry defaults).
                     if (w.Host is Avalonia.Controls.Window host)
                     {
-                        host.Position = new Avalonia.PixelPoint(
-                            (int)(f.X + cascade * 28), (int)(f.Y + cascade * 28));
-                        host.Width  = f.Width;
-                        host.Height = f.Height;
+                        if (sizeOk) { host.Width = f.Width; host.Height = f.Height; }
+                        if (posOk)
+                            host.Position = new Avalonia.PixelPoint(
+                                (int)(f.X + cascade * 28), (int)(f.Y + cascade * 28));
+                        if (host is GenieHostWindow g) g.ClampToVisibleScreen();
                     }
                 }
                 cascade++;

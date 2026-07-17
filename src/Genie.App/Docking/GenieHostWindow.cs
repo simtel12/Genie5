@@ -4,8 +4,10 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using System.Linq;
 using Avalonia.Platform;
 using Avalonia.Reactive;
+using Avalonia.VisualTree;
 using Dock.Avalonia.Controls;
 
 namespace Genie.App.Docking;
@@ -46,8 +48,73 @@ public sealed class GenieHostWindow : HostWindow
         // off-screen (saved restore-bounds land beyond the visible desktop on a
         // multi-monitor setup — seen as a sliver at a monitor's far edge). On open,
         // pull it back fully onto a visible screen so it can never vanish.
-        Opened += (_, _) => { EnsureOnVisibleScreen(); FollowMainWindowMinimize(); };
+        Opened += (_, _) =>
+        {
+            EnsureOnVisibleScreen();
+            FollowMainWindowMinimize();
+            // The chrome's template is applied by now, but give the visual
+            // tree one more tick before searching it for the button strip.
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                TryInjectMinimizeButton,
+                Avalonia.Threading.DispatcherPriority.Loaded);
+        };
         Closed += (_, _) => { _mainStateSub?.Dispose(); _mainStateSub = null; };
+    }
+
+    /// <summary>
+    /// Add a minimize button to the float's chrome, before the maximize
+    /// button. Dock's ToolChromeControl (which acts as the float's title bar)
+    /// ships ▾ / maximize / close only — and since #170 removed the per-float
+    /// taskbar buttons, there was NO minimize affordance left (field report).
+    /// The injected button mimics the maximize button's styling; recovery for
+    /// a minimized float is the Window menu (SetToolVisibility restores a
+    /// minimized host) or minimizing/restoring the main window.
+    /// Best-effort: if Dock's template changes, this quietly does nothing.
+    /// </summary>
+    private void TryInjectMinimizeButton()
+    {
+        Button? maximize = null;
+        foreach (var b in this.GetVisualDescendants().OfType<Button>())
+        {
+            if (b.Name == "GenieMinimizeButton") return;   // already injected
+            if (b.Name == "PART_MinimizeButton")
+            {
+                // The theme ships a native minimize button (HostWindowTitleBar
+                // chrome) — if it's in this tree, just make sure it shows.
+                b.IsVisible = true;
+                return;
+            }
+            if (b.Name == "PART_MaximizeRestoreButton") maximize = b;
+        }
+        if (maximize?.Parent is not Panel strip) return;
+
+        var glyph = new Avalonia.Controls.Shapes.Path
+        {
+            Data = Avalonia.Media.Geometry.Parse("M0,0 L8,0"),
+            StrokeThickness   = 1,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom,
+            Margin            = new Thickness(0, 0, 0, 2),
+        };
+        glyph.Bind(Avalonia.Controls.Shapes.Path.StrokeProperty,
+                   maximize.GetObservable(ForegroundProperty));
+
+        var minimize = new Button
+        {
+            Name    = "GenieMinimizeButton",
+            Content = glyph,
+            Theme   = maximize.Theme,
+            Width   = maximize.Width,
+            Height  = maximize.Height,
+            Padding = maximize.Padding,
+            HorizontalAlignment = maximize.HorizontalAlignment,
+            VerticalAlignment   = maximize.VerticalAlignment,
+        };
+        foreach (var c in maximize.Classes) minimize.Classes.Add(c);
+        ToolTip.SetTip(minimize, "Minimize");
+        minimize.Click += (_, _) => WindowState = WindowState.Minimized;
+
+        var idx = strip.Children.IndexOf(maximize);
+        strip.Children.Insert(idx < 0 ? 0 : idx, minimize);
     }
 
     private IDisposable? _mainStateSub;
@@ -83,6 +150,11 @@ public sealed class GenieHostWindow : HostWindow
                 }
             }));
     }
+
+    /// <summary>Re-run the on-screen clamp after external code repositions the
+    /// window (layout restore applies saved geometry AFTER Opened, so the
+    /// Opened-time clamp saw only the pre-geometry defaults).</summary>
+    public void ClampToVisibleScreen() => EnsureOnVisibleScreen();
 
     /// <summary>Clamp a normal-state floating window's bounds onto the working area
     /// of whichever screen it most overlaps (else the primary), so a stale/off-screen
