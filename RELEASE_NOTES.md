@@ -1,3 +1,19 @@
+# Genie 5 — v5.0.0-alpha.8.16
+
+A quick fix for a script-variable regression from 8.14/8.15.
+
+## 🔧 Fixed
+
+- **Nested `%$name_suffix` variables resolve again** — a variable name with
+  an underscore suffix, like mm_train's `%$selection_DESC`, stopped
+  resolving in alpha.8.14/8.15 and could surface as a `bad condition …
+  unexpected '%'` error in menu scripts. The variable-name shrink search
+  now breaks correctly at an underscore (as Genie 4 does), so
+  `$selection_DESC` resolves as `$selection` + `_DESC` again. The
+  alpha.8.14 fix this regressed (undefined skill/spell variables no longer
+  erroring) stays fixed. **If you use mm_train or another menu script,
+  grab this build.**
+
 # Genie 5 — v5.0.0-alpha.8.15
 
 Floating windows grow up, layouts remember them, and plugins get real

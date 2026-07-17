@@ -4,7 +4,17 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8.15 — Floating Windows & Plugin Transforms
+## Latest: v5.0.0-alpha.8.16 — Menu-Script Fix
+
+A quick fix for a script-variable regression from 8.14/8.15.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.16** as a delta.
+
+- **Nested `%$name_suffix` variables resolve again** — a name with an underscore suffix (like mm_train's `%$selection_DESC`) stopped resolving in 8.14/8.15 and could throw `bad condition … unexpected '%'` in menu scripts. The variable shrink-search breaks at an underscore again, matching Genie 4. If you use mm_train or any menu script, grab this build.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.16)
+
+## v5.0.0-alpha.8.15 — Floating Windows & Plugin Transforms
 
 Floating windows grow up, layouts remember them, and plugins get real transform power.
 
