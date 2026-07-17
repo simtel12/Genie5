@@ -29,7 +29,7 @@ The plugin contract lives in a small, **UI-free** library (`Genie.Plugins.Abstra
 
 Identity (`Id`, `Name`, `Version`, `Author`, `Description`, `MinHostVersion`), an `Enabled` flag, lifecycle (`Initialize` / `Shutdown`), and hooks:
 
-- **Transform hooks** — `OnGameText(text, stream)` and `OnInput(input)` return modified text, or `null` to gag/swallow. Plugins chain in load order. (This is the bulk of what Genie 4 plugins did.)
+- **Transform hooks** — `OnGameText(text, stream)`, `OnInput(input)`, and `OnEcho(text, window)` return modified text, or `null` to gag/swallow. Plugins chain in load order. (`OnGameText`/`OnInput` are the bulk of what Genie 4 plugins did; `OnEcho` is a Genie 5 extension — Genie 4 never ran echoed lines through plugins. It sees `#echo` output, script `echo` lines, and system messages, with the target window name — and has a default pass-through implementation, so plugins built before it exist keep loading unchanged.)
 - **Observation hooks** — `OnXml(fragment)`, `OnCommandSent(command)`, `OnPrompt()`, `OnVariableChanged(name, value)`.
 
 ### `IPluginHost`

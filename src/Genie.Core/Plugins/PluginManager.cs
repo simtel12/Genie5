@@ -181,6 +181,23 @@ public sealed class PluginManager
     public string? DispatchInput(string input)
         => Chain(input, (p, s) => p.OnInput(s));
 
+    // A plugin may echo from inside OnEcho (host.Echo → GenieCore funnel →
+    // back here). Per-thread guard: such nested echoes pass through
+    // undispatched instead of recursing forever.
+    [ThreadStatic] private static bool _inEchoDispatch;
+
+    /// <summary>Run an echoed display line (<c>#echo</c>, script <c>echo</c>,
+    /// host messages) through every enabled plugin in order — a deliberate
+    /// Genie 5 extension (Genie 4 never ran echoes through ParseText).
+    /// Returns the final text to display, or null if a plugin gagged it.</summary>
+    public string? DispatchEcho(string text, string window)
+    {
+        if (_inEchoDispatch) return text;
+        _inEchoDispatch = true;
+        try     { return Chain(text, (p, s) => p.OnEcho(s, window)); }
+        finally { _inEchoDispatch = false; }
+    }
+
     private string? Chain(string initial, Func<IGeniePlugin, string, string?> step)
     {
         string current = initial;

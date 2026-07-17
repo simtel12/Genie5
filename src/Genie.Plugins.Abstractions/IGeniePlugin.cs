@@ -65,6 +65,22 @@ public interface IGeniePlugin
     /// </summary>
     string? OnInput(string input);
 
+    /// <summary>
+    /// An echoed display line — <c>#echo</c> (plain, styled, or directed),
+    /// script <c>echo</c> output, and host/system messages — before it reaches
+    /// a window. Return the text to display, modified to rewrite, or <c>null</c>
+    /// to gag it. Chained in registration order. <paramref name="window"/> is
+    /// the target window ("main", or a <c>#echo &gt;window</c> target).
+    ///
+    /// <para><b>Genie 5 extension</b> — Genie 4 never ran echoes through
+    /// <c>ParseText</c>; this hook is deliberately additive. Default
+    /// implementation passes the text through unchanged, so plugins built
+    /// before this hook keep working without recompiling. Echoes a plugin
+    /// itself emits from inside <see cref="OnEcho"/> are not re-dispatched
+    /// (no feedback loop).</para>
+    /// </summary>
+    string? OnEcho(string text, string window) => text;
+
     // ── Observation hooks ─────────────────────────────────────────────────────
     /// <summary>A raw XML chunk from the game stream, before/independent of the
     /// parser's typed events — needed for structured data the typed events

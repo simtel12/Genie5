@@ -299,6 +299,37 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     /// </summary>
     public event Action<string, string?, bool>? EchoStyledLine;
 
+    // ── Echo funnels ─────────────────────────────────────────────────────────
+    // Every echoed display line runs through the plugin chain (OnEcho) before
+    // its event fires — a deliberate Genie 5 extension (Genie 4 never ran
+    // echoes through ParseText). A plugin can rewrite the line or gag it
+    // (null return suppresses the event). Plugin echoes emitted from inside
+    // OnEcho pass through undispatched (PluginManager re-entrancy guard).
+
+    private void RaiseEchoLine(string text)
+    {
+        var t = Plugins is null ? text : Plugins.DispatchEcho(text, "main");
+        if (t is not null) EchoLine?.Invoke(t);
+    }
+
+    private void RaiseScriptOutput(string text)
+    {
+        var t = Plugins is null ? text : Plugins.DispatchEcho(text, "main");
+        if (t is not null) ScriptOutputLine?.Invoke(t);
+    }
+
+    private void RaiseEchoToWindow(string text, string? window, string? color)
+    {
+        var t = Plugins is null ? text : Plugins.DispatchEcho(text, string.IsNullOrEmpty(window) ? "main" : window!);
+        if (t is not null) EchoToWindow?.Invoke(t, window, color);
+    }
+
+    private void RaiseEchoStyled(string text, string? color, bool mono)
+    {
+        var t = Plugins is null ? text : Plugins.DispatchEcho(text, "main");
+        if (t is not null) EchoStyledLine?.Invoke(t, color, mono);
+    }
+
     /// <summary>
     /// Raised by <c>#link</c> (Genie 4 clickable menu link). Args: (text,
     /// command, window?). The App renders <c>text</c> as a clickable link in the
@@ -441,7 +472,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             typeAhead:     _typeAhead,
             sendCommand:   cmd =>
                            {
-                               ScriptOutputLine?.Invoke(cmd);
+                               RaiseScriptOutput(cmd);
                                _typeAhead.NotifySent();
                                // Offline (no live connection) the game-bound send is
                                // dropped — a script can still run, set variables,
@@ -449,7 +480,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
                                // Sends resume the moment a connection exists.
                                _ = _connection?.SendCommandAsync(cmd);
                            },
-            echo:          msg => ScriptOutputLine?.Invoke(msg),
+            echo:          msg => RaiseScriptOutput(msg),
             handleHashCmd: cmd => Commands.ProcessInput(cmd, interactive: false),
             injectGameLine: line => InjectParsedLine(line));
 
@@ -467,8 +498,8 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         Scripts.SpellStartTimeEpoch       = () => _state.Combat.SpellTimeStart?.ToUnixTimeSeconds() ?? 0;
         // #config ignorescriptwarnings — suppress non-fatal script parse advisories (#151).
         Scripts.WarningsSuppressed        = () => Config.IgnoreScriptWarnings;
-        Scripts.EchoTo                   = (msg, win, color) => EchoToWindow?.Invoke(msg, win, color);
-        Scripts.EchoStyled               = (msg, color, mono) => EchoStyledLine?.Invoke(msg, color, mono);
+        Scripts.EchoTo                   = (msg, win, color) => RaiseEchoToWindow(msg, win, color);
+        Scripts.EchoStyled               = (msg, color, mono) => RaiseEchoStyled(msg, color, mono);
         // Named-window seam for the built-in trackers (Spell Timer / Experience /
         // Time Tracker), which re-render a whole dock panel each prompt. Same event
         // the App's ExperienceViewModel + generic PluginWindowViewModel consume.
@@ -903,13 +934,13 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
     // ── ICommandHost ───────────────────────────────────────────────────────────
 
-    void ICommandHost.Echo(string text) => EchoLine?.Invoke(text);
+    void ICommandHost.Echo(string text) => RaiseEchoLine(text);
 
     void ICommandHost.EchoTo(string text, string? window, string? color)
-        => EchoToWindow?.Invoke(text, window, color);
+        => RaiseEchoToWindow(text, window, color);
 
     void ICommandHost.EchoMain(string text, string? color, bool mono)
-        => EchoStyledLine?.Invoke(text, color, mono);
+        => RaiseEchoStyled(text, color, mono);
 
     void ICommandHost.EchoLink(string text, string command, string? window)
         => EchoLinkLine?.Invoke(text, command, window);
@@ -940,7 +971,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // display name), use it instead of the raw text so the user sees
         // "get a tapered cutlass" instead of "get #49489411 in #49489410".
         if (userInput)
-            EchoLine?.Invoke(echoOverride ?? text);
+            RaiseEchoLine(echoOverride ?? text);
 
         // Genie 4 mycommandchar (Game.cs SendText: `!sText.StartsWith(
         // cMyCommandChar)` gates the socket write, lastcommand, and activity
@@ -1151,7 +1182,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         }
         if (deviations.Count == 0) return;   // all stream-affecting flags as expected — stay quiet
 
-        EchoLine?.Invoke(
+        RaiseEchoLine(
             $"[genie] flags check — parser input differs from the tested baseline: {string.Join("; ", deviations)}. " +
             "Room/combat/prompt parsing may misbehave; use FLAG <name> ON|OFF to restore, or #config flagscheck off to silence.");
     }
@@ -1246,12 +1277,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     {
         if (lines.Count == 0)
         {
-            EchoLine?.Invoke(string.IsNullOrEmpty(name) || name!.Equals("all", StringComparison.OrdinalIgnoreCase)
+            RaiseEchoLine(string.IsNullOrEmpty(name) || name!.Equals("all", StringComparison.OrdinalIgnoreCase)
                 ? "No scripts running."
                 : $"No running script named {name}.");
             return;
         }
-        foreach (var l in lines) EchoLine?.Invoke(l);
+        foreach (var l in lines) RaiseEchoLine(l);
     }
 
     void ICommandHost.SetScriptDebugLevel(int level, string? name)
@@ -1278,7 +1309,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     void ICommandHost.ShowScriptExplorer()
     {
         if (ScriptExplorerRequested is null)
-            EchoLine?.Invoke("The Script Explorer requires the App UI.");
+            RaiseEchoLine("The Script Explorer requires the App UI.");
         else
             ScriptExplorerRequested.Invoke();
     }
@@ -1357,7 +1388,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // If no one is listening (Console / headless test harness), echo a
         // diagnostic so callers know nothing happened.
         if (EditScriptRequested is null)
-            EchoLine?.Invoke($"[editor] no editor host wired — '{name}' not opened.");
+            RaiseEchoLine($"[editor] no editor host wired — '{name}' not opened.");
         else
             EditScriptRequested.Invoke(name);
     }
@@ -1376,7 +1407,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // the raw args to the subscriber. Console builds with no handler just
         // get a diagnostic.
         if (LayoutCommandRequested is null)
-            EchoLine?.Invoke("[layout] no layout host wired (Console build).");
+            RaiseEchoLine("[layout] no layout host wired (Console build).");
         else
             LayoutCommandRequested.Invoke(args);
     }
@@ -1391,7 +1422,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     void ICommandHost.PluginCommand(string args)
     {
         if (PluginCommandRequested is null)
-            EchoLine?.Invoke("[plugin] no plugin host wired (Console build).");
+            RaiseEchoLine("[plugin] no plugin host wired (Console build).");
         else
             PluginCommandRequested.Invoke(args);
     }
@@ -1403,7 +1434,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     void ICommandHost.ConfigCommand(string args)
     {
         if (ConfigCommandRequested is null)
-            EchoLine?.Invoke("[config] no config host wired (Console build).");
+            RaiseEchoLine("[config] no config host wired (Console build).");
         else
             ConfigCommandRequested.Invoke(args);
     }
@@ -1421,7 +1452,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // forward the raw destination argument. Console builds with no handler
         // just get a diagnostic (no UI mapper to drive).
         if (MapperGotoRequested is null)
-            EchoLine?.Invoke("[goto] no mapper host wired (Console build).");
+            RaiseEchoLine("[goto] no mapper host wired (Console build).");
         else
             MapperGotoRequested.Invoke(args);
     }
@@ -1441,7 +1472,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // unlike reset — they round-trip to the App handler (#146). Console
         // builds with no handler get a diagnostic.
         if (MapperCommandRequested is null)
-            EchoLine?.Invoke("[mapper] no mapper host wired (Console build).");
+            RaiseEchoLine("[mapper] no mapper host wired (Console build).");
         else
             MapperCommandRequested.Invoke(args);
     }
@@ -1544,7 +1575,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // game socket), so an explicit `#connect acct pw …` password never leaks
         // through the lastcommand global.
         if (ConnectRequested is null)
-            EchoLine?.Invoke("[connect] no connect host wired (Console build).");
+            RaiseEchoLine("[connect] no connect host wired (Console build).");
         else
             ConnectRequested.Invoke(request);
     }
@@ -1563,10 +1594,10 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     string Genie.Plugins.IPluginHost.HostVersion      => HostVersionString;
     int    Genie.Plugins.IPluginHost.InterfaceVersion => PluginInterfaceVersion;
 
-    void Genie.Plugins.IPluginHost.Echo(string text) => EchoLine?.Invoke(text);
+    void Genie.Plugins.IPluginHost.Echo(string text) => RaiseEchoLine(text);
 
     void Genie.Plugins.IPluginHost.EchoToWindow(string window, string text)
-        => EchoToWindow?.Invoke(text, window, null);
+        => RaiseEchoToWindow(text, window, null);
 
     void Genie.Plugins.IPluginHost.SetWindow(string window, string content)
         => SetPluginWindow?.Invoke(window, content);
@@ -1589,7 +1620,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
 
     Genie.Plugins.IGameStateView Genie.Plugins.IPluginHost.State => _pluginStateView;
 
-    void Genie.Plugins.IPluginHost.Log(string message) => EchoLine?.Invoke(message);
+    void Genie.Plugins.IPluginHost.Log(string message) => RaiseEchoLine(message);
 
     // ── Public API ─────────────────────────────────────────────────────────────
 
