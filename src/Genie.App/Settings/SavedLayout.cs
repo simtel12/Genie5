@@ -74,6 +74,13 @@ public sealed class SavedLayout
     /// feature; those fall back to <see cref="VisibleTools"/>.</summary>
     public Docking.DockNodeSnapshot? DockTree { get; set; }
 
+    /// <summary>Floating windows (tool ids + screen geometry) attached to the
+    /// dock root when the layout was saved. Floats live outside the
+    /// <see cref="DockTree"/> snapshot, so they need their own capture —
+    /// layouts saved before this field simply have an empty list and restore
+    /// with no floats (the old behavior).</summary>
+    public List<Docking.FloatingWindowSnapshot> FloatingWindows { get; set; } = new();
+
     /// <summary>Whether this layout was saved in windowed (MDI) document mode.
     /// On load, the app switches to that mode before rebuilding — so a layout
     /// saved in windowed mode reopens windowed, not tabbed.</summary>

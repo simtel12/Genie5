@@ -43,3 +43,23 @@ public sealed class DockNodeSnapshot
 
     public List<DockNodeSnapshot> Children { get; set; } = new();
 }
+
+/// <summary>
+/// Serializable snapshot of one floating window attached to the dock root —
+/// the tool ids it hosts plus its screen geometry. Floats live in
+/// <c>IRootDock.Windows</c>, OUTSIDE the docked tree that
+/// <see cref="DockNodeSnapshot"/> captures, so without this a saved layout
+/// silently dropped every floated panel (field report, 2026-07-16).
+/// Restore refloats each id at the saved geometry; a multi-tab float is
+/// restored as one window per tool (cascaded), a deliberate simplification.
+/// </summary>
+public sealed class FloatingWindowSnapshot
+{
+    /// <summary>Registry ids of the tools hosted in this floating window.</summary>
+    public List<string> ToolIds { get; set; } = new();
+
+    public double X      { get; set; }
+    public double Y      { get; set; }
+    public double Width  { get; set; }
+    public double Height { get; set; }
+}

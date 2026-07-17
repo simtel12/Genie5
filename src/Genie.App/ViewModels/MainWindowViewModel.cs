@@ -4748,6 +4748,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             // layout restores the visual arrangement, not just visibility.
             layout.DockTree = factory.CaptureLayout();
 
+            // Floating windows live in IRootDock.Windows, OUTSIDE the tree
+            // snapshot — capture them separately or a saved layout silently
+            // drops every floated panel (field report, 2026-07-16).
+            layout.FloatingWindows = factory.CaptureFloatingWindows();
+
             // In windowed mode the tree snapshot isn't the arrangement — the
             // per-window MDI geometry is. Capture it so the layout reopens with
             // each floating window where it was.
@@ -4830,6 +4835,16 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 foreach (var id in factory.ToolIds)
                     factory.SetToolVisibility(id, wanted.Contains(id));
             }
+
+            // Re-float the layout's floating windows at their saved geometry.
+            // Deferred a UI tick: FloatDockable needs the freshly-assigned tree
+            // live on the DockControl and the owner window realized (the same
+            // constraint FloatMapperIfPending documents).
+            if (layout.FloatingWindows is { Count: > 0 } floats)
+                Avalonia.Threading.Dispatcher.UIThread.Post(
+                    () => { factory.RestoreFloatingWindows(floats); RefreshVisibilityBools(); },
+                    Avalonia.Threading.DispatcherPriority.Background);
+
             RefreshVisibilityBools();
         }
     }

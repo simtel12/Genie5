@@ -1410,6 +1410,106 @@ public class GenieDockFactory : Factory
     }
 
     /// <summary>
+    /// Snapshot every floating window attached to the root — the tool ids each
+    /// hosts plus its screen geometry — for layout persistence. Floats live in
+    /// <see cref="IRootDock.Windows"/>, outside the docked tree that
+    /// <see cref="CaptureLayout"/> walks, so without this saved layouts dropped
+    /// every floated panel.
+    /// </summary>
+    public List<FloatingWindowSnapshot> CaptureFloatingWindows()
+    {
+        var list = new List<FloatingWindowSnapshot>();
+        if (_root?.Windows is not { } windows) return list;
+        foreach (var w in windows)
+        {
+            if (w.Layout is not { } layout) continue;
+            var ids = new List<string>();
+            CollectLeafToolIds(layout, ids);
+            if (ids.Count == 0) continue;
+            list.Add(new FloatingWindowSnapshot
+            {
+                ToolIds = ids,
+                X       = w.X,
+                Y       = w.Y,
+                Width   = w.Width,
+                Height  = w.Height,
+            });
+        }
+        return list;
+    }
+
+    /// <summary>Collect the registry ids of leaf tools/documents under a
+    /// floating window's layout tree (skips the wrapper docks).</summary>
+    private static void CollectLeafToolIds(IDockable node, List<string> ids)
+    {
+        if (node is IDock dock)
+        {
+            if (dock.VisibleDockables is { } kids)
+                foreach (var k in kids) CollectLeafToolIds(k, ids);
+            return;
+        }
+        if (node is not ProportionalDockSplitter && node.Id is { Length: > 0 } id)
+            ids.Add(id);
+    }
+
+    /// <summary>
+    /// Re-float the tools recorded by <see cref="CaptureFloatingWindows"/> at
+    /// their saved geometry. Must run AFTER the rebuilt tree is live on the
+    /// DockControl and the owner window is shown (FloatDockable needs both —
+    /// same constraint as <see cref="FloatMapperIfPending"/>). A snapshot that
+    /// held several tools restores one float per tool, cascaded from the saved
+    /// origin — a deliberate simplification over rebuilding multi-tab float
+    /// containers. Unknown/stale ids are skipped.
+    /// </summary>
+    public void RestoreFloatingWindows(IEnumerable<FloatingWindowSnapshot> floats)
+    {
+        if (_root is null) return;
+        foreach (var f in floats)
+        {
+            int cascade = 0;
+            foreach (var id in f.ToolIds)
+            {
+                if (string.IsNullOrEmpty(id)) continue;
+                if (IsToolFloating(id)) { cascade++; continue; }   // already floating
+
+                if (FindByIdInTree(_root, id) is { } docked)
+                    FloatDockable(docked);                          // float the docked instance
+                else
+                    ShowToolFloating(id);                           // open-closed-tool-floated path
+
+                if (FindWindowHosting(id) is { } w)
+                {
+                    w.X      = f.X + cascade * 28;
+                    w.Y      = f.Y + cascade * 28;
+                    w.Width  = f.Width;
+                    w.Height = f.Height;
+                    // The HostWindow is already presented; push the geometry
+                    // through to the realized OS window as well.
+                    if (w.Host is Avalonia.Controls.Window host)
+                    {
+                        host.Position = new Avalonia.PixelPoint(
+                            (int)(f.X + cascade * 28), (int)(f.Y + cascade * 28));
+                        host.Width  = f.Width;
+                        host.Height = f.Height;
+                    }
+                }
+                cascade++;
+            }
+        }
+    }
+
+    /// <summary>The floating <see cref="IDockWindow"/> whose layout currently
+    /// hosts the given tool id, or null if the tool isn't floating.</summary>
+    private IDockWindow? FindWindowHosting(string id)
+    {
+        if (_root?.Windows is not { } windows) return null;
+        foreach (var w in windows)
+            if (w.Layout is { } layout && FindByIdInTree(layout, id) is not null)
+                return w;
+        return null;
+    }
+
+    /// <summary>
     /// Close every floating <see cref="IDockWindow"/> currently attached to the
     /// root. Swapping a freshly-built tree onto the DockControl does NOT tear
     /// down the old root's HostWindows — Dock.Avalonia only owns windows via the
