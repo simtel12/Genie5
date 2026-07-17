@@ -2689,22 +2689,29 @@ public sealed class ScriptEngine
         // "-1" when only `count` is defined. If nothing resolves, the full
         // candidate is consumed and substituted as empty.
         //
-        // A shrunk candidate must end at a word boundary — the remainder may
-        // start with '.', '-', or a digit, but never a letter/underscore
-        // (public #171). Without this, an UNDEFINED dotted name gets eaten
-        // mid-word by any shorter defined var: `$Outdoorsmanship.Ranks`
-        // matched the compass boolean `$out` → "0doorsmanship.Ranks", and
-        // `$SpellTimer.X.active` matched the reserved `$spelltime` →
-        // "0r.X.active" — both parse errors downstream. (Genie 4 dodges this
-        // only because its VariableList lookup is case-sensitive; our globals
-        // are deliberately case-insensitive.) The community-documented shrink
-        // `%%spell.Prep` → `%spell` + ".Prep" still works — '.' is a boundary.
+        // A shrunk candidate may only break where the remainder does NOT start
+        // with a letter — i.e. never in the middle of a word (public #171).
+        // Without this, an UNDEFINED name gets eaten mid-word by a shorter
+        // defined var: `$Outdoorsmanship.Ranks` matched the compass boolean
+        // `$out` → "0doorsmanship.Ranks" (remainder "doorsmanship…" starts with
+        // a letter), and `$SpellTimer.X.active` matched `$spelltime` →
+        // "0r.X.active". (Genie 4 dodges this only via its case-sensitive
+        // VariableList; our globals are case-insensitive.)
+        //
+        // But '.', '-', digits AND '_' are all legitimate suffix boundaries —
+        // Genie 4 breaks at any of them. `_` in particular is load-bearing:
+        // `%$selection_DESC` (mm_train #1071) must shrink `$selection_DESC` →
+        // `$selection` + "_DESC", forming `%<value>_DESC`. An earlier version
+        // of this rule wrongly rejected the '_' boundary too, so the inner
+        // global collapsed to "" and the leading `%` survived as a bare sigil
+        // → `!(% = "")` (regression, Jason's live mm_train run). The
+        // documented shrinks `%count-1` and `%%spell.Prep` still work.
         int nameEnd = j;
         string value = string.Empty;
         bool resolved = false;
         while (nameEnd > nameStart)
         {
-            if (nameEnd == j || !(char.IsLetter(s[nameEnd]) || s[nameEnd] == '_'))
+            if (nameEnd == j || !char.IsLetter(s[nameEnd]))
             {
                 var name = s[nameStart..nameEnd];
                 if (TryResolveVar(name, c, inst, out value)) { resolved = true; break; }
