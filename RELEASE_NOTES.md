@@ -1,3 +1,51 @@
+# Genie 5 — v5.0.0-alpha.8.15
+
+Floating windows grow up, layouts remember them, and plugins get real
+transform power.
+
+## 🆕 New
+
+- **Startup layout per character** — the Connect dialog gains a **Layout**
+  dropdown: pick any saved layout (global or that profile's own) and it
+  applies automatically every time that character connects. The choice
+  saves with the profile — including when you hit Connect without Save.
+- **`#tvar save` / `#tvar load`** — the advertised subcommands now work:
+  save writes the tvars you've set this session to `tvars.cfg` (never the
+  live game state), load replays them — including across restarts.
+- **Plugin transform hooks are honored end-to-end** (plugin authors):
+  - `OnGameText` now runs **first** in the per-line pipeline (Genie 4's
+    order — plugins before triggers) and its return value is respected:
+    rewrite a line and that's what scripts, triggers, and every window
+    see; return null and the line is gagged everywhere. `#parse`-injected
+    lines flow through the same way. Game state, the mapper, and the
+    built-in trackers still read the raw server events — a plugin controls
+    what's *seen*, not what *happened*.
+  - New **`OnEcho(text, window)`** hook — `#echo` output, script `echo`
+    lines, and system messages dispatch through plugins before display,
+    same rewrite/gag contract. Genie 4 never ran echoes through plugins;
+    existing plugin DLLs keep loading unchanged (default pass-through).
+
+## 🔧 Fixed
+
+- **One taskbar button** (#170) — floated panels no longer each claim a
+  taskbar entry. They behave as proper tool windows now: a **minimize
+  button** on the float's title bar, floats minimize/restore together
+  with the main window, and a minimized float comes back via its Window
+  menu entry.
+- **Saved layouts keep floating windows** — save a layout with floated
+  panels and loading it brings each one back at its saved position and
+  size. Layouts saved before this release simply restore as they always
+  did.
+- **`$spellpreptime` is the spell's full prep length** (Genie 4 parity) —
+  it had mirrored `$spelltime`'s elapsed count-up; it's now the constant
+  casttime − prep-start duration, `0` when nothing is being prepared.
+
+## 📝 Plugin-author note
+
+Plugin dispatch moved from *last* to *first* in the per-line pipeline.
+Observe-only plugins are unaffected; a plugin that relied on seeing lines
+after scripts/triggers acted will notice the order change.
+
 # Genie 5 — v5.0.0-alpha.8.14
 
 Three community-reported fixes, all in Genie 4 parity territory: **script

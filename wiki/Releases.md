@@ -4,7 +4,21 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8.14 — Script & Hand Parity
+## Latest: v5.0.0-alpha.8.15 — Floating Windows & Plugin Transforms
+
+Floating windows grow up, layouts remember them, and plugins get real transform power.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.15** as a delta.
+
+- **Floating windows behave like real tool windows** — one taskbar button per Genie instance (no more one-per-float), a minimize button on the float's title bar, floats minimize/restore together with the main window, and **saved layouts now capture and restore floats** at their positions.
+- **Startup layout per character** — a Layout dropdown in the Connect dialog auto-applies your chosen saved layout every time that character connects.
+- **`#tvar save` / `#tvar load`** persist your session tvars to `tvars.cfg` and back — including across restarts.
+- **Plugin transform hooks honored end-to-end** — `OnGameText` runs first in the line pipeline and can rewrite or gag what scripts, triggers, and windows see; the new `OnEcho` hook does the same for echoed lines. See [Plugins](Plugins).
+- **`$spellpreptime`** is the spell's full prep length (Genie 4 parity), not the elapsed count-up (that's `$spelltime`).
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.15)
+
+## v5.0.0-alpha.8.14 — Script & Hand Parity
 
 Three community-reported fixes: script variables and your hands now behave exactly like Genie 3/4.
 
