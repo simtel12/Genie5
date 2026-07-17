@@ -50,11 +50,23 @@ public interface IGeniePlugin
 
     // ── Transform hooks (Genie 4 ParseText / ParseInput parity) ──────────────
     /// <summary>
-    /// A fully-parsed game text line. Return the text to display — unchanged to
+    /// A fully-parsed game text line, dispatched FIRST in the per-line pipeline
+    /// (Genie 4 order: plugins before triggers). Return the text unchanged to
     /// observe, modified to rewrite, or <c>null</c> to gag the line entirely.
-    /// Plugins are chained in registration order; a <c>null</c> short-circuits
-    /// the chain (the line is suppressed). <paramref name="stream"/> is "main"
+    /// The transform is honored end-to-end: what you return is what scripts
+    /// (waitfor/match), user triggers, and every display window see; a gag
+    /// suppresses the line for all of them. <c>#parse</c>-injected lines flow
+    /// through here the same way. Plugins are chained in registration order; a
+    /// <c>null</c> short-circuits the chain. <paramref name="stream"/> is "main"
     /// or a stream id (talk, thoughts, combat, …).
+    ///
+    /// <para><b>Scope of a rewrite/gag:</b> display, scripts, and triggers only.
+    /// Game state (vitals, room, hands), the script globals, the mapper, and the
+    /// built-in trackers run off the raw parser events — a plugin controls what
+    /// is <em>seen</em>, not what <em>happened</em>. A rewritten line loses its
+    /// link/bold/preset styling (the span offsets no longer apply). A line the
+    /// plugin itself injects from inside this hook (via <c>#parse</c>) is not
+    /// re-dispatched (no feedback loop).</para>
     /// </summary>
     string? OnGameText(string text, string stream);
 

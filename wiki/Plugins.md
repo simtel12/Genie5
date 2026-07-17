@@ -29,7 +29,9 @@ The plugin contract lives in a small, **UI-free** library (`Genie.Plugins.Abstra
 
 Identity (`Id`, `Name`, `Version`, `Author`, `Description`, `MinHostVersion`), an `Enabled` flag, lifecycle (`Initialize` / `Shutdown`), and hooks:
 
-- **Transform hooks** — `OnGameText(text, stream)`, `OnInput(input)`, and `OnEcho(text, window)` return modified text, or `null` to gag/swallow. Plugins chain in load order. (`OnGameText`/`OnInput` are the bulk of what Genie 4 plugins did; `OnEcho` is a Genie 5 extension — Genie 4 never ran echoed lines through plugins. It sees `#echo` output, script `echo` lines, and system messages, with the target window name — and has a default pass-through implementation, so plugins built before it exist keep loading unchanged.)
+- **Transform hooks** — `OnGameText(text, stream)`, `OnInput(input)`, and `OnEcho(text, window)` return modified text, or `null` to gag/swallow. Plugins chain in load order, and the transforms are honored end-to-end:
+  - `OnGameText` runs **first** in the per-line pipeline (Genie 4's order — plugins before triggers), and what it returns is what scripts, triggers, and every window see; `null` suppresses the line for all of them. `#parse`-injected lines flow through it the same way (a Genie 5 upgrade — Genie 4 fed `#parse` to plugins observe-only). Game state, the mapper, and the built-in trackers read the raw server events, so a plugin controls what's *seen*, not what *happened*; a rewritten line loses its link/bold/preset styling.
+  - `OnEcho` is a Genie 5 extension — Genie 4 never ran echoed lines through plugins. It sees `#echo` output, script `echo` lines, and system messages, with the target window name — and has a default pass-through implementation, so plugins built before it exist keep loading unchanged.
 - **Observation hooks** — `OnXml(fragment)`, `OnCommandSent(command)`, `OnPrompt()`, `OnVariableChanged(name, value)`.
 
 ### `IPluginHost`

@@ -720,28 +720,7 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             switch (evt)
             {
                 case TextEvent te:
-                    // Self-calibrate the type-ahead limit from the server's own cap
-                    // report ("(Sorry,) you may only type ahead N line(s).") so a
-                    // wrong seed (e.g. a Lich/DevReplay default, or premium+LTB) is
-                    // corrected by the authority. Cheap guard before any parsing.
-                    if (te.Text.IndexOf("type ahead", StringComparison.OrdinalIgnoreCase) >= 0)
-                        CalibrateTypeAhead(te.Text);
-                    // Each per-line consumer is timed into its own stage so the
-                    // overlay shows which feature is eating the frame. The Time
-                    // wrapper is a zero-overhead passthrough while disabled.
-                    Metrics.Time(PipelineStage.Scripts,  () => Scripts.OnGameLine(te.Text));   // match/waitfor + EXP/info trackers
-                    // ParseGameOnly (Genie 4 parity): when on, fire triggers only on
-                    // the main game stream, not secondary stream-windows (thoughts,
-                    // logons, combat, …). Default off → triggers see every stream.
-                    Metrics.Time(PipelineStage.Triggers, () =>
-                    {
-                        if (!(Config?.ParseGameOnly ?? false) || te.Stream == "main")
-                            Triggers.ProcessLine(te.Text);                                     // user-defined triggers
-                    });
-                    // Plugins observe each line. Phase 1 ignores the transform
-                    // return (display-pipeline rewrite/gag wiring is deferred);
-                    // observe-only plugins return the text unchanged.
-                    Metrics.Time(PipelineStage.Plugins,  () => Plugins.DispatchGameText(te.Text, te.Stream));
+                    ProcessGameTextEvent(te);
                     break;
 
                 case PromptEvent:
@@ -927,7 +906,12 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // swallowed and OnCompleted is intentionally NOT forwarded, so tearing down
         // a connection can never complete/error the relays out from under live
         // subscribers. These three subs are disposed first in TeardownConnection.
-        _gameEventsRelaySub = parser.GameEvents.Subscribe(e => _gameEventsRelay.OnNext(e), static _ => { });
+        //
+        // TextEvents are NOT forwarded here — ProcessGameTextEvent relays them
+        // itself after the plugin transform (rewrite/gag), so UI consumers only
+        // ever see the plugin-approved text. Everything else passes through raw.
+        _gameEventsRelaySub = parser.GameEvents.Subscribe(
+            e => { if (e is not TextEvent) _gameEventsRelay.OnNext(e); }, static _ => { });
         _rawXmlRelaySub     = connection.RawXmlStream.Subscribe(x => _rawXmlRelay.OnNext(x), static _ => { });
         _connStateRelaySub  = connection.StateStream.Subscribe(s => _connStateRelay.OnNext(s), static _ => { });
     }
@@ -1069,16 +1053,65 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     }
 
     /// <summary>
+    /// The per-line game-text pipeline for a live <see cref="TextEvent"/>.
+    /// Genie 4 order — plugins FIRST (its <c>ParsePluginText</c> ran before
+    /// <c>TriggerParse</c>), then scripts, triggers, and finally the relay to
+    /// UI consumers — and, as a deliberate Genie 5 extension, the plugin
+    /// transform is HONORED: a rewrite feeds the modified text to scripts,
+    /// triggers, and the display; a <c>null</c> gags the line everywhere
+    /// downstream. A rewritten line drops its link/bold/preset spans (their
+    /// offsets are meaningless in the new text). <see cref="GameStateEngine"/>,
+    /// <see cref="Scripting.ScriptGlobalsSync"/>, the mapper, and the built-in
+    /// extensions all run off the RAW parser events, so a plugin gag can never
+    /// corrupt game state — it is authoritative over what is *seen*, not what
+    /// *happened*. Type-ahead calibration also reads the raw text: it is a
+    /// safety net the server owns, not something a plugin may disable.
+    /// </summary>
+    internal void ProcessGameTextEvent(TextEvent te)
+    {
+        // Self-calibrate the type-ahead limit from the server's own cap
+        // report ("(Sorry,) you may only type ahead N line(s).") so a
+        // wrong seed (e.g. a Lich/DevReplay default, or premium+LTB) is
+        // corrected by the authority. Cheap guard before any parsing.
+        if (te.Text.IndexOf("type ahead", StringComparison.OrdinalIgnoreCase) >= 0)
+            CalibrateTypeAhead(te.Text);
+
+        // Each per-line consumer is timed into its own stage so the overlay
+        // shows which feature is eating the frame. The Time wrapper is a
+        // zero-overhead passthrough while disabled.
+        string? transformed = te.Text;
+        Metrics.Time(PipelineStage.Plugins,
+                     () => transformed = Plugins.DispatchGameText(te.Text, te.Stream));
+        if (transformed is null) return;                    // gagged — nothing downstream
+        var ev = string.Equals(transformed, te.Text, StringComparison.Ordinal)
+            ? te
+            : te with { Text = transformed, Links = null, BoldSpans = null, PresetSpans = null };
+
+        Metrics.Time(PipelineStage.Scripts,  () => Scripts.OnGameLine(ev.Text));   // match/waitfor + EXP/info trackers
+        // ParseGameOnly (Genie 4 parity): when on, fire triggers only on
+        // the main game stream, not secondary stream-windows (thoughts,
+        // logons, combat, …). Default off → triggers see every stream.
+        Metrics.Time(PipelineStage.Triggers, () =>
+        {
+            if (!(Config?.ParseGameOnly ?? false) || ev.Stream == "main")
+                Triggers.ProcessLine(ev.Text);                                     // user-defined triggers
+        });
+        _gameEventsRelay.OnNext(ev);                        // UI consumers see the approved text
+    }
+
+    /// <summary>
     /// Inject a synthetic line into the full per-line pipeline as if the server
-    /// had emitted it — the Genie 4 <c>#parse</c> primitive. Runs the same three
-    /// legs as a live <see cref="TextEvent"/> (scripts' waitfor/match + built-in
-    /// trackers, the global user-trigger list, and plugins) but deliberately
-    /// omits the game-only bits: it never echoes to a window, never reaches the
-    /// game socket, and skips type-ahead calibration. Reached from a scripted
-    /// <c>#parse</c> (via the ScriptEngine injector callback) and a typed
-    /// <c>#parse</c> from the command bar (via the command host). The argument
-    /// arrives already <c>$</c>/<c>%</c>-expanded by the caller, matching Genie 4's
-    /// <c>ParseGlobalVars</c> on the #parse argument.
+    /// had emitted it — the Genie 4 <c>#parse</c> primitive. Runs the same legs
+    /// as a live <see cref="TextEvent"/> in the same order — plugins first (the
+    /// transform is honored: rewrite feeds scripts/triggers, <c>null</c> gags
+    /// the injection; Genie 4 fed #parse to plugins observe-only and LAST), then
+    /// scripts' waitfor/match + built-in trackers, then the global user-trigger
+    /// list — but deliberately omits the game-only bits: it never echoes to a
+    /// window, never reaches the game socket, and skips type-ahead calibration.
+    /// Reached from a scripted <c>#parse</c> (via the ScriptEngine injector
+    /// callback) and a typed <c>#parse</c> from the command bar (via the command
+    /// host). The argument arrives already <c>$</c>/<c>%</c>-expanded by the
+    /// caller, matching Genie 4's <c>ParseGlobalVars</c> on the #parse argument.
     /// </summary>
     public void InjectParsedLine(string line)
     {
@@ -1086,10 +1119,11 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // Treat as the main stream so the ParseGameOnly gate (below) always
         // lets injected text reach triggers — Genie 4 fed #parse to triggers
         // unconditionally.
-        Scripts.OnGameLine(line);                       // scripts (waitfor/match) + built-in trackers + JS waiters
+        var transformed = Plugins.DispatchGameText(line, "main");
+        if (transformed is null) return;                    // plugin gagged the injection
+        Scripts.OnGameLine(transformed);                    // scripts (waitfor/match) + built-in trackers + JS waiters
         if (!(Config?.ParseGameOnly ?? false))
-            Triggers.ProcessLine(line);                 // global user-defined triggers
-        Plugins.DispatchGameText(line, "main");         // plugins observe the line
+            Triggers.ProcessLine(transformed);              // global user-defined triggers
     }
 
     private void OnConnectReady(DrXmlParser? lichAttachParser = null)

@@ -169,12 +169,23 @@ public sealed class PluginManager
 
     // ── Transform dispatch (chained; null = gag/swallow) ─────────────────────
 
-    /// <summary>Run a display line through every enabled plugin in registration
-    /// order, each seeing the prior's output. Returns the final text to display,
-    /// or null if any plugin gagged it (short-circuits the chain). A plugin that
-    /// throws is skipped with its input preserved.</summary>
+    // A plugin may inject a line from inside OnGameText (host.SendCommand("#parse …")
+    // → GenieCore.InjectParsedLine → back here). Per-thread guard: such nested
+    // lines pass through undispatched instead of recursing forever.
+    [ThreadStatic] private static bool _inGameTextDispatch;
+
+    /// <summary>Run a game-text line through every enabled plugin in registration
+    /// order, each seeing the prior's output. Returns the final text — the caller
+    /// (GenieCore's per-line pipeline) honors it end-to-end: a rewrite feeds
+    /// scripts/triggers/display, null means gagged (short-circuits the chain).
+    /// A plugin that throws is skipped with its input preserved.</summary>
     public string? DispatchGameText(string text, string stream)
-        => Chain(text, (p, s) => p.OnGameText(s, stream));
+    {
+        if (_inGameTextDispatch) return text;
+        _inGameTextDispatch = true;
+        try     { return Chain(text, (p, s) => p.OnGameText(s, stream)); }
+        finally { _inGameTextDispatch = false; }
+    }
 
     /// <summary>Run a typed-input line through every enabled plugin in order.
     /// Returns the final command to run, or null if swallowed.</summary>
