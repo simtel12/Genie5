@@ -25,6 +25,15 @@ public sealed class GenieHostWindow : HostWindow
 
     public GenieHostWindow()
     {
+        // #170: floated panels are secondary tool windows of the one Genie
+        // instance — they must not each claim a taskbar button (a layout with
+        // several floats filled the taskbar with identical Genie entries).
+        // One instance = one button (the main window's). Floats remain
+        // reachable through the Window menu even if minimized — the dock
+        // factory's floating-window lookups (FindByIdInTree recursing floating
+        // windows) restore them.
+        ShowInTaskbar = false;
+
         // Window-level fallback (bubbles from any child). Only acts when we couldn't
         // bind PART_TitleBar directly (see OnApplyTemplate); gated on the top band so
         // a double-tap in the panel content never maximizes.
