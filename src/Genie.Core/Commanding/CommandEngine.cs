@@ -760,13 +760,15 @@ public sealed class CommandEngine
             case "tvar":
                 // #tvar name value — set a session-global $variable that all
                 // scripts can read via $name. Genie 4 parity: tvars persist
-                // across scripts (and the engine writes them to tvars.cfg
-                // for round-trip across launches via #tvar save / load).
+                // across scripts within the session. `save`/`load` round-trip
+                // them to tvars.cfg — a Genie 5 convenience (Genie 4 tvars are
+                // VariableType.Temporary and are never written to disk).
                 if (parts.Count >= 3)
                 {
                     var tname  = parts[1];
                     var tvalue = ResolveValueCommand(string.Join(" ", parts.Skip(2)));
                     _host.SetGlobalVariable(tname, tvalue);
+                    _userTvars.Add(tname);
                     if (_processInputDepth == 1 && _interactive)
                         _host.Echo($"Global variable set: {tname}={tvalue}");
                 }
@@ -785,6 +787,7 @@ public sealed class CommandEngine
                 if (parts.Count > 1)
                 {
                     _host.RemoveGlobalVariable(parts[1]);
+                    _userTvars.Remove(parts[1]);
                     _host.Echo($"Global variable removed: {parts[1]}");
                 }
                 break;
@@ -2343,23 +2346,46 @@ public sealed class CommandEngine
         _host.Echo("Macros Loaded");
     }
 
-    // ── #tvar save / load (stubbed) ─────────────────────────────────────────
+    // ── #tvar save / load ────────────────────────────────────────────────────
     //
-    // Tvars are session-globals. Genie 4 persists them to tvars.cfg between
-    // sessions. We don't yet — Scripts.Globals is the in-memory home for
-    // both user tvars and parser-pumped live game state (health, stamina,
-    // etc.), and separating them is a small refactor. The save/load
-    // commands echo "not implemented" so users get a clear signal instead
-    // of silent failure.
+    // A Genie 5 convenience: Genie 4's tvars are VariableType.Temporary and
+    // are NEVER written to disk (verified against Genie 4 Command.cs /
+    // Globals.cs — variables.cfg carries only #var-type SaveToFile entries).
+    // Scripts.Globals is the in-memory home for BOTH user tvars and the
+    // parser-pumped live game state (health, roomname, righthand, …), so
+    // save writes only the names actually set via #tvar this session
+    // (_userTvars) — never the live state, which must not round-trip into
+    // a file and stomp real values on load. The file is standard cfg format
+    // (one replayable #tvar command per line), so load just replays it
+    // through the guarded cfg-line runner.
+
+    /// <summary>Names set via <c>#tvar</c> this session — the only globals
+    /// <c>#tvar save</c> persists. <c>#untvar</c> removes; a <c>#tvar load</c>
+    /// replay re-adds via the normal <c>#tvar</c> path.</summary>
+    private readonly HashSet<string> _userTvars = new(StringComparer.OrdinalIgnoreCase);
 
     private void SaveTvars()
     {
-        _host.Echo("#tvar save is not yet implemented (tvars are in-memory only for now).");
+        var path = Path.Combine(_config.ConfigProfileDir, "tvars.cfg");
+        var all  = _host.GetGlobalVariables();
+        var lines = _userTvars
+            .Where(all.ContainsKey)
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .Select(n => $"#tvar {ConfigPersistence.FormatArg(n)} {ConfigPersistence.FormatArg(all[n])}")
+            .ToList();
+        if (ConfigPersistence.WriteLines(path, lines))
+            _host.Echo($"Global variables saved ({lines.Count})");
+        else
+            _host.Echo($"Failed to save global variables: {path}");
     }
 
     private void LoadTvars()
     {
-        _host.Echo("#tvar load is not yet implemented (tvars are in-memory only for now).");
+        var path  = Path.Combine(_config.ConfigProfileDir, "tvars.cfg");
+        var lines = ConfigPersistence.ReadLines(path);
+        if (lines is null) { _host.Echo($"No tvars file: {path}"); return; }
+        RunCfgFileLines(lines, "tvars.cfg");
+        _host.Echo("Global variables loaded");
     }
 
     // ── Tick ────────────────────────────────────────────────────────────────
