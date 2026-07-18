@@ -1645,7 +1645,7 @@ public sealed class ScriptEngine
                 if (inst.Labels.TryGetValue(gLabel, out var gi))
                 {
                     inst.Pc = gi + 1;
-                    DbgEcho(inst, 1, $"goto {gLabel} → line {gi + 1}");
+                    DbgEcho(inst, 1, $"goto {gLabel} → line {TargetLineNo(inst, gi + 1)}");
                     inst.Trace.Add($"goto {gLabel}", gOrigin, lineNo);
                 }
                 else { _echo($"[script] unknown label: {rest}"); inst.Running = false; }
@@ -1685,7 +1685,7 @@ public sealed class ScriptEngine
                 }
                 inst.GosubStack.Push(inst.Pc);
                 inst.Pc = ss + 1;
-                DbgEcho(inst, 1, $"gosub {label.Trim()} → line {ss + 1}" +
+                DbgEcho(inst, 1, $"gosub {label.Trim()} → line {TargetLineNo(inst, ss + 1)}" +
                     (string.IsNullOrEmpty(gosubArgs) ? "" : $" args: {gosubArgs}"));
                 inst.Trace.Add($"gosub {label.Trim()}", inst.Lines[currentIdx].Origin, lineNo);
                 // Gosub arguments populate $0..$9 on a NEW stack frame — they
@@ -1720,7 +1720,7 @@ public sealed class ScriptEngine
                     var retPc = inst.GosubStack.Pop();
                     if (inst.DollarStack.Count > 1) inst.DollarStack.Pop();
                     if (inst.DollarCounts.Count > 1) inst.DollarCounts.Pop();
-                    DbgEcho(inst, 1, $"return → line {retPc}");
+                    DbgEcho(inst, 1, $"return → line {TargetLineNo(inst, retPc)}");
                     inst.Trace.Add("return", inst.Lines[currentIdx].Origin, lineNo);
                     inst.Pc = retPc;
                 }
@@ -2608,6 +2608,21 @@ public sealed class ScriptEngine
         if (i < 0) return (s, string.Empty);
         return (s[..i], s[(i + 1)..].Trim());
     }
+
+    /// <summary>
+    /// The real 1-based source line at a compiled-<see cref="ScriptInstance.Lines"/>
+    /// index, for the goto/gosub/return debug trace. The Lines array is the
+    /// COMPILED program — its index is NOT the source line number (block braces
+    /// split, blanks/comments dropped, includes expanded), so printing "index+1"
+    /// misreported every jump target (e.g. `gosub mech.forage → line 1034` when
+    /// the label sat at source line 878). Map the target Pc back through
+    /// <see cref="ScriptLine.LineNumber"/> instead. Clamped so an end-of-script Pc
+    /// (a label on the final line) still yields a sane number.
+    /// </summary>
+    private static int TargetLineNo(ScriptInstance inst, int pc)
+        => inst.Lines.Count == 0
+            ? 0
+            : inst.Lines[Math.Clamp(pc, 0, inst.Lines.Count - 1)].LineNumber;
 
     /// <summary>Lazily build the per-script JavaScript library context (#104),
     /// bound to THIS instance's variable scope: bare getVar/setVar → the script's
