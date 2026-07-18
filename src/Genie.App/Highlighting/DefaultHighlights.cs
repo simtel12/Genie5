@@ -493,7 +493,17 @@ public static class DefaultHighlights
             }
             e.Handled = true;
         };
-        return new InlineUIContainer { Child = tb };
+        // #177: without an explicit baseline the InlineUIContainer sits its
+        // child's box on the text baseline, lifting the link text above the
+        // surrounding Runs (it read as superscript — obvious-paths links were
+        // visibly raised). TextBottom aligns the child's bottom with the text
+        // line's bottom; since the link uses the same inherited font/size as
+        // the flow, that puts its glyphs on the same baseline as the rest.
+        return new InlineUIContainer
+        {
+            Child             = tb,
+            BaselineAlignment = BaselineAlignment.TextBottom,
+        };
     }
 }
 
