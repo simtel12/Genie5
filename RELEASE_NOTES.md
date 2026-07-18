@@ -1,3 +1,27 @@
+# Genie 5 — v5.0.0-alpha.8.17
+
+A community bug-fix round — display polish and a Genie 4 command.
+
+## 🆕 New
+
+- **`#comment <window> <text>`** — Genie 4's window-title annotation is back.
+  A trigger like `#comment Room $zoneid. $roomid` titles the Room panel
+  **Room (69. 120)**; `#comment Room` with no text clears it. The window
+  name matches a panel (`Room`, `Mapper`, …) case-insensitively. (#179)
+
+## 🔧 Fixed
+
+- **Intentional blank lines are preserved** — `INFO`, `LOOK <character>`,
+  `HELP ADVICE` and similar output use blank lines for spacing; Genie 5 had
+  been collapsing them. They now render with the same spacing as Genie 4,
+  without adding stray blanks elsewhere. (#176)
+- **Obvious-paths links sit on the baseline** — the room-exit direction
+  links no longer render raised/superscript; they align with the
+  surrounding text. (#177)
+- **Script debug trace shows real line numbers** — at debug level 1+, the
+  `goto` / `gosub` / `return` trace now reports the actual source line of
+  the jump target instead of an internal index.
+
 # Genie 5 — v5.0.0-alpha.8.16
 
 A quick fix for a script-variable regression from 8.14/8.15.

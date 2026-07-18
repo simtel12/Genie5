@@ -4,7 +4,20 @@ Where to get Genie 5 and what changed in each build. Downloads live on the [Rele
 
 > Genie 5 is **alpha**. Versions are tagged `v5.0.0-alpha.N`. Builds are unsigned for now (Windows/macOS show a first-launch warning — see [Installation](Installation#platform-first-launch-notes)); signed Windows builds are expected from an upcoming release.
 
-## Latest: v5.0.0-alpha.8.16 — Menu-Script Fix
+## Latest: v5.0.0-alpha.8.17 — Community Fixes
+
+A community bug-fix round — display polish and a Genie 4 command.
+
+> **📡 Still on the beta channel — that's intentional.** Every alpha ships as a GitHub **pre-release**, so the Core updater defaults to **beta**; that's what lets **Help → Check for Updates** see new alpha builds. Already on an earlier alpha? Open the Updates dialog and you'll be offered **alpha.8.17** as a delta.
+
+- **`#comment <window> <text>`** — Genie 4's window-title annotation: `#comment Room $zoneid. $roomid` titles the Room panel **Room (69. 120)**; blank text clears it.
+- **Intentional blank lines are preserved** — `INFO`, `LOOK <character>`, `HELP ADVICE` output keeps its blank-line spacing instead of collapsing.
+- **Obvious-paths links** sit on the text baseline instead of rendering raised/superscript.
+- **Script debug trace** (`goto`/`gosub`/`return` at debug level 1+) reports the real source line of the jump target.
+
+[Full release notes →](https://github.com/GenieClient/Genie5/releases/tag/v5.0.0-alpha.8.17)
+
+## v5.0.0-alpha.8.16 — Menu-Script Fix
 
 A quick fix for a script-variable regression from 8.14/8.15.
 
