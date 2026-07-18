@@ -52,6 +52,12 @@ public sealed class DrXmlParser : IDisposable
     private string _handExist = "";      // HeldItemEvent fires at the close tag with the body text (#172)
     private bool _inCompass   = false;
     private bool _inPrompt    = false;   // <prompt>…</prompt> body — route to _promptBuffer, fire on close
+    // #176: a genuine blank line (server sent `\n\n` in the TEXT stream) is
+    // preserved, but the empty produced by a `\n` right after a tag close
+    // (component/prompt/style/etc.) is not — those aren't real output. This is
+    // true only while a real text line has been emitted since the last tag, so
+    // an empty line emits a blank iff it directly follows real text.
+    private bool _emittedTextLine = false;
     private string _currentPresetId = "";
     private readonly System.Text.StringBuilder _compassBuffer = new();
 
@@ -536,7 +542,20 @@ public sealed class DrXmlParser : IDisposable
             : null;
         _pendingPresetSpans.Clear();
 
-        if (stripped.Length == 0) return;
+        if (stripped.Length == 0)
+        {
+            // Preserve a real blank line (INFO/LOOK/HELP spacing, public #176)
+            // — but only when it directly follows real text on this stream.
+            // The empty produced by a tag-adjacent newline (buffer emptied by a
+            // component/prompt close) has _emittedTextLine == false and is
+            // dropped, so we never spam a blank after every tag.
+            if (_emittedTextLine)
+            {
+                _emittedTextLine = false;   // one blank per run of empties
+                _events.OnNext(new TextEvent(_activeStream, string.Empty));
+            }
+            return;
+        }
 
         // Bare-text prompt line (">", "H>", "HR>"). Trim leading whitespace
         // for prompt detection only — the regex anchors on '^' so accidental
@@ -623,6 +642,7 @@ public sealed class DrXmlParser : IDisposable
             links = links is null ? new[] { newsLink } : links.Append(newsLink).ToArray();
 
         _events.OnNext(new TextEvent(_activeStream, stripped, links, boldSpans, presetSpans));
+        _emittedTextLine = true;   // a real blank line may now follow (#176)
     }
 
     // One armed `look` response → synthetic room ComponentEvents (issue #126).
@@ -950,6 +970,13 @@ public sealed class DrXmlParser : IDisposable
     private void HandleElement(XmlReader r, string rawTag)
     {
         var name = r.Name.ToLowerInvariant();
+
+        // A tag boundary breaks the run of real text (#176): a newline that
+        // arrives right after this tag with an empty buffer must NOT emit a
+        // blank line. The next real text line re-arms it. Inline tags (<d>,
+        // bold) are harmless — the line carrying their text still emits and
+        // re-sets the flag before any following blank.
+        _emittedTextLine = false;
 
         if (_settingsTags.Contains(name)) return;
 
@@ -1475,6 +1502,11 @@ public sealed class DrXmlParser : IDisposable
 
     private void HandleEndElement(string name)
     {
+        // Tag boundary — same blank-line gating as HandleElement (#176). A
+        // close handler that emits real text (hand/spell/inv merge-seam,
+        // roomDesc flush) re-arms the flag itself via EmitLine.
+        _emittedTextLine = false;
+
         if (_settingsTags.Contains(name)) return;
 
         switch (name.ToLowerInvariant())
