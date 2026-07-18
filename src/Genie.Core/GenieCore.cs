@@ -935,6 +935,14 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
     void ICommandHost.WindowCommand(string sub, string window)
         => WindowCommandRequested?.Invoke(sub, window);
 
+    void ICommandHost.SetWindowComment(string window, string comment)
+        => WindowCommentRequested?.Invoke(window, comment);
+
+    /// <summary>Raised by <c>#comment &lt;window&gt; &lt;text&gt;</c> (Genie 4
+    /// title annotation). Args: (window, comment); a blank comment clears it.
+    /// The App sets the matching dock panel's title bar.</summary>
+    public event Action<string, string>? WindowCommentRequested;
+
     void ICommandHost.SetStatusBar(string text, int index)
         => StatusBarRequested?.Invoke(text, index);
 

@@ -43,6 +43,17 @@ public interface ICommandHost
     void WindowCommand(string sub, string window);
 
     /// <summary>
+    /// Set a Genie 4 <c>#comment</c> annotation on a window's title bar:
+    /// <c>#comment Room 69. 120</c> shows the Room panel titled "Room (69. 120)".
+    /// A blank comment clears it back to the base title. The dock lives in the
+    /// App layer, so Core forwards the window name + resolved text; Console /
+    /// headless builds drop it.
+    /// <para>Default no-op so the many test/headless hosts need no change; the
+    /// real App host (GenieCore) implements it.</para>
+    /// </summary>
+    void SetWindowComment(string window, string comment) { }
+
+    /// <summary>
     /// Set the script status-bar text (Genie 4 <c>#statusbar</c> / <c>#status</c>).
     /// <paramref name="index"/> selects one of Genie 4's ten status slots
     /// (1-10; the command-bar layer defaults a missing/invalid index to 1); the

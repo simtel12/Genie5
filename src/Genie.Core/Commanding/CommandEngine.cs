@@ -297,6 +297,20 @@ public sealed class CommandEngine
                 _host.WindowCommand(sub, wname);
                 break;
             }
+            case "comment":
+            {
+                // #comment <window> <text> — Genie 4 window-title annotation.
+                // A common trigger use is `#comment Room $zoneid. $roomid` to
+                // show "Room (69. 120)" in the Room panel's title. parts[1] is
+                // the window; the rest (joined) is the comment. `#comment
+                // <window>` with no text clears the annotation. The whole line
+                // is already $/%-expanded before dispatch, so the text carries
+                // resolved values.
+                if (parts.Count >= 2)
+                    _host.SetWindowComment(parts[1],
+                        parts.Count > 2 ? string.Join(" ", parts.Skip(2)) : string.Empty);
+                break;
+            }
             case "status":
             case "statusbar":
                 // Genie 4 #statusbar [N] {text} — write text to one of ten status

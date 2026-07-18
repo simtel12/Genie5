@@ -2957,6 +2957,15 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                         break;
                 }
             });
+
+        // #comment <window> <text> (#179): annotate a panel's title bar, e.g.
+        // `#comment Room 69. 120` → "Room (69. 120)". Blank text clears it.
+        core.WindowCommentRequested += (window, comment) =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (DockFactory is GenieDockFactory f)
+                    f.SetWindowComment(window?.Trim() ?? "", comment ?? "");
+            });
     }
 
     /// <summary>Rebuild the Window → Plugin Windows submenu from the factory's

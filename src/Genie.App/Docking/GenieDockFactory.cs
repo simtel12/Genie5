@@ -1566,6 +1566,38 @@ public class GenieDockFactory : Factory
             w.Exit();
     }
 
+    // Base titles captured the first time a #comment is applied to a window,
+    // so the annotation can be cleared back to the original (#179).
+    private readonly Dictionary<string, string> _windowBaseTitles =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Genie 4 <c>#comment &lt;window&gt; &lt;text&gt;</c>: annotate a dock
+    /// panel's title bar as "<c>Base (text)</c>", or restore the base title
+    /// when <paramref name="comment"/> is blank. The window name matches a tool
+    /// id (e.g. "room", "mapper") or a plugin-window name, case-insensitively.
+    /// </summary>
+    public void SetWindowComment(string window, string comment)
+    {
+        if (string.IsNullOrWhiteSpace(window) || _root is null) return;
+
+        // Resolve the target dockable: a built-in tool id (e.g. "room"), else a
+        // plugin window by name. Match against what's actually in the tree.
+        var id = _tools.Keys.FirstOrDefault(k => k.Equals(window, StringComparison.OrdinalIgnoreCase));
+        if (id is null && FindByIdInTree(_root, PluginWindowId(window)) is not null)
+            id = PluginWindowId(window);
+        if (id is null || FindByIdInTree(_root, id) is not { } dockable) return;
+
+        if (!_windowBaseTitles.TryGetValue(id, out var baseTitle))
+        {
+            baseTitle = dockable.Title ?? window;
+            _windowBaseTitles[id] = baseTitle;
+        }
+        dockable.Title = string.IsNullOrWhiteSpace(comment)
+            ? baseTitle
+            : $"{baseTitle} ({comment.Trim()})";
+    }
+
     /// <summary>
     /// True if the tool is currently in one of the root's floating
     /// <see cref="IRootDock.Windows"/> (as opposed to docked in the main
