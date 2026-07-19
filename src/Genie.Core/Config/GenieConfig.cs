@@ -247,6 +247,9 @@ public sealed class GenieConfig
 
     /// <summary>Extra arguments passed to Lich after the script path (e.g.
     /// <c>--login MyChar --without-frontend --detachable-client=8000</c>).
+    /// Supports <c>{character}</c> and <c>{port}</c> placeholders, expanded at
+    /// auto-launch from the Lich-proxy profile's Character field and proxy port
+    /// (e.g. <c>--login {character} --dragonrealms --genie --headless {port}</c>).
     /// Genie 4's <c>LichArguments</c>. <c>#config lichargs {args}</c>.</summary>
     public string LichArguments { get; set; } = string.Empty;
 

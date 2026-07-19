@@ -924,6 +924,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// session-ending "Disconnected" popup (#114) can show it. Null for a clean close.</summary>
     private string? _lastDropReason;
 
+    /// <summary>PID of a Lich process Genie auto-launched this session. Null when we only
+    /// attached to an already-running Lich (never kill that). Cleared after <see cref="StopOwnedLich"/>.</summary>
+    private int? _ownedLichProcessId;
+
+    /// <summary>Character + port key for the owned auto-launched Lich — used to detect a
+    /// character/port switch that needs a stop-then-relaunch before connect.</summary>
+    private string? _ownedLichLaunchKey;
+
     /// <summary>Base name of the recipe script whose completion should auto-stop
     /// the current capture (null for a manual capture, which the user stops).</summary>
     private string? _activeCaptureScript;
@@ -1208,7 +1216,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ConnectCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             var result = await ShowConnectDialog.Handle(Unit.Default);
-            if (result is not null) await ConnectAsync(result.Config, result.Profile);
+            if (result is null) return;
+            // Same teardown as #connect — character change must drop the old
+            // session (and Genie-owned Lich) before the new auto-launch.
+            if (IsConnected) await DisconnectAsync();
+            else _manualDisconnect = true;
+            await ConnectAsync(result.Config, result.Profile);
         });
 
         DisplaySettingsCommand = ReactiveCommand.CreateFromTask(async () =>
@@ -3546,19 +3559,68 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // already listening on the proxy port this attaches without launching, so
         // a manually-started Lich still works. A hard launch failure aborts the
         // connect (a doomed LichProxy connect would only fail with a vaguer error).
+        // lichargs may use {character}/{port} placeholders filled from this connect.
+        // Genie-started Lich is owned (PID tracked) and stopped on disconnect /
+        // character change; an AlreadyRunning attach is never claimed as owned.
         if (coreCfg.Mode == ConnectionMode.LichProxy && _core.Config.LichAutoLaunch)
         {
+            if (!Genie.Core.Connection.LichLauncher.TryExpandArguments(
+                    _core.Config.LichArguments,
+                    coreCfg.CharacterName,
+                    coreCfg.LichProxyPort,
+                    out var lichArgs,
+                    out var expandError))
+            {
+                GameText.AddSystemLine(expandError);
+                return;
+            }
+
+            var launchKey = OwnedLichLaunchKey(coreCfg.CharacterName, coreCfg.LichProxyPort);
+            // Character/port switch: stop the previous Genie-started Lich so the
+            // new --login can bind the proxy port (AlreadyRunning would otherwise
+            // leave us attached to the wrong character).
+            if (_ownedLichProcessId is not null
+                && !string.Equals(_ownedLichLaunchKey, launchKey, StringComparison.OrdinalIgnoreCase))
+                StopOwnedLich();
+
+            // EnsureRunningAsync uses ConfigureAwait(false); marshal progress onto
+            // the UI thread so GameText.Lines isn't mutated during / across a
+            // CollectionChanged (character change races the "disconnected" line).
             var lich = await Genie.Core.Connection.LichLauncher.EnsureRunningAsync(
                 coreCfg.LichProxyHost, coreCfg.LichProxyPort,
-                _core.Config.LichRubyPath, _core.Config.LichPath, _core.Config.LichArguments,
+                _core.Config.LichRubyPath, _core.Config.LichPath, lichArgs,
                 _core.Config.LichStartPause,
-                progress: msg => GameText.AddSystemLine(msg));
+                progress: msg => Avalonia.Threading.Dispatcher.UIThread.Post(
+                    () => GameText.AddSystemLine(msg)));
             GameText.AddSystemLine(lich.Message);
             if (lich.Outcome == Genie.Core.Connection.LichLaunchOutcome.Failed)
                 return;   // don't attempt a connect we know can't reach Lich
+
+            if (lich.Outcome == Genie.Core.Connection.LichLaunchOutcome.Launched
+                && lich.ProcessId is int pid)
+            {
+                _ownedLichProcessId = pid;
+                _ownedLichLaunchKey = launchKey;
+            }
         }
 
         await _core.ConnectAsync(coreCfg, reloadRules: reloadRules, clearPerCharacter: charSwitch);
+    }
+
+    /// <summary>Stable key for the owned auto-launched Lich (character + proxy port).</summary>
+    private static string OwnedLichLaunchKey(string? characterName, int port) =>
+        $"{characterName ?? ""}\0{port}";
+
+    /// <summary>Kill a Lich process Genie auto-launched. No-op when we only attached
+    /// to an already-running Lich (<see cref="_ownedLichProcessId"/> null).</summary>
+    private void StopOwnedLich()
+    {
+        if (_ownedLichProcessId is not int pid) return;
+        _ownedLichProcessId = null;
+        _ownedLichLaunchKey = null;
+        Genie.Core.Connection.LichLauncher.TryStop(pid, out var message);
+        if (!string.IsNullOrEmpty(message))
+            GameText.AddSystemLine(message);
     }
 
     /// <summary>Build the one persistent core + run all once-per-app App wiring the
@@ -4034,6 +4096,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 if (e.Kind == ConnectionEventKind.Disconnected && _reconnectAt is null)
                 {
                     GameText.AddSystemLine(WindowTimestamp.Prefix() + "disconnected");
+
+                    // Final session end (no auto-reconnect): stop a Genie-started
+                    // Lich. Idempotent with DisconnectAsync's StopOwnedLich. Skipped
+                    // while reconnect is armed so a transient drop can reattach.
+                    StopOwnedLich();
 
                     if (Display.ShowDisconnectPopup)
                     {
@@ -4583,6 +4650,11 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // (issue #88). The pump is cheap when no scripts are active.
         if (_core is not null)
             await _core.DisconnectAsync();
+
+        // Manual disconnect ends the Genie-owned Lich session (logout). Kept
+        // AFTER the TCP teardown so the FE detach completes first. Auto-reconnect
+        // paths do not call this method, so a transient drop can reattach.
+        StopOwnedLich();
     }
 
     /// <summary>Heartbeat handler — pumps the script engine so time-based

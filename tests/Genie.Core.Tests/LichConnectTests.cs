@@ -128,6 +128,20 @@ public class LichConnectTests : IDisposable
         Assert.Empty(host.GameCommands);   // never reaches the game
     }
 
+    [Fact]
+    public void LichSettings_mentions_placeholders_when_lichargs_uses_them()
+    {
+        _config.SetSetting("lichargs", "--login {character} --headless {port}", showException: false);
+        var (host, engine) = Make();
+
+        engine.ProcessInput("#ls");
+
+        var dump = string.Join("\n", host.Echoes);
+        Assert.Contains("Placeholders:", dump);
+        Assert.Contains("{character}", dump);
+        Assert.Contains("{port}", dump);
+    }
+
     private sealed class FakeConnectHost : ICommandHost
     {
         public ConnectRequest? LastRequest { get; private set; }
