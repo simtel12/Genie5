@@ -332,11 +332,35 @@ public class GameTextViewModel : ReactiveObject
             presets = presets?.Select(s => s with { Start = s.Start + shift }).ToList();
         }
         Lines.Add(new TextLine(text, color, links, bolds, presets));
-        while (Lines.Count > _maxLines)
-            Lines.RemoveAt(0);
+        TrimScrollback();
         // Only a prompt line arms the dedup; every other line clears it so the
         // next prompt is allowed through (Genie 4 LastRowWasPrompt semantics).
         _lastLineWasPrompt = isPrompt;
+    }
+
+    /// <summary>
+    /// Drop oldest lines when over the scrollback cap. Trimming is deferred when
+    /// a <see cref="ObservableCollection{T}.CollectionChanged"/> is already in
+    /// flight (Avalonia ItemsControl / nested Add) — mutating inside that event
+    /// throws <c>Cannot change ObservableCollection during a CollectionChanged event</c>.
+    /// </summary>
+    private void TrimScrollback()
+    {
+        if (Lines.Count <= _maxLines) return;
+        try
+        {
+            while (Lines.Count > _maxLines)
+                Lines.RemoveAt(0);
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message.Contains("CollectionChanged", StringComparison.Ordinal))
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                while (Lines.Count > _maxLines)
+                    Lines.RemoveAt(0);
+            });
+        }
     }
 
     /// <summary>
@@ -391,8 +415,7 @@ public class GameTextViewModel : ReactiveObject
         if (Settings?.Timestamp == true)              // #90: stamp echoes too
             text = WindowTimestamp.Prefix() + text;
         Lines.Add(new TextLine(text, StreamColor.System, EchoColor: color, Mono: mono));
-        while (Lines.Count > _maxLines)
-            Lines.RemoveAt(0);
+        TrimScrollback();
         _lastLineWasPrompt = false;
     }
 }
