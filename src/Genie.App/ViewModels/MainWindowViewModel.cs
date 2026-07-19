@@ -3583,24 +3583,50 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 && !string.Equals(_ownedLichLaunchKey, launchKey, StringComparison.OrdinalIgnoreCase))
                 StopOwnedLich();
 
-            // EnsureRunningAsync uses ConfigureAwait(false); marshal progress onto
-            // the UI thread so GameText.Lines isn't mutated during / across a
-            // CollectionChanged (character change races the "disconnected" line).
-            var lich = await Genie.Core.Connection.LichLauncher.EnsureRunningAsync(
-                coreCfg.LichProxyHost, coreCfg.LichProxyPort,
-                _core.Config.LichRubyPath, _core.Config.LichPath, lichArgs,
-                _core.Config.LichStartPause,
-                progress: msg => Avalonia.Threading.Dispatcher.UIThread.Post(
-                    () => GameText.AddSystemLine(msg)));
-            GameText.AddSystemLine(lich.Message);
-            if (lich.Outcome == Genie.Core.Connection.LichLaunchOutcome.Failed)
-                return;   // don't attempt a connect we know can't reach Lich
-
-            if (lich.Outcome == Genie.Core.Connection.LichLaunchOutcome.Launched
-                && lich.ProcessId is int pid)
+            // Same character/port reconnect while we still own a live Lich: attach
+            // only. Calling EnsureRunningAsync here could launch a *second* Lich if
+            // the FE port is briefly not listening (Lich recreates the listener
+            // after an FE drop) and then overwrite ownership with the new PID.
+            if (_ownedLichProcessId is int ownedPid
+                && string.Equals(_ownedLichLaunchKey, launchKey, StringComparison.OrdinalIgnoreCase)
+                && Genie.Core.Connection.LichLauncher.TryIsProcessAlive(ownedPid))
             {
-                _ownedLichProcessId = pid;
-                _ownedLichLaunchKey = launchKey;
+                GameText.AddSystemLine(
+                    $"[lich] reattaching to owned process {ownedPid} on {coreCfg.LichProxyHost}:{coreCfg.LichProxyPort}.");
+            }
+            else
+            {
+                // Owned PID gone (crash / external kill) — drop the stale claim so a
+                // fresh Launched outcome can take ownership again.
+                if (_ownedLichProcessId is int stalePid
+                    && !Genie.Core.Connection.LichLauncher.TryIsProcessAlive(stalePid))
+                {
+                    _ownedLichProcessId = null;
+                    _ownedLichLaunchKey = null;
+                }
+
+                // EnsureRunningAsync uses ConfigureAwait(false); marshal progress onto
+                // the UI thread so GameText.Lines isn't mutated during / across a
+                // CollectionChanged (character change races the "disconnected" line).
+                var lich = await Genie.Core.Connection.LichLauncher.EnsureRunningAsync(
+                    coreCfg.LichProxyHost, coreCfg.LichProxyPort,
+                    _core.Config.LichRubyPath, _core.Config.LichPath, lichArgs,
+                    _core.Config.LichStartPause,
+                    progress: msg => Avalonia.Threading.Dispatcher.UIThread.Post(
+                        () => GameText.AddSystemLine(msg)));
+                GameText.AddSystemLine(lich.Message);
+                if (lich.Outcome == Genie.Core.Connection.LichLaunchOutcome.Failed)
+                    return;   // don't attempt a connect we know can't reach Lich
+
+                // Only claim ownership on a fresh launch, and never overwrite an
+                // existing owned PID (AlreadyRunning must not become "ours").
+                if (lich.Outcome == Genie.Core.Connection.LichLaunchOutcome.Launched
+                    && lich.ProcessId is int pid
+                    && _ownedLichProcessId is null)
+                {
+                    _ownedLichProcessId = pid;
+                    _ownedLichLaunchKey = launchKey;
+                }
             }
         }
 
