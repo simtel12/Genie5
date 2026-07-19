@@ -133,6 +133,10 @@ public static class LichLauncher
                 $"[lich] Ruby not found at '{rubyPath}'. Fix #config lichruby, or clear it to use Ruby from PATH.");
 
         // 3. Launch ruby <lichPath> <arguments> and keep the PID for ownership.
+        //    Progress is best-effort and must NEVER abort the launch — callers often
+        //    push lines into a UI ObservableCollection, and this method uses
+        //    ConfigureAwait(false), so progress may run off the UI thread and race
+        //    CollectionChanged (character change: "disconnected" + relaunch).
         int pid;
         try
         {
@@ -147,7 +151,6 @@ public static class LichLauncher
             foreach (var a in SplitArguments(arguments))
                 psi.ArgumentList.Add(a);
 
-            progress?.Invoke($"[lich] starting: {ruby} {lichPath} {arguments}".TrimEnd());
             using var proc = Process.Start(psi);
             if (proc is null)
                 return new(LichLaunchOutcome.Failed, "[lich] failed to start the Lich process.");
@@ -157,6 +160,8 @@ public static class LichLauncher
         {
             return new(LichLaunchOutcome.Failed, $"[lich] failed to start Lich: {ex.Message}");
         }
+
+        ReportProgress(progress, $"[lich] starting: {ruby} {lichPath} {arguments}".TrimEnd());
 
         // 4. Poll the proxy port until it opens or the start-pause elapses.
         //    If we never see the port, kill the orphan we just started.
@@ -170,7 +175,7 @@ public static class LichLauncher
             }
             if (await IsPortOpenAsync(host, port, TimeSpan.FromMilliseconds(800), ct).ConfigureAwait(false))
                 return new(LichLaunchOutcome.Launched, $"[lich] up on {host}:{port}.", pid);
-            progress?.Invoke($"[lich] waiting for Lich… ({i + 1}/{pause}s)");
+            ReportProgress(progress, $"[lich] waiting for Lich… ({i + 1}/{pause}s)");
             try { await Task.Delay(1000, ct).ConfigureAwait(false); }
             catch (OperationCanceledException)
             {
@@ -231,6 +236,15 @@ public static class LichLauncher
             message = $"[lich] failed to stop process {processId}: {ex.Message}";
             return false;
         }
+    }
+
+    /// <summary>Invoke <paramref name="progress"/> without letting UI/logging
+    /// failures fail the launch. See <see cref="EnsureRunningAsync"/>.</summary>
+    private static void ReportProgress(Action<string>? progress, string message)
+    {
+        if (progress is null) return;
+        try { progress(message); }
+        catch { /* best-effort */ }
     }
 
     /// <summary>Ruby executable name when none is configured — resolved off PATH

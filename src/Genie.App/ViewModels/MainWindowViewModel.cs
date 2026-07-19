@@ -1216,7 +1216,12 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ConnectCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             var result = await ShowConnectDialog.Handle(Unit.Default);
-            if (result is not null) await ConnectAsync(result.Config, result.Profile);
+            if (result is null) return;
+            // Same teardown as #connect — character change must drop the old
+            // session (and Genie-owned Lich) before the new auto-launch.
+            if (IsConnected) await DisconnectAsync();
+            else _manualDisconnect = true;
+            await ConnectAsync(result.Config, result.Profile);
         });
 
         DisplaySettingsCommand = ReactiveCommand.CreateFromTask(async () =>
@@ -3578,11 +3583,15 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 && !string.Equals(_ownedLichLaunchKey, launchKey, StringComparison.OrdinalIgnoreCase))
                 StopOwnedLich();
 
+            // EnsureRunningAsync uses ConfigureAwait(false); marshal progress onto
+            // the UI thread so GameText.Lines isn't mutated during / across a
+            // CollectionChanged (character change races the "disconnected" line).
             var lich = await Genie.Core.Connection.LichLauncher.EnsureRunningAsync(
                 coreCfg.LichProxyHost, coreCfg.LichProxyPort,
                 _core.Config.LichRubyPath, _core.Config.LichPath, lichArgs,
                 _core.Config.LichStartPause,
-                progress: msg => GameText.AddSystemLine(msg));
+                progress: msg => Avalonia.Threading.Dispatcher.UIThread.Post(
+                    () => GameText.AddSystemLine(msg)));
             GameText.AddSystemLine(lich.Message);
             if (lich.Outcome == Genie.Core.Connection.LichLaunchOutcome.Failed)
                 return;   // don't attempt a connect we know can't reach Lich
