@@ -3546,11 +3546,23 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         // already listening on the proxy port this attaches without launching, so
         // a manually-started Lich still works. A hard launch failure aborts the
         // connect (a doomed LichProxy connect would only fail with a vaguer error).
+        // lichargs may use {character}/{port} placeholders filled from this connect.
         if (coreCfg.Mode == ConnectionMode.LichProxy && _core.Config.LichAutoLaunch)
         {
+            if (!Genie.Core.Connection.LichLauncher.TryExpandArguments(
+                    _core.Config.LichArguments,
+                    coreCfg.CharacterName,
+                    coreCfg.LichProxyPort,
+                    out var lichArgs,
+                    out var expandError))
+            {
+                GameText.AddSystemLine(expandError);
+                return;
+            }
+
             var lich = await Genie.Core.Connection.LichLauncher.EnsureRunningAsync(
                 coreCfg.LichProxyHost, coreCfg.LichProxyPort,
-                _core.Config.LichRubyPath, _core.Config.LichPath, _core.Config.LichArguments,
+                _core.Config.LichRubyPath, _core.Config.LichPath, lichArgs,
                 _core.Config.LichStartPause,
                 progress: msg => GameText.AddSystemLine(msg));
             GameText.AddSystemLine(lich.Message);

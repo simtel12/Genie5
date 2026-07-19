@@ -725,6 +725,9 @@ public sealed class CommandEngine
                 _host.Echo($"Lich Path:\t {(_config.LichPath.Length == 0 ? "(not set)" : _config.LichPath)}");
                 _host.Echo($"Lich Args:\t {(_config.LichArguments.Length == 0 ? "(none)" : _config.LichArguments)}");
                 _host.Echo($"Start Pause:\t {_config.LichStartPause}s");
+                if (_config.LichArguments.Contains("{character}", StringComparison.OrdinalIgnoreCase)
+                    || _config.LichArguments.Contains("{port}", StringComparison.OrdinalIgnoreCase))
+                    _host.Echo("Placeholders:\t {character} and {port} expand from the Lich-proxy Character / port at connect.");
                 if (!_config.LichAutoLaunch)
                     _host.Echo("Auto-launch is off — #lc / #lichconnect attach to an already-running Lich. " +
                                "Set #config lichpath {path} and #config lichautolaunch on to have Genie start it.");

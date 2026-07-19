@@ -35,6 +35,15 @@ You can mix them: a Lich script can be doing one thing while a Genie `.cmd` scri
 ## Notes & current limits
 
 - **Lich launch: manual by default, auto-launch opt-in.** Out of the box, start Lich first, then connect Genie to it. If you'd rather Genie start Lich for you, turn on auto-launch: set `#config lichpath {path-to-lich.rbw}` and `#config lichautolaunch on`, and Genie will launch Lich before a Lich-proxy connect (it's idempotent — if Lich is already up, Genie just connects). Genie 4's `#lc` / `#lconnect` shortcuts work too, and `#ls` dumps the current Lich settings.
+- **Dynamic `lichargs`.** Auto-launch expands `{character}` and `{port}` in `#config lichargs` from the Lich-proxy profile's Character field and proxy port at connect time. Nested braces are fine (Genie’s `{…}` config grouping allows them):
+
+  ```text
+  #config lichpath {/path/to/lich.rbw}
+  #config lichargs {--login {character} --dragonrealms --genie --headless {port}}
+  #config lichautolaunch on
+  ```
+
+  Switch characters by changing the profile Character (and stopping any already-running Lich on that port). If `{character}` is present but Character is empty, Genie aborts the connect with a clear error.
 - **Policy still applies.** Running behind Lich doesn't change DragonRealms' [Scripting Policy](https://elanthipedia.play.net/Policy:Scripting_policy). The responsiveness expectation in [Policy Compliance](Policy-Compliance) applies to whatever automation you run, in either tool.
 
 ## Related

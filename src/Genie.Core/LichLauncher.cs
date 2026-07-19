@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
 
 namespace Genie.Core.Connection;
 
@@ -41,6 +42,61 @@ public sealed record LichLaunchResult(LichLaunchOutcome Outcome, string Message)
 /// </summary>
 public static class LichLauncher
 {
+    private static readonly Regex CharacterPlaceholder =
+        new(@"\{character\}", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static readonly Regex PortPlaceholder =
+        new(@"\{port\}", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Expands <c>{character}</c> and <c>{port}</c> placeholders in a
+    /// <c>#config lichargs</c> template so auto-launch can take the Character /
+    /// port from the Genie Lich-proxy profile (or Connect dialog) instead of a
+    /// hard-coded <c>--login</c> name.
+    /// </summary>
+    /// <remarks>
+    /// Placeholders are case-insensitive. Static <c>lichargs</c> with no
+    /// placeholders are returned unchanged (Genie 4 parity). If the template
+    /// contains <c>{character}</c> and <paramref name="characterName"/> is
+    /// empty, expansion fails so the caller can abort before launching Lich
+    /// with a broken command line.
+    /// </remarks>
+    /// <param name="template">Raw <see cref="Config.GenieConfig.LichArguments"/> value.</param>
+    /// <param name="characterName">Profile / Connect-dialog Character field.</param>
+    /// <param name="port">Lich proxy port (<see cref="ConnectionConfig.LichProxyPort"/>).</param>
+    /// <param name="expanded">Resolved argument string on success; empty on failure.</param>
+    /// <param name="error">Human-readable <c>[lich] …</c> message on failure; empty on success.</param>
+    /// <returns><see langword="true"/> when <paramref name="expanded"/> is safe to pass to
+    /// <see cref="EnsureRunningAsync"/>.</returns>
+    public static bool TryExpandArguments(
+        string? template,
+        string? characterName,
+        int port,
+        out string expanded,
+        out string error)
+    {
+        var args = template ?? string.Empty;
+        var needsCharacter = CharacterPlaceholder.IsMatch(args);
+        if (needsCharacter && string.IsNullOrWhiteSpace(characterName))
+        {
+            expanded = string.Empty;
+            error =
+                "[lich] lichargs uses {character} but no Character is set on this Lich-proxy " +
+                "connect. Set Character in the Connect dialog / profile, or replace {character} " +
+                "with a fixed --login name in #config lichargs.";
+            return false;
+        }
+
+        if (needsCharacter)
+            args = CharacterPlaceholder.Replace(args, characterName!.Trim());
+
+        args = PortPlaceholder.Replace(args, port.ToString());
+
+        expanded = args;
+        error = string.Empty;
+        return true;
+    }
+
     public static async Task<LichLaunchResult> EnsureRunningAsync(
         string host,
         int port,
