@@ -20,8 +20,11 @@ public enum LichLaunchOutcome
     Failed,
 }
 
-/// <summary>Outcome + a human-readable message for the game window.</summary>
-public sealed record LichLaunchResult(LichLaunchOutcome Outcome, string Message);
+/// <summary>Outcome + a human-readable message for the game window.
+/// <see cref="ProcessId"/> is set only when <see cref="Outcome"/> is
+/// <see cref="LichLaunchOutcome.Launched"/> — the caller owns that process and
+/// should stop it on disconnect / character change via <see cref="LichLauncher.TryStop"/>.</summary>
+public sealed record LichLaunchResult(LichLaunchOutcome Outcome, string Message, int? ProcessId = null);
 
 /// <summary>
 /// Cross-platform "start Lich for me" helper backing the Genie 4 <c>#lc</c> /
@@ -34,7 +37,10 @@ public sealed record LichLaunchResult(LichLaunchOutcome Outcome, string Message)
 ///   <item>launches <c>ruby</c> directly (no <c>cmd.exe</c>), so it works the same
 ///     on Windows, macOS and Linux;</item>
 ///   <item><b>polls</b> the port and returns as soon as Lich is up, using the
-///     start-pause only as an upper bound.</item>
+///     start-pause only as an upper bound;</item>
+///   <item>returns the launched process id so the App can stop <b>only</b> a
+///     Genie-started Lich on disconnect / character change (never a manually
+///     started one that was merely attached to).</item>
 /// </list>
 /// Pure Core code (no UI dependency); the App calls it from its connect path when
 /// <see cref="Config.GenieConfig.LichAutoLaunch"/> is on and the mode is
@@ -109,7 +115,7 @@ public static class LichLauncher
     {
         // 1. Already listening? Attach — never double-launch. This preserves the
         //    long-standing "start Lich yourself, then #lichconnect" workflow even
-        //    with auto-launch turned on.
+        //    with auto-launch turned on. No ProcessId: caller must not claim ownership.
         if (await IsPortOpenAsync(host, port, TimeSpan.FromMilliseconds(600), ct).ConfigureAwait(false))
             return new(LichLaunchOutcome.AlreadyRunning,
                 $"[lich] already listening on {host}:{port} — attaching.");
@@ -126,7 +132,8 @@ public static class LichLauncher
             return new(LichLaunchOutcome.Failed,
                 $"[lich] Ruby not found at '{rubyPath}'. Fix #config lichruby, or clear it to use Ruby from PATH.");
 
-        // 3. Launch ruby <lichPath> <arguments>.
+        // 3. Launch ruby <lichPath> <arguments> and keep the PID for ownership.
+        int pid;
         try
         {
             var psi = new ProcessStartInfo
@@ -144,6 +151,7 @@ public static class LichLauncher
             using var proc = Process.Start(psi);
             if (proc is null)
                 return new(LichLaunchOutcome.Failed, "[lich] failed to start the Lich process.");
+            pid = proc.Id;
         }
         catch (Exception ex)
         {
@@ -151,21 +159,78 @@ public static class LichLauncher
         }
 
         // 4. Poll the proxy port until it opens or the start-pause elapses.
+        //    If we never see the port, kill the orphan we just started.
         var pause = Math.Clamp(startPauseSeconds, 1, 120);
         for (var i = 0; i < pause; i++)
         {
             if (ct.IsCancellationRequested)
+            {
+                TryStop(pid, out _);
                 return new(LichLaunchOutcome.Failed, "[lich] launch cancelled.");
+            }
             if (await IsPortOpenAsync(host, port, TimeSpan.FromMilliseconds(800), ct).ConfigureAwait(false))
-                return new(LichLaunchOutcome.Launched, $"[lich] up on {host}:{port}.");
+                return new(LichLaunchOutcome.Launched, $"[lich] up on {host}:{port}.", pid);
             progress?.Invoke($"[lich] waiting for Lich… ({i + 1}/{pause}s)");
             try { await Task.Delay(1000, ct).ConfigureAwait(false); }
-            catch (OperationCanceledException) { return new(LichLaunchOutcome.Failed, "[lich] launch cancelled."); }
+            catch (OperationCanceledException)
+            {
+                TryStop(pid, out _);
+                return new(LichLaunchOutcome.Failed, "[lich] launch cancelled.");
+            }
         }
 
+        TryStop(pid, out _);
         return new(LichLaunchOutcome.Failed,
             $"[lich] Lich did not open {host}:{port} within {pause}s. " +
             "Increase #config lichstartpause, or check Lich's own window for errors.");
+    }
+
+    /// <summary>
+    /// Stops a process Genie previously auto-launched. Safe if the PID is already
+    /// gone (treated as success). Uses the entire process tree so a <c>ruby</c>
+    /// wrapper and its Lich children both exit.
+    /// </summary>
+    /// <param name="processId">PID from <see cref="LichLaunchResult.ProcessId"/>.</param>
+    /// <param name="message"><c>[lich] …</c> status line for the game window.</param>
+    /// <returns><see langword="true"/> when the process is gone (killed or already exited);
+    /// <see langword="false"/> only when a kill attempt threw.</returns>
+    public static bool TryStop(int processId, out string message)
+    {
+        if (processId <= 0)
+        {
+            message = string.Empty;
+            return false;
+        }
+
+        try
+        {
+            Process proc;
+            try { proc = Process.GetProcessById(processId); }
+            catch (ArgumentException)
+            {
+                message = $"[lich] auto-launched process {processId} already exited.";
+                return true;
+            }
+
+            using (proc)
+            {
+                if (proc.HasExited)
+                {
+                    message = $"[lich] auto-launched process {processId} already exited.";
+                    return true;
+                }
+
+                proc.Kill(entireProcessTree: true);
+                proc.WaitForExit(5_000);
+                message = $"[lich] stopped auto-launched process {processId}.";
+                return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"[lich] failed to stop process {processId}: {ex.Message}";
+            return false;
+        }
     }
 
     /// <summary>Ruby executable name when none is configured — resolved off PATH
