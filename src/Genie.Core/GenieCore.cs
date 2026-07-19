@@ -1141,8 +1141,8 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
         // parser's one-shot captures, then reconstruct both — `look` re-emits
         // the room as display text (folded into synthetic components while the
         // seed is armed), and the `,eq` ident query asks Lich itself for the
-        // bare character name (`info` can't be used: its Name field embeds
-        // optional pre-titles and surname).
+        // bare character name once XMLData.name is populated (`info` can't be
+        // used: its Name field embeds optional pre-titles and surname).
         if (lichAttachParser is not null)
         {
             lichAttachParser.BeginRoomSeedCapture();
@@ -1168,8 +1168,14 @@ public sealed class GenieCore : IAsyncDisposable, ICommandHost, Genie.Plugins.IP
             if (_connection is null) return;
             await _connection.SendCommandAsync("look").ConfigureAwait(false);
             if (lichAttach)
-                await _connection.SendCommandAsync(",eq respond \"GENIE5-IDENT \" + XMLData.name")
-                                 .ConfigureAwait(false);
+                // XMLData.name is often still nil for a beat after FE attach (fresh
+                // Lich launch / before game XML fills identity). Bare
+                // `"…" + XMLData.name` raises NilClass#to_str in Lich ExecScript.
+                // Wait briefly (≤3s), then respond only when we have a non-empty name.
+                await _connection.SendCommandAsync(
+                        ",eq 30.times{ break unless XMLData.name.to_s.empty?; sleep 0.1 }; " +
+                        "n=XMLData.name.to_s; respond \"GENIE5-IDENT #{n}\" unless n.empty?")
+                    .ConfigureAwait(false);
 
             // Flag-state probe (issue #29): silently read the DR `flags` verb and
             // warn if any stream-affecting flag is in a state the parser wasn't
