@@ -9,9 +9,14 @@
 
     <!-- Genie.Core is a self-contained Exe, so it can't be a ProjectReference
          (NETSDK1151). Reference the built DLL instead and load it + its deps at
-         runtime via the ModuleInitializer resolver (ModuleInit.cs). Build Core
-         before running these tests. -->
-    <CoreOutDir>$(MSBuildThisFileDirectory)..\..\src\Genie.Core\bin\$(Configuration)\net8.0\win-x64\</CoreOutDir>
+         runtime via the ModuleInitializer resolver (ModuleInit.cs).
+         CoreOutDir follows the host RID (osx-arm64 / win-x64 / linux-x64 / …)
+         so `dotnet test` works on every platform without -p:CoreOutDir=….
+         Override with -p:CoreRid=… or -p:CoreOutDir=… when needed. -->
+    <CoreRid Condition="'$(CoreRid)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</CoreRid>
+    <CoreRid Condition="'$(CoreRid)' == ''">$(NETCoreSdkRuntimeIdentifier)</CoreRid>
+    <CoreOutDir Condition="'$(CoreOutDir)' == ''">$(MSBuildThisFileDirectory)../../src/Genie.Core/bin/$(Configuration)/net8.0/$(CoreRid)/</CoreOutDir>
+    <_GenieCoreProject>$(MSBuildThisFileDirectory)../../src/Genie.Core/Genie.Core.csproj</_GenieCoreProject>
   </PropertyGroup>
 
   <ItemGroup>
@@ -42,5 +47,14 @@
   <ItemGroup>
     <AssemblyMetadata Include="CoreOutDir" Value="$(CoreOutDir)" />
   </ItemGroup>
+
+  <!-- Build Core into the host-RID folder before HintPath resolution so a bare
+       `dotnet test` does not require a separate Core build step. -->
+  <Target Name="EnsureGenieCoreBuilt" BeforeTargets="ResolveAssemblyReferences">
+    <MSBuild
+      Projects="$(_GenieCoreProject)"
+      Targets="Build"
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(CoreRid)" />
+  </Target>
 
 </Project>
