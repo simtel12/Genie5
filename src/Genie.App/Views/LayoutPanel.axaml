@@ -2,11 +2,18 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Genie.App.Views.LayoutPanel">
 
-  <Grid RowDefinitions="180,*" Margin="4">
+  <!-- Top: window list sizes to content (capped) so it doesn't eat a fixed
+       180px; bottom: the settings form lives in a ScrollViewer so its Apply/
+       Reset buttons stay reachable even when the dialog is short or Windows
+       display scaling (125/150%) shrinks the available height (#178 — the
+       buttons were clipped below the fold with the old fixed-height layout,
+       and there was no way to scroll to them). -->
+  <Grid RowDefinitions="Auto,*" Margin="4">
 
-    <!-- Top: window list (compact, ~10 entries fit comfortably in 180px) -->
+    <!-- Window list: ~5–10 entries visible, scrolls internally past that. -->
     <ListBox Name="WindowList"
              Grid.Row="0"
+             MinHeight="96" MaxHeight="180"
              Margin="0,0,0,6"
              SelectionChanged="OnWindowSelected"/>
 
@@ -16,9 +23,12 @@
          neighbouring label. Splitting Font into two rows fixes the overlap
          and gives each field plenty of horizontal room. Foreground +
          Background stay paired on one row because their inputs are narrow
-         (small ColorPicker + checkbox). -->
-    <Grid Grid.Row="1"
-          ColumnDefinitions="Auto,*,Auto,*"
+         (small ColorPicker + checkbox). Wrapped in a ScrollViewer so the
+         Apply/Reset row is never clipped (#178). -->
+    <ScrollViewer Grid.Row="1"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+    <Grid ColumnDefinitions="Auto,*,Auto,*"
           RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
           Margin="0,4,0,0">
 
@@ -84,5 +94,6 @@
                  Foreground="Gray" FontStyle="Italic"/>
 
     </Grid>
+    </ScrollViewer>
   </Grid>
 </UserControl>
