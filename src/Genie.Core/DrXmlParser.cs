@@ -307,8 +307,9 @@ public sealed class DrXmlParser : IDisposable
     }
 
     // ── Lich ident reply (public issue #127) ─────────────────────────────────
-    // GenieCore asks Lich for the bare character name via `,eq respond
-    // "GENIE5-IDENT " + XMLData.name` on attach. The reply is a mono-bracketed
+    // GenieCore asks Lich for the bare character name via `,eq` +
+    // `respond "GENIE5-IDENT #{XMLData.name}"` on attach (nil-safe; waits briefly
+    // if name is not populated yet). The reply is a mono-bracketed
     // marker line; while the window is armed we consume it (never displayed)
     // and emit CharacterNameEvent. One-shot: disarms on match or deadline.
     private DateTimeOffset _identDeadline = DateTimeOffset.MinValue;

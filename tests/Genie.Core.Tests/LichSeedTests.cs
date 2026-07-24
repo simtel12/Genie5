@@ -14,9 +14,8 @@ namespace Genie.Core.Tests;
 /// room components and character identity) never reaches Genie. The parser
 /// reconstructs both: an armed room-seed capture folds the next `look`
 /// response into synthetic room ComponentEvents, and an armed ident window
-/// consumes the `,eq respond "GENIE5-IDENT " + XMLData.name` reply into a
-/// CharacterNameEvent. Raw formats verbatim from live captures
-/// (raw_session_20260521_202149.xml).
+/// consumes the `,eq` / <c>GENIE5-IDENT …</c> reply into a CharacterNameEvent.
+/// Raw formats verbatim from live captures (raw_session_20260521_202149.xml).
 /// </summary>
 public class LichSeedTests
 {
