@@ -25,5 +25,8 @@ public enum ConfigFieldUpdated
     /// <summary>The monster-count ignore list changed (Mobs-panel editor or a
     /// typed <c>#config monstercountignorelist</c>) — GenieCore re-filters
     /// Room.Creatures and the Mobs panel reloads its rows.</summary>
-    MonsterIgnore
+    MonsterIgnore,
+    /// <summary>Connect-debug toggle changed (<c>#config conndebug</c>) — the host
+    /// may start/stop mirroring an owned Lich's <c>temp/debug-*.log</c>.</summary>
+    ConnDebug
 }

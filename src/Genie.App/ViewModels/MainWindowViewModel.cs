@@ -928,9 +928,17 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     /// attached to an already-running Lich (never kill that). Cleared after <see cref="StopOwnedLich"/>.</summary>
     private int? _ownedLichProcessId;
 
+    /// <summary>UTC start time of the owned auto-launched Lich — used to ignore leftover
+    /// <c>temp/debug-*.log</c> files from earlier runs when <c>conndebug</c> mirrors logs.</summary>
+    private DateTime? _ownedLichProcessStartUtc;
+
     /// <summary>Character + port key for the owned auto-launched Lich — used to detect a
     /// character/port switch that needs a stop-then-relaunch before connect.</summary>
     private string? _ownedLichLaunchKey;
+
+    /// <summary>Live-tails the owned Lich's <c>temp/debug-*.log</c> into the game window
+    /// when <c>#config conndebug</c> is on. Null when not tailing.</summary>
+    private Genie.Core.Connection.LichDebugLogTailer? _lichDebugTailer;
 
     /// <summary>Base name of the recipe script whose completion should auto-stop
     /// the current capture (null for a manual capture, which the user stops).</summary>
@@ -3593,6 +3601,7 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             {
                 GameText.AddSystemLine(
                     $"[lich] reattaching to owned process {ownedPid} on {coreCfg.LichProxyHost}:{coreCfg.LichProxyPort}.");
+                SyncOwnedLichDebugTail();
             }
             else
             {
@@ -3601,7 +3610,9 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                 if (_ownedLichProcessId is int stalePid
                     && !Genie.Core.Connection.LichLauncher.TryIsProcessAlive(stalePid))
                 {
+                    StopOwnedLichDebugTail();
                     _ownedLichProcessId = null;
+                    _ownedLichProcessStartUtc = null;
                     _ownedLichLaunchKey = null;
                 }
 
@@ -3625,7 +3636,9 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
                     && _ownedLichProcessId is null)
                 {
                     _ownedLichProcessId = pid;
+                    _ownedLichProcessStartUtc = lich.ProcessStartTimeUtc ?? DateTime.UtcNow;
                     _ownedLichLaunchKey = launchKey;
+                    SyncOwnedLichDebugTail();
                 }
             }
         }
@@ -3642,11 +3655,73 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
     private void StopOwnedLich()
     {
         if (_ownedLichProcessId is not int pid) return;
+        StopOwnedLichDebugTail();
         _ownedLichProcessId = null;
+        _ownedLichProcessStartUtc = null;
         _ownedLichLaunchKey = null;
         Genie.Core.Connection.LichLauncher.TryStop(pid, out var message);
         if (!string.IsNullOrEmpty(message))
             GameText.AddSystemLine(message);
+    }
+
+    /// <summary>
+    /// Start or stop mirroring the owned Lich's <c>temp/debug-*.log</c> based on
+    /// <c>#config conndebug</c> and whether we currently own a Lich process.
+    /// </summary>
+    private void SyncOwnedLichDebugTail()
+    {
+        if (_core is null || !_core.Config.ConnDebug || _ownedLichProcessId is null)
+        {
+            StopOwnedLichDebugTail();
+            return;
+        }
+
+        var notBefore = _ownedLichProcessStartUtc
+                        ?? TryGetProcessStartUtc(_ownedLichProcessId.Value)
+                        ?? DateTime.UtcNow;
+        _ownedLichProcessStartUtc ??= notBefore;
+
+        var tempDir = Genie.Core.Connection.LichDebugLogTailer.ResolveTempDirectory(
+            _core.Config.LichPath, _core.Config.LichArguments);
+        if (string.IsNullOrEmpty(tempDir))
+        {
+            GameText.AddSystemLine("[lich-debug] cannot resolve Lich temp directory (set #config lichpath).");
+            return;
+        }
+
+        if (_lichDebugTailer is not null)
+            return;   // already tailing this owned session
+
+        var tailer = new Genie.Core.Connection.LichDebugLogTailer();
+        _lichDebugTailer = tailer;
+        tailer.Start(
+            tempDir,
+            notBefore,
+            onLine: line => Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => GameText.AddSystemLine($"[lich-debug] {line}")),
+            onFileBound: path => Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => GameText.AddSystemLine($"[lich-debug] tailing {path}")));
+    }
+
+    private void StopOwnedLichDebugTail()
+    {
+        var tailer = _lichDebugTailer;
+        _lichDebugTailer = null;
+        try { tailer?.Dispose(); }
+        catch { /* best-effort */ }
+    }
+
+    private static DateTime? TryGetProcessStartUtc(int processId)
+    {
+        try
+        {
+            using var proc = System.Diagnostics.Process.GetProcessById(processId);
+            return proc.StartTime.ToUniversalTime();
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>Build the one persistent core + run all once-per-app App wiring the
@@ -4010,6 +4085,13 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         {
             if (field == Genie.Core.Config.ConfigFieldUpdated.SizeInputToGame)
                 Avalonia.Threading.Dispatcher.UIThread.Post(SyncAlignInputFromConfig);
+        };
+
+        // Owned-Lich debug-log mirror ⇄ `#config conndebug` (start/stop mid-session).
+        _core.Config.ConfigChanged += field =>
+        {
+            if (field == Genie.Core.Config.ConfigFieldUpdated.ConnDebug)
+                Avalonia.Threading.Dispatcher.UIThread.Post(SyncOwnedLichDebugTail);
         };
 
         // Guild for the title bar — fires when the player runs `info`. DR has

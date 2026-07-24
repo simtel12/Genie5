@@ -85,8 +85,11 @@ plaintext fallback and want to know why, turn on the step-by-step connect trace:
 
 The next connect prints each protocol step (TLS handshake, key exchange, auth,
 character list, game select) with timings straight into the game window, so a
-stall can be pinned to an exact step — ideal to paste into a bug report. It's
-**off by default**; turn it back off with `#config conndebug false`.
+stall can be pinned to an exact step — ideal to paste into a bug report. When
+Genie auto-launches Lich (owns the process), `conndebug` also mirrors that
+session's Lich `temp/debug-*.log` into the game window as `[lich-debug]` lines
+for the whole owned session. It's **off by default**; turn it back off with
+`#config conndebug false`.
 
 ## Related
 

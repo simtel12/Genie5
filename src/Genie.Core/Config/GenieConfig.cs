@@ -146,8 +146,10 @@ public sealed class GenieConfig
 
     /// <summary>When <c>true</c>, the connection sequence emits its granular
     /// per-step SGE protocol marks (<c>→K sent</c>, <c>←32-byte key</c>,
-    /// <c>→auth</c>, TCP/TLS handshake timings…) into the game window. The
-    /// high-level connect status lines show regardless. Default OFF — a normal
+    /// <c>→auth</c>, TCP/TLS handshake timings…) into the game window. When Genie
+    /// also auto-launched (owns) Lich, new lines from that session's
+    /// <c>temp/debug-*.log</c> are mirrored with a <c>[lich-debug]</c> prefix.
+    /// The high-level connect status lines show regardless. Default OFF — a normal
     /// login stays quiet; flip on to capture a full trace when diagnosing a
     /// connection stall (<c>#config conndebug true</c>).</summary>
     public bool ConnDebug { get; set; }
@@ -784,7 +786,7 @@ public sealed class GenieConfig
                 case "flagscheck": FlagsCheck = ToBool(value); break;
                 case "automapper": AutoMapper = ToBool(value); Notify(ConfigFieldUpdated.AutoMapper); break;
                 case "automapperalpha": AutoMapperAlpha = ClampAlpha(value); Notify(ConfigFieldUpdated.AutoMapper); break;
-                case "conndebug": ConnDebug = ToBool(value); break;
+                case "conndebug": ConnDebug = ToBool(value); Notify(ConfigFieldUpdated.ConnDebug); break;
                 case "showlinks": ShowLinks = ToBool(value); break;
                 case "monsterbold": MonsterBold = ToBool(value); break;
                 case "showimages": ShowImages = ToBool(value); Notify(ConfigFieldUpdated.ImagesEnabled); break;
