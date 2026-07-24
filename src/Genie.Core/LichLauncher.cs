@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
 
@@ -116,7 +117,10 @@ public static class LichLauncher
         // 1. Already listening? Attach — never double-launch. This preserves the
         //    long-standing "start Lich yourself, then #lichconnect" workflow even
         //    with auto-launch turned on. No ProcessId: caller must not claim ownership.
-        if (await IsPortOpenAsync(host, port, TimeSpan.FromMilliseconds(600), ct).ConfigureAwait(false))
+        //    Probe via bind (not connect): Lich's detachable FE accepts exactly one
+        //    client then closes the listen socket, so a TCP connect probe steals that
+        //    accept and races the real FE connect (auto-reconnect always failed).
+        if (IsProxyPortInUse(host, port))
             return new(LichLaunchOutcome.AlreadyRunning,
                 $"[lich] already listening on {host}:{port} — attaching.");
 
@@ -173,7 +177,7 @@ public static class LichLauncher
                 TryStop(pid, out _);
                 return new(LichLaunchOutcome.Failed, "[lich] launch cancelled.");
             }
-            if (await IsPortOpenAsync(host, port, TimeSpan.FromMilliseconds(800), ct).ConfigureAwait(false))
+            if (IsProxyPortInUse(host, port))
                 return new(LichLaunchOutcome.Launched, $"[lich] up on {host}:{port}.", pid);
             ReportProgress(progress, $"[lich] waiting for Lich… ({i + 1}/{pause}s)");
             try { await Task.Delay(1000, ct).ConfigureAwait(false); }
@@ -188,6 +192,29 @@ public static class LichLauncher
         return new(LichLaunchOutcome.Failed,
             $"[lich] Lich did not open {host}:{port} within {pause}s. " +
             "Increase #config lichstartpause, or check Lich's own window for errors.");
+    }
+
+    /// <summary>
+    /// True when <paramref name="processId"/> still refers to a live process.
+    /// Used by the App to reattach to a Genie-owned Lich without calling
+    /// <see cref="EnsureRunningAsync"/> (which might launch a second instance).
+    /// </summary>
+    public static bool TryIsProcessAlive(int processId)
+    {
+        if (processId <= 0) return false;
+        try
+        {
+            using var proc = Process.GetProcessById(processId);
+            return !proc.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return false;   // PID unknown / already reaped
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -262,21 +289,72 @@ public static class LichLauncher
             ? Array.Empty<string>()
             : arguments.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
 
-    /// <summary>True if a TCP connection to <paramref name="host"/>:<paramref name="port"/>
-    /// succeeds within <paramref name="timeout"/> — used to detect a listening Lich.</summary>
-    private static async Task<bool> IsPortOpenAsync(string host, int port, TimeSpan timeout, CancellationToken ct)
+    /// <summary>
+    /// True when something is already bound to <paramref name="host"/>:<paramref name="port"/>.
+    /// Uses a bind probe — never a TCP connect — so Lich's single-accept detachable
+    /// FE listener is not consumed. Internal for tests.
+    /// </summary>
+    internal static bool IsProxyPortInUse(string host, int port)
     {
+        if (port is < 1 or > 65535) return false;
+        if (!TryResolveBindAddress(host, out var address)) return false;
+
+        TcpListener? listener = null;
         try
         {
-            using var tcp = new TcpClient();
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(timeout);
-            await tcp.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
-            return tcp.Connected;
+            listener = new TcpListener(address, port);
+            // Prefer exclusive bind so AddressAlreadyInUse means a real occupant
+            // (not a SO_REUSEADDR dual-bind false negative on Windows). Unsupported
+            // on some Unix stacks — ignore and rely on the default bind semantics.
+            try { listener.ExclusiveAddressUse = true; }
+            catch (SocketException) { /* platform default */ }
+            listener.Start();
+            return false;   // we bound → nothing was listening
+        }
+        catch (SocketException ex) when (
+            ex.SocketErrorCode is SocketError.AddressAlreadyInUse
+                                or SocketError.AccessDenied
+                                or SocketError.AddressNotAvailable)
+        {
+            // In use, or we can't bind for the same practical reason (port held).
+            return true;
         }
         catch
         {
-            return false;   // refused / timed out / unreachable → not listening
+            return false;
+        }
+        finally
+        {
+            try { listener?.Stop(); }
+            catch { /* best-effort */ }
+        }
+    }
+
+    /// <summary>Resolve <paramref name="host"/> to a single bindable address
+    /// (prefers loopback literals / first DNS result).</summary>
+    private static bool TryResolveBindAddress(string host, out IPAddress address)
+    {
+        address = IPAddress.None;
+        if (string.IsNullOrWhiteSpace(host)) return false;
+
+        if (IPAddress.TryParse(host.Trim(), out var parsed))
+        {
+            address = parsed;
+            return true;
+        }
+
+        try
+        {
+            var addrs = Dns.GetHostAddresses(host.Trim());
+            if (addrs.Length == 0) return false;
+            // Prefer IPv4 loopback-family results when present — Lich defaults to 127.0.0.1.
+            address = addrs.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork)
+                      ?? addrs[0];
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 }
