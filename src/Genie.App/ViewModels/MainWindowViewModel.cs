@@ -1868,7 +1868,20 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
         ToggleAtmosphericsCommand = MakeToggleCommand("atmospherics", v => AtmosphericsVisible = v);
         ToggleLogCommand      = MakeToggleCommand("log",       v => LogVisible      = v);
         ToggleItemLogCommand  = MakeToggleCommand("itemlog",   v => ItemLogVisible  = v);
-        ToggleScriptsCommand  = MakeToggleCommand("scripts",   v => ScriptsVisible  = v);
+        // Scripts gets its own toggle (not MakeToggleCommand): the panel reads
+        // live off Core (script library scan, running-scripts list, folder
+        // open) but Core itself is built lazily on first connect/command
+        // (EnsureCoreBuilt). Opening the panel before either of those has
+        // happened must not leave it stuck showing an empty library — build
+        // Core first, the same on-demand pattern Genie4ImportCommand uses.
+        ToggleScriptsCommand = ReactiveCommand.Create(() =>
+        {
+            EnsureCoreBuilt(null, eagerLoadOfflineRules: true);
+            if (DockFactory is not GenieDockFactory factory) return;
+            var newVisible = !factory.IsToolVisible("scripts");
+            factory.SetToolVisibility("scripts", newVisible);
+            ScriptsVisible = newVisible;
+        });
         ToggleSceneCommand    = MakeToggleCommand("scene",     v => SceneVisible    = v);
         ToggleMobsCommand     = MakeToggleCommand("mobs",      v => MobsVisible     = v);
         TogglePlayersCommand  = MakeToggleCommand("players",   v => PlayersVisible  = v);
@@ -3420,7 +3433,14 @@ public class MainWindowViewModel : ReactiveObject, IActivatableViewModel
             case "atmospherics": ForceSet(visible, v => AtmosphericsVisible = v, () => AtmosphericsVisible); break;
             case "log":       ForceSet(visible, v => LogVisible      = v, () => LogVisible);      break;
             case "itemlog":   ForceSet(visible, v => ItemLogVisible  = v, () => ItemLogVisible);  break;
-            case "scripts":   ForceSet(visible, v => ScriptsVisible  = v, () => ScriptsVisible);  break;
+            case "scripts":
+                // Dock-driven show (drag the tab back into view, restore a
+                // layout, etc.) bypasses ToggleScriptsCommand — ensure Core
+                // here too so the panel's library/folder-open aren't stuck
+                // waiting on a connect that may never come.
+                if (visible) EnsureCoreBuilt(null, eagerLoadOfflineRules: true);
+                ForceSet(visible, v => ScriptsVisible = v, () => ScriptsVisible);
+                break;
             case "scene":     ForceSet(visible, v => SceneVisible    = v, () => SceneVisible);    break;
             case "mobs":      ForceSet(visible, v => MobsVisible     = v, () => MobsVisible);     break;
             case "players":   ForceSet(visible, v => PlayersVisible  = v, () => PlayersVisible);  break;
